@@ -63,6 +63,7 @@ bda-2/
 │   └── ghrec/                      # 추천
 │       ├── recommend.py            # popularity scoring, top-N
 │       ├── evaluate.py             # NDCG, precision@K, diversity
+│       ├── inference.py            # 추천 inference + 병렬 평가
 │       └── metadata.py             # GitHub REST API + SQLite 캐시
 ├── notebooks/
 │   ├── gharchive/                  # 데이터 핸들링 노트북
@@ -71,7 +72,9 @@ bda-2/
 │   └── ghrec/                      # 추천 노트북
 │       ├── 01_most_popular.ipynb
 │       ├── 02_popularity_prediction.ipynb
-│       └── 03_repo_metadata.ipynb
+│       ├── 03_repo_metadata.ipynb
+│       ├── 04_user_item_matrix.ipynb
+│       └── 05_als_vs_popularity.ipynb
 └── data/                           # gitignore 대상
     ├── daily_agg/                  # 추출된 parquet 파일
     └── repo_metadata.db            # GitHub 메타데이터 SQLite 캐시
@@ -127,6 +130,8 @@ uv run jupyter lab
 1. **01_most_popular** — Star 기준 vs 가중 점수 기준 Top-N 비교
 2. **02_popularity_prediction** — 3주 train / 1주 test split, K별 평가 (NDCG, Precision@K)
 3. **03_repo_metadata** — GitHub REST API로 메타데이터 수집, SQLite 캐싱, 예측 결과 해석
+4. **04_user_item_matrix** — Feedback → User×Item matrix, Dense vs Sparse 메모리 비교
+5. **05_als_vs_popularity** — ALS 행렬분해 vs Popularity baseline 성능 비교 (멀티프로세싱 평가)
 
 ## 주요 의존성
 
@@ -136,6 +141,8 @@ uv run jupyter lab
 | pyarrow | Parquet 읽기/쓰기 |
 | pandas | 데이터 처리 |
 | requests | GitHub REST API 호출 |
+| scipy | Sparse matrix |
+| implicit | ALS 행렬분해 |
 | matplotlib | 시각화 |
 | tqdm | 진행률 표시 |
 | ipykernel | Jupyter 커널 |

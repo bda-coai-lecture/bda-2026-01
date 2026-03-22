@@ -8,12 +8,14 @@ dependencies = [
     "db-dtypes>=1.4.4",
     "google-cloud-bigquery>=3.40.1",
     "google-cloud-bigquery-storage>=2.36.2",
+    "implicit>=0.7.2",
     "ipykernel>=7.2.0",
     "matplotlib>=3.10.8",
     "nbconvert>=7.17.0",
     "pandas>=3.0.1",
     "pyarrow>=23.0.1",
     "requests>=2.32.5",
+    "scipy>=1.17.1",
     "tqdm>=4.67.3",
 ]
 
