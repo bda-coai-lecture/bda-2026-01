@@ -1,12 +1,11 @@
-# BDA 2기 — GitHub Archive 분석
+# BDA 2기 — GitHub 추천 시스템
 
-GitHub Archive(BigQuery) 데이터를 일별 집계로 추출하고, popularity 기반 추천 baseline을 구축하는 실습 프로젝트.
+GitHub Archive(BigQuery) 데이터를 활용한 **repo 추천 시스템** 구축 프로젝트.  
+데이터 추출 → EDA → Popularity baseline → 행렬분해(ALS) → Two-Stage(ALS+LGBM) → Two-Tower(Neural) → FAISS 서빙 → Streamlit 대시보드까지 full pipeline을 다룹니다.
 
 ## 환경 설정
 
 ### 1. uv 설치
-
-[uv](https://docs.astral.sh/uv/)는 Python 패키지/프로젝트 매니저입니다.
 
 ```bash
 # macOS / Linux
@@ -20,12 +19,8 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ```bash
 git clone <repo-url> && cd bda-2
-
-# 의존성 설치 (Python 3.13 + venv 자동 생성)
 uv sync
 ```
-
-`uv sync` 한 번이면 끝입니다. `uv.lock`이 있으므로 모든 사람이 동일한 버전으로 설치됩니다.
 
 ### 3. GCP 서비스 계정 키
 
@@ -33,7 +28,7 @@ BigQuery 쿼리를 위해 GCP 서비스 계정 키(JSON)가 필요합니다.
 
 1. [GCP Console](https://console.cloud.google.com/) → IAM → 서비스 계정 → 키 생성
 2. 필요 권한: `BigQuery Job User` + `BigQuery Data Viewer`
-3. 환경변수 `GCP_KEY_PATH`에 키 파일 경로를 설정하거나, 노트북과 같은 디렉토리에 `gcp-key.json`으로 저장
+3. 프로젝트 루트에 `gcp-key.json`으로 저장하거나 환경변수 설정:
 
 ```bash
 export GCP_KEY_PATH="/path/to/your/gcp-key.json"
@@ -41,13 +36,11 @@ export GCP_KEY_PATH="/path/to/your/gcp-key.json"
 
 ### 4. GitHub 토큰 (선택)
 
-repo 메타데이터 수집 시 GitHub REST API를 사용합니다. `gh` CLI가 로그인되어 있으면 자동으로 토큰을 가져옵니다.
+repo 메타데이터 수집 시 GitHub REST API를 사용합니다.
 
 ```bash
 gh auth login
 ```
-
-토큰 없이도 동작하지만, rate limit이 60회/시간으로 제한됩니다 (토큰 있으면 5,000회/시간).
 
 ## 프로젝트 구조
 
@@ -55,94 +48,137 @@ gh auth login
 bda-2/
 ├── pyproject.toml
 ├── uv.lock
+├── app_reco.py                     # Streamlit 정성평가 대시보드
 ├── src/
 │   ├── gharchive/                  # 데이터 핸들링
 │   │   ├── client.py               # BigQuery 클라이언트 + 로거
 │   │   ├── extract.py              # 일별 집계 추출
+│   │   ├── loader.py               # Parquet 로더
 │   │   └── transform.py            # 타입 최적화
 │   └── ghrec/                      # 추천
 │       ├── recommend.py            # popularity scoring, top-N
 │       ├── evaluate.py             # NDCG, precision@K, diversity
 │       ├── inference.py            # 추천 inference + 병렬 평가
 │       └── metadata.py             # GitHub REST API + SQLite 캐시
+├── scripts/
+│   ├── eval_full.py                # 전체 데이터 평가 (ALS vs Two-Stage)
+│   └── train_two_tower.py          # Two-Tower 학습 + ALS 비교
 ├── notebooks/
-│   ├── gharchive/                  # 데이터 핸들링 노트북
-│   │   ├── 01_extract_daily_agg.ipynb
-│   │   └── 02_storage_formats.ipynb
-│   └── ghrec/                      # 추천 노트북
-│       ├── 01_most_popular.ipynb
-│       ├── 02_popularity_prediction.ipynb
-│       ├── 03_repo_metadata.ipynb
-│       ├── 04_user_item_matrix.ipynb
-│       └── 05_als_vs_popularity.ipynb
+│   ├── gharchive/                  # 데이터 파이프라인
+│   └── ghrec/                      # 추천 모델
 └── data/                           # gitignore 대상
-    ├── daily_agg/                  # 추출된 parquet 파일
-    └── repo_metadata.db            # GitHub 메타데이터 SQLite 캐시
+    ├── daily_agg/                  # 추출된 parquet (20260215~20260403)
+    ├── repo_metadata.db            # GitHub 메타데이터 SQLite 캐시
+    └── models/                     # 학습된 모델 아티팩트
+```
+
+## 노트북
+
+### gharchive (데이터 파이프라인)
+
+| # | 노트북 | 내용 |
+|---|---|---|
+| 00 | setup | BigQuery 클라이언트 설정 |
+| 01 | extract_daily_agg | dry run 비용 확인 → 28일분 parquet 추출 |
+| 02 | storage_formats | JSON/CSV/Parquet 포맷 비교 벤치마크 |
+| 03 | dau | DAU 트렌드 분석 |
+| 04 | extract_week5 | 5주차 데이터 추가 추출 (3/15~3/21) |
+| 05 | retention_activity | Weekly retention + 유저 활동성 분석 |
+| 06 | activity_deep_dive | 활동 패턴 심층 분석 |
+| 07 | data_quality | 데이터 건전성 검증 |
+
+### ghrec (추천 시스템)
+
+| # | 노트북 | 내용 | 핵심 결과 |
+|---|---|---|---|
+| 00 | eda | GitHub Archive EDA | |
+| 01 | most_popular | Star vs 가중점수 Top-N | |
+| 02 | popularity_prediction | 3주 train/1주 test 평가 | NDCG, Precision@K |
+| 03 | repo_metadata | GitHub REST API 메타 수집 | SQLite 캐싱 |
+| 04 | user_item_matrix | Sparse matrix 구축 | Dense vs Sparse 비교 |
+| 05 | als_vs_popularity | ALS 행렬분해 vs Popularity | ALS 68x 더 다양한 추천 |
+| 06 | embedding_exploration | ALS/BPR 임베딩 탐색, 케이스 스터디 | 유사 repo, t-SNE |
+| **07** | **two_stage** | **ALS retrieval + LGBM ranking** | **NDCG@10 +28% vs ALS** |
+| **08** | **faiss_benchmark** | **FAISS ANN 벤치마크** | **54ms → 3ms (17x)** |
+| **09** | **two_tower** | **Two-Tower (PyTorch) vs ALS** | **NDCG@50 2.7x vs ALS** |
+
+## Two-Stage 추천 구조
+
+```
+유저 → [ALS Retrieval] → 후보 400개 → [LGBM Ranking] → Top-K 추천
+              │                              │
+        collaborative signal           + metadata features
+        (행렬분해 임베딩)              (stars, forks, language,
+                                       popularity, user activity)
+```
+
+### 전체 데이터 평가 (436K users, n=400)
+
+| Model | K=10 NDCG | K=50 NDCG | K=100 NDCG |
+|---|---|---|---|
+| Popularity | 0.00016 | 0.00042 | 0.00084 |
+| ALS | 0.00117 | 0.00164 | 0.00178 |
+| **Two-Stage** | **0.00150** | **0.00206** | **0.00220** |
+
+### Retrieval 모델 비교 (5% sample)
+
+| Model | K=50 NDCG | 특징 |
+|---|---|---|
+| ALS | 0.00013 | interaction only |
+| **Two-Tower** | **0.00035** | + language, stars, forks |
+
+### FAISS 서빙 속도
+
+| Method | Latency | Recall@200 |
+|---|---|---|
+| Brute-force (sklearn) | 54ms | 100% |
+| **FAISS FlatIP** | **3ms** | **100%** |
+
+## Streamlit 대시보드
+
+Repo-to-Repo 추천 정성 평가 도구.
+
+```bash
+uv run streamlit run app_reco.py
+```
+
+- repo 이름 검색 (stars 순 정렬) 또는 ID 직접 입력
+- Two-Stage (ALS → LGBM) / ALS Only 추천 방식 선택
+- GitHub API → SQLite 자동 캐싱으로 메타데이터 표시
+- FAISS FlatIP으로 3ms 검색
+
+## 스크립트
+
+```bash
+# 전체 데이터 평가 (ALS vs Two-Stage, ~53분)
+uv run python scripts/eval_full.py
+
+# Two-Tower 학습 + ALS 비교 (~13분)
+OMP_NUM_THREADS=1 uv run python scripts/train_two_tower.py
 ```
 
 ## 데이터
 
 | 파일 | 설명 |
 |---|---|
-| `data/daily_agg/*.parquet` | BigQuery에서 추출한 일별 집계 (actor_id, repo_id, type, cnt) |
-| `data/repo_metadata.db` | GitHub REST API 응답을 캐싱한 SQLite DB |
-
-두 파일 모두 `data/` 아래라 git에 포함되지 않습니다. 노트북을 순서대로 실행하면 자동 생성됩니다.
-
-### repo_metadata.db 스키마
-
-```sql
-CREATE TABLE repo_metadata (
-    repo_id       INTEGER PRIMARY KEY,
-    repo_name     TEXT NOT NULL,
-    description   TEXT,
-    language      TEXT,
-    stargazers    INTEGER,
-    forks         INTEGER,
-    topics        TEXT,           -- JSON array string
-    license_key   TEXT,
-    created_at    TEXT,
-    updated_at    TEXT,
-    archived      INTEGER DEFAULT 0,
-    fetched_at    TEXT NOT NULL,
-    http_status   INTEGER DEFAULT 200
-);
-```
-
-한 번 수집한 repo는 SQLite에 캐싱되어 재호출하지 않습니다.
-
-## 노트북 실행
-
-```bash
-# Jupyter 실행 (uv 가상환경 내에서)
-uv run jupyter lab
-
-# 또는 VS Code에서 .ipynb 직접 열기 (커널: .venv/bin/python 선택)
-```
-
-### gharchive (데이터 핸들링)
-
-1. **01_extract_daily_agg** — dry run으로 비용 확인 → 28일분 데이터 parquet 저장
-2. **02_storage_formats** — JSON/CSV/Parquet 포맷 비교 + dtype별 크기/속도 벤치마크
-
-### ghrec (추천)
-
-1. **01_most_popular** — Star 기준 vs 가중 점수 기준 Top-N 비교
-2. **02_popularity_prediction** — 3주 train / 1주 test split, K별 평가 (NDCG, Precision@K)
-3. **03_repo_metadata** — GitHub REST API로 메타데이터 수집, SQLite 캐싱, 예측 결과 해석
-4. **04_user_item_matrix** — Feedback → User×Item matrix, Dense vs Sparse 메모리 비교
-5. **05_als_vs_popularity** — ALS 행렬분해 vs Popularity baseline 성능 비교 (멀티프로세싱 평가)
+| `data/daily_agg/*.parquet` | BigQuery 일별 집계 (20260215~20260403, 48일) |
+| `data/repo_metadata.db` | GitHub 메타데이터 SQLite 캐시 |
+| `data/models/als_twostage.pkl` | ALS 모델 (64 factors) |
+| `data/models/lgbm_ranker.txt` | LGBM LambdaRank ranker |
+| `data/models/two_tower.pt` | Two-Tower PyTorch 모델 |
+| `data/models/index_mappings.pkl` | user/item index 매핑 |
+| `data/models/repo_name_map.pkl` | repo_id → repo_name (11.8M) |
 
 ## 주요 의존성
 
 | 패키지 | 용도 |
 |---|---|
-| google-cloud-bigquery | BigQuery 쿼리 실행 |
-| pyarrow | Parquet 읽기/쓰기 |
-| pandas | 데이터 처리 |
-| requests | GitHub REST API 호출 |
-| scipy | Sparse matrix |
-| implicit | ALS 행렬분해 |
+| google-cloud-bigquery | BigQuery 쿼리 |
+| pandas, pyarrow | 데이터 처리 |
+| implicit | ALS/BPR 행렬분해 |
+| lightgbm | LambdaRank ranking |
+| torch | Two-Tower 모델 |
+| faiss-cpu | ANN 검색 |
+| scikit-learn | 평가 메트릭 |
+| streamlit | 대시보드 |
 | matplotlib | 시각화 |
-| tqdm | 진행률 표시 |
-| ipykernel | Jupyter 커널 |
