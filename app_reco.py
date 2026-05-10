@@ -383,7 +383,7 @@ if query_repo_id is not None:
                 "Score": f"{score:.4f}",
                 "Stars": f"{rmeta['stargazers']:,}" if isinstance(rmeta.get("stargazers"), (int, float)) else "-",
                 "Language": rmeta.get("language", "-"),
-                "Description": (rmeta.get("description") or "-")[:80],
+                "Description": (str(rmeta.get("description") or "-"))[:80],
                 "추천 이유": reason,
                 "Link": f"https://github.com/{rname}",
                 "repo_id": rid,

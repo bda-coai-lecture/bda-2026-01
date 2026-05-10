@@ -32,6 +32,7 @@ from tqdm import tqdm
 
 from gharchive.loader import load_period
 DATA_DIR = Path("data/daily_agg")
+MART_DIR = Path("data/marts/week6")
 MODEL_DIR = Path("data/models/week6")
 DB_PATH = Path("data/repo_metadata.db")
 DEFAULT_RELATED_PATH = MODEL_DIR / "item2item_related_latest.parquet"
@@ -103,6 +104,58 @@ def build_feedback(df: pd.DataFrame, weights: dict[str, float]) -> pd.DataFrame:
     return fb[fb["score"] > 0]
 
 
+def empty_activity_frame() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "actor_id": pd.Series(dtype="int64"),
+            "repo_id": pd.Series(dtype="int64"),
+            "type": pd.Series(dtype="string"),
+            "cnt": pd.Series(dtype="int64"),
+        }
+    )
+
+
+def empty_feedback_frame() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "actor_id": pd.Series(dtype="int64"),
+            "repo_id": pd.Series(dtype="int64"),
+            "score": pd.Series(dtype="float32"),
+        }
+    )
+
+
+def load_mart_feedback(path: Path, split: str | None = None) -> pd.DataFrame:
+    if not path.exists():
+        raise FileNotFoundError(f"mart not found: {path}")
+    columns = ["actor_id", "repo_id", "weighted_score"]
+    if split is not None:
+        columns = ["split", *columns]
+    df = pd.read_parquet(path, columns=columns)
+    if split is not None:
+        df = df[df["split"] == split].drop(columns=["split"])
+    out = df.rename(columns={"weighted_score": "score"})
+    out = out.dropna(subset=["actor_id", "repo_id", "score"])
+    return out.astype({"actor_id": "int64", "repo_id": "int64", "score": "float32"})
+
+
+def should_use_marts(mode: str, mart_dir: Path) -> bool:
+    if mode == "never":
+        return False
+    required = [
+        mart_dir / "user_repo_interaction_mart.parquet",
+        mart_dir / "user_profile_mart.parquet",
+        mart_dir / "repo_feature_mart.parquet",
+        mart_dir / "experiment_split_mart.parquet",
+        mart_dir / "repo_repo_related_mart.parquet",
+    ]
+    exists = all(path.exists() for path in required)
+    if mode == "always" and not exists:
+        missing = [str(path) for path in required if not path.exists()]
+        raise FileNotFoundError(f"missing required mart files: {missing}")
+    return exists
+
+
 def feedback_popularity(feedback: pd.DataFrame) -> pd.Series:
     return feedback.groupby("repo_id", observed=True)["score"].sum().sort_values(ascending=False)
 
@@ -134,6 +187,36 @@ def load_related_candidates(
     return out
 
 
+def load_related_candidates_from_mart(
+    path: Path,
+    item2idx: dict[int, int],
+    top_per_anchor: int,
+) -> dict[int, list[tuple[int, float]]]:
+    if top_per_anchor <= 0 or not path.exists():
+        return {}
+    related = pd.read_parquet(
+        path,
+        columns=["anchor_repo_id", "rank", "related_repo_id", "cooc_score"],
+    ).rename(columns={"cooc_score": "score"})
+    valid_items = set(item2idx)
+    related = related[
+        related["anchor_repo_id"].isin(valid_items)
+        & related["related_repo_id"].isin(valid_items)
+        & (related["rank"] <= top_per_anchor)
+    ]
+    if related.empty:
+        return {}
+    out: dict[int, list[tuple[int, float]]] = {}
+    for anchor, rows in related.sort_values(["anchor_repo_id", "rank"]).groupby(
+        "anchor_repo_id", observed=True
+    ):
+        out[int(anchor)] = [
+            (int(row.related_repo_id), float(row.score))
+            for row in rows.itertuples(index=False)
+        ]
+    return out
+
+
 def aggregate_user_activity(feedback: pd.DataFrame) -> dict[int, dict[str, float]]:
     if feedback.empty:
         return {}
@@ -142,6 +225,186 @@ def aggregate_user_activity(feedback: pd.DataFrame) -> dict[int, dict[str, float
         .agg(user_total_score=("score", "sum"), user_unique_repos=("repo_id", "nunique"))
         .to_dict(orient="index")
     )
+
+
+def load_feature_marts(
+    mart_dir: Path,
+    user_ids: set[int] | None = None,
+    repo_ids: set[int] | None = None,
+) -> dict[str, pd.DataFrame]:
+    user_cols = [
+        "actor_id",
+        "total_score",
+        "unique_repos",
+        "watch_share",
+        "fork_share",
+        "pr_share",
+        "push_share",
+        "issue_share",
+        "comment_share",
+        "event_entropy",
+        "recent_score_share",
+        "score_growth_ratio",
+    ]
+    repo_cols = [
+        "repo_id",
+        "total_score_7d",
+        "unique_users_7d",
+        "fork_users_7d",
+        "issue_users_7d",
+        "pr_users_7d",
+        "push_users_7d",
+        "watch_users_7d",
+        "comment_users_7d",
+        "total_score_28d",
+        "unique_users_28d",
+        "fork_users_28d",
+        "issue_users_28d",
+        "pr_users_28d",
+        "push_users_28d",
+        "watch_users_28d",
+        "comment_users_28d",
+        "total_score_42d",
+        "unique_users_42d",
+        "fork_users_42d",
+        "issue_users_42d",
+        "pr_users_42d",
+        "push_users_42d",
+        "watch_users_42d",
+        "comment_users_42d",
+        "language",
+        "stars",
+        "forks",
+        "archived",
+    ]
+    user_profile = pd.read_parquet(mart_dir / "user_profile_mart.parquet", columns=user_cols)
+    repo_feature = pd.read_parquet(mart_dir / "repo_feature_mart.parquet", columns=repo_cols)
+    if user_ids is not None:
+        user_profile = user_profile[user_profile["actor_id"].isin(user_ids)].copy()
+    if repo_ids is not None:
+        repo_feature = repo_feature[repo_feature["repo_id"].isin(repo_ids)].copy()
+    return {"user_profile": user_profile, "repo_feature": repo_feature}
+
+
+def user_activity_from_profile(profile: pd.DataFrame) -> dict[int, dict[str, float]]:
+    if profile.empty:
+        return {}
+    return (
+        profile.set_index("actor_id")[["total_score", "unique_repos"]]
+        .rename(columns={"total_score": "user_total_score", "unique_repos": "user_unique_repos"})
+        .to_dict(orient="index")
+    )
+
+
+def user_event_from_profile(profile: pd.DataFrame) -> dict[int, dict[str, float]]:
+    if profile.empty:
+        return {}
+    out = pd.DataFrame(index=profile["actor_id"].astype("int64"))
+    out["log_user_events"] = np.log1p(profile["total_score"].astype(float).to_numpy())
+    out["user_watch_share"] = profile["watch_share"].fillna(0).to_numpy()
+    out["user_pr_share"] = profile["pr_share"].fillna(0).to_numpy()
+    out["user_fork_share"] = profile["fork_share"].fillna(0).to_numpy()
+    out["user_push_share"] = profile["push_share"].fillna(0).to_numpy()
+    out["user_issue_share"] = profile["issue_share"].fillna(0).to_numpy()
+    out["user_comment_share"] = profile["comment_share"].fillna(0).to_numpy()
+    out["user_event_entropy"] = profile["event_entropy"].fillna(0).to_numpy()
+    return out.astype(np.float32).to_dict(orient="index")
+
+
+def user_recent_prior_activity_from_profile(
+    profile: pd.DataFrame,
+) -> tuple[dict[int, dict[str, float]], dict[int, dict[str, float]]]:
+    if profile.empty:
+        return {}, {}
+    total_score = profile["total_score"].fillna(0).astype(float)
+    unique_repos = profile["unique_repos"].fillna(0).astype(float)
+    recent_share = profile["recent_score_share"].fillna(0).astype(float).clip(lower=0, upper=1)
+    growth = profile["score_growth_ratio"].fillna(0).astype(float)
+    recent_score = total_score * recent_share
+    denom = growth + 1.0
+    prior_score = ((recent_score - growth) / denom.where(denom.abs() > 1e-6, np.nan)).fillna(0)
+    prior_score = prior_score.clip(lower=0)
+    recent_unique = (unique_repos * recent_share).clip(lower=0)
+    prior_unique = (unique_repos - recent_unique).clip(lower=0)
+
+    recent = pd.DataFrame(
+        {
+            "actor_id": profile["actor_id"].astype("int64"),
+            "user_total_score": recent_score,
+            "user_unique_repos": recent_unique,
+        }
+    )
+    prior = pd.DataFrame(
+        {
+            "actor_id": profile["actor_id"].astype("int64"),
+            "user_total_score": prior_score,
+            "user_unique_repos": prior_unique,
+        }
+    )
+    return (
+        recent.set_index("actor_id").astype(np.float32).to_dict(orient="index"),
+        prior.set_index("actor_id").astype(np.float32).to_dict(orient="index"),
+    )
+
+
+def repo_event_from_feature_mart(repo_feature: pd.DataFrame, days: int) -> dict[int, dict[str, float]]:
+    if repo_feature.empty:
+        return {}
+    cols = {
+        "watch": f"watch_users_{days}d",
+        "pr": f"pr_users_{days}d",
+        "fork": f"fork_users_{days}d",
+        "push": f"push_users_{days}d",
+        "issue": f"issue_users_{days}d",
+        "comment": f"comment_users_{days}d",
+    }
+    counts = repo_feature[list(cols.values())].fillna(0).astype(float)
+    total = counts.sum(axis=1).replace(0, 1.0)
+    out = pd.DataFrame(index=repo_feature["repo_id"].astype("int64"))
+    out["log_item_events"] = np.log1p(repo_feature[f"total_score_{days}d"].fillna(0).astype(float))
+    out["item_watch_share"] = counts[cols["watch"]] / total
+    out["item_pr_share"] = counts[cols["pr"]] / total
+    out["item_fork_share"] = counts[cols["fork"]] / total
+    out["item_push_share"] = counts[cols["push"]] / total
+    out["item_issue_share"] = counts[cols["issue"]] / total
+    out["item_comment_share"] = counts[cols["comment"]] / total
+    out["item_pr_per_user_event"] = counts[cols["pr"]] / total
+    out["item_fork_per_user_event"] = counts[cols["fork"]] / total
+    out["item_issue_comment_ratio"] = counts[cols["comment"]] / (counts[cols["issue"]] + 1.0)
+    return out.astype(np.float32).to_dict(orient="index")
+
+
+def repo_metadata_from_feature_mart(
+    repo_feature: pd.DataFrame,
+) -> tuple[dict[int, dict[str, float]], dict[str, int]]:
+    if repo_feature.empty:
+        return {}, {}
+    languages = sorted(
+        lang for lang in repo_feature["language"].dropna().unique() if isinstance(lang, str)
+    )
+    lang2idx = {lang: i + 1 for i, lang in enumerate(languages)}
+    out = pd.DataFrame(index=repo_feature["repo_id"].astype("int64"))
+    out["log_stars"] = np.log1p(repo_feature["stars"].fillna(0).astype(float))
+    out["log_forks"] = np.log1p(repo_feature["forks"].fillna(0).astype(float))
+    out["language_idx"] = repo_feature["language"].map(lang2idx).fillna(0).astype(float).to_numpy()
+    out["archived"] = repo_feature["archived"].fillna(0).astype(float).to_numpy()
+    return out.astype(np.float32).to_dict(orient="index"), lang2idx
+
+
+def repo_score_series_from_feature_mart(
+    repo_feature: pd.DataFrame,
+    item2idx: dict[int, int],
+    column: str,
+) -> pd.Series:
+    if repo_feature.empty or column not in repo_feature:
+        return pd.Series(dtype="float64")
+    scores = (
+        repo_feature[repo_feature["repo_id"].isin(item2idx)]
+        .set_index("repo_id")[column]
+        .fillna(0)
+        .astype(float)
+    )
+    return scores[scores > 0].sort_values(ascending=False)
 
 
 def rank_percentiles(scores: pd.Series, item2idx: dict[int, int]) -> dict[int, float]:
@@ -407,15 +670,11 @@ def build_feature_context(
     model: AlternatingLeastSquares | BayesianPersonalizedRanking,
     user2idx: dict[int, int],
     item2idx: dict[int, int],
+    feature_marts: dict[str, pd.DataFrame] | None = None,
 ):
     pop_series = feedback_popularity(history_fb)
     recent_pop_series = feedback_popularity(recent_fb) if len(recent_fb) else pd.Series(dtype=float)
     prior_pop_series = feedback_popularity(prior_fb) if len(prior_fb) else pd.Series(dtype=float)
-    pop = pop_series.to_dict()
-    recent_pop = recent_pop_series.to_dict()
-    prior_pop = prior_pop_series.to_dict()
-    pop_rank_pct = rank_percentiles(pop_series, item2idx)
-    recent_rank_pct = rank_percentiles(recent_pop_series, item2idx)
     user_activity = aggregate_user_activity(history_fb)
     recent_user_activity = aggregate_user_activity(recent_fb)
     prior_user_activity = aggregate_user_activity(prior_fb)
@@ -429,9 +688,52 @@ def build_feature_context(
         .apply(lambda s: s.astype(np.int32).to_numpy())
         .to_dict()
     )
-    item_event, user_event = event_stats(history_df)
-    recent_item_event, _ = event_stats(recent_df) if len(recent_df) else ({}, {})
-    meta, lang2idx = load_metadata(DB_PATH)
+    if feature_marts:
+        item_event, user_event, recent_item_event = {}, {}, {}
+        meta, lang2idx = {}, {}
+        feature_source = "mart"
+        user_profile = feature_marts.get("user_profile", pd.DataFrame())
+        repo_feature = feature_marts.get("repo_feature", pd.DataFrame())
+        if not user_profile.empty:
+            user_activity = user_activity_from_profile(user_profile)
+            user_event = user_event_from_profile(user_profile)
+            recent_user_activity, prior_user_activity = user_recent_prior_activity_from_profile(
+                user_profile
+            )
+        if not repo_feature.empty:
+            repo_feature = repo_feature[repo_feature["repo_id"].isin(item2idx)].copy()
+            item_user_counts = repo_feature.set_index("repo_id")["unique_users_42d"].fillna(0).to_dict()
+            recent_item_users = repo_feature.set_index("repo_id")["unique_users_7d"].fillna(0).to_dict()
+            prior_item_users = repo_feature.set_index("repo_id")["unique_users_28d"].fillna(0).to_dict()
+            item_event = repo_event_from_feature_mart(repo_feature, 42)
+            recent_item_event = repo_event_from_feature_mart(repo_feature, 7)
+            meta, lang2idx = repo_metadata_from_feature_mart(repo_feature)
+            pop_series = repo_score_series_from_feature_mart(repo_feature, item2idx, "total_score_42d")
+            recent_pop_series = repo_score_series_from_feature_mart(
+                repo_feature, item2idx, "total_score_7d"
+            )
+            prior_pop_series = (
+                repo_feature[repo_feature["repo_id"].isin(item2idx)]
+                .assign(
+                    prior_score=lambda df: (
+                        df["total_score_28d"].fillna(0).astype(float)
+                        - df["total_score_7d"].fillna(0).astype(float)
+                    ).clip(lower=0)
+                )
+                .set_index("repo_id")["prior_score"]
+                .sort_values(ascending=False)
+            )
+    else:
+        item_event, user_event = event_stats(history_df)
+        recent_item_event, _ = event_stats(recent_df) if len(recent_df) else ({}, {})
+        meta, lang2idx = load_metadata(DB_PATH)
+        feature_source = "raw"
+
+    pop = pop_series.to_dict()
+    recent_pop = recent_pop_series.to_dict()
+    prior_pop = prior_pop_series.to_dict()
+    pop_rank_pct = rank_percentiles(pop_series, item2idx)
+    recent_rank_pct = rank_percentiles(recent_pop_series, item2idx)
 
     user_factors = model.user_factors.astype(np.float32)
     item_factors = model.item_factors.astype(np.float32)
@@ -562,6 +864,7 @@ def build_feature_context(
         "item_static": item_static,
         "item_feature_names": item_feature_names,
         "lang2idx": lang2idx,
+        "feature_source": feature_source,
     }
 
 
@@ -1017,6 +1320,13 @@ def main():
     parser.add_argument("--rank-end", type=parse_date, default=date(2026, 5, 1))
     parser.add_argument("--test-start", type=parse_date, default=date(2026, 5, 2))
     parser.add_argument("--test-end", type=parse_date, default=date(2026, 5, 8))
+    parser.add_argument("--mart-dir", type=Path, default=MART_DIR)
+    parser.add_argument(
+        "--use-marts",
+        choices=["auto", "always", "never"],
+        default="auto",
+        help="Read feedback and related candidates from Week 6 mart parquet files.",
+    )
     parser.add_argument("--sample-ratio", type=float, default=1.0)
     parser.add_argument("--min-item-users", type=int, default=3)
     parser.add_argument("--min-user-items", type=int, default=1)
@@ -1087,22 +1397,37 @@ def main():
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
     print("1. load data")
-    history_df = load_period(DATA_DIR, args.history_start, args.history_end)
-    rank_df = load_period(DATA_DIR, args.rank_start, args.rank_end)
-    test_df = load_period(DATA_DIR, args.test_start, args.test_end)
-    recent_start = max(args.history_start, args.history_end - timedelta(days=13))
-    prior_end = recent_start - timedelta(days=1)
-    recent_df = load_period(DATA_DIR, recent_start, args.history_end)
-    prior_df = (
-        load_period(DATA_DIR, args.history_start, prior_end)
-        if prior_end >= args.history_start
-        else history_df.iloc[0:0].copy()
-    )
-    history_fb = build_feedback(history_df, event_weights)
-    rank_fb = build_feedback(rank_df, event_weights)
-    test_fb = build_feedback(test_df, event_weights)
-    recent_fb = build_feedback(recent_df, event_weights)
-    prior_fb = build_feedback(prior_df, event_weights) if len(prior_df) else history_fb.iloc[0:0].copy()
+    use_marts = should_use_marts(args.use_marts, args.mart_dir)
+    if use_marts:
+        if args.event_weight:
+            raise ValueError("--event-weight cannot be combined with mart feedback; rebuild marts instead.")
+        print(f"   using marts from {args.mart_dir}")
+        history_df = empty_activity_frame()
+        recent_df = empty_activity_frame()
+        prior_df = empty_activity_frame()
+        recent_fb = empty_feedback_frame()
+        prior_fb = empty_feedback_frame()
+        history_fb = load_mart_feedback(args.mart_dir / "user_repo_interaction_mart.parquet")
+        split_mart = args.mart_dir / "experiment_split_mart.parquet"
+        rank_fb = load_mart_feedback(split_mart, "rank_label")
+        test_fb = load_mart_feedback(split_mart, "test")
+    else:
+        history_df = load_period(DATA_DIR, args.history_start, args.history_end)
+        recent_start = max(args.history_start, args.history_end - timedelta(days=13))
+        prior_end = recent_start - timedelta(days=1)
+        recent_df = load_period(DATA_DIR, recent_start, args.history_end)
+        prior_df = (
+            load_period(DATA_DIR, args.history_start, prior_end)
+            if prior_end >= args.history_start
+            else history_df.iloc[0:0].copy()
+        )
+        rank_df = load_period(DATA_DIR, args.rank_start, args.rank_end)
+        test_df = load_period(DATA_DIR, args.test_start, args.test_end)
+        history_fb = build_feedback(history_df, event_weights)
+        rank_fb = build_feedback(rank_df, event_weights)
+        test_fb = build_feedback(test_df, event_weights)
+        recent_fb = build_feedback(recent_df, event_weights)
+        prior_fb = build_feedback(prior_df, event_weights) if len(prior_df) else empty_feedback_frame()
 
     print("2. filter catalog/users")
     history_fb, rank_fb, test_fb = filter_catalog(
@@ -1118,21 +1443,22 @@ def main():
     )
     keep_users = set(history_fb["actor_id"].unique())
     keep_items = set(history_fb["repo_id"].unique())
-    history_df = history_df[
-        history_df["actor_id"].isin(keep_users) & history_df["repo_id"].isin(keep_items)
-    ]
-    recent_df = recent_df[
-        recent_df["actor_id"].isin(keep_users) & recent_df["repo_id"].isin(keep_items)
-    ]
-    prior_df = prior_df[
-        prior_df["actor_id"].isin(keep_users) & prior_df["repo_id"].isin(keep_items)
-    ]
-    recent_fb = recent_fb[
-        recent_fb["actor_id"].isin(keep_users) & recent_fb["repo_id"].isin(keep_items)
-    ]
-    prior_fb = prior_fb[
-        prior_fb["actor_id"].isin(keep_users) & prior_fb["repo_id"].isin(keep_items)
-    ]
+    if not use_marts:
+        history_df = history_df[
+            history_df["actor_id"].isin(keep_users) & history_df["repo_id"].isin(keep_items)
+        ]
+        recent_df = recent_df[
+            recent_df["actor_id"].isin(keep_users) & recent_df["repo_id"].isin(keep_items)
+        ]
+        prior_df = prior_df[
+            prior_df["actor_id"].isin(keep_users) & prior_df["repo_id"].isin(keep_items)
+        ]
+        recent_fb = recent_fb[
+            recent_fb["actor_id"].isin(keep_users) & recent_fb["repo_id"].isin(keep_items)
+        ]
+        prior_fb = prior_fb[
+            prior_fb["actor_id"].isin(keep_users) & prior_fb["repo_id"].isin(keep_items)
+        ]
     print(
         f"   history={len(history_fb):,} interactions, "
         f"users={history_fb.actor_id.nunique():,}, repos={history_fb.repo_id.nunique():,}"
@@ -1141,6 +1467,9 @@ def main():
 
     print(f"3. train {args.retrieval_model.upper()}")
     train_sparse, user2idx, item2idx, idx2item = make_matrix(history_fb)
+    feature_marts = (
+        load_feature_marts(args.mart_dir, set(user2idx), set(item2idx)) if use_marts else None
+    )
     if args.retrieval_model == "als":
         model = AlternatingLeastSquares(
             factors=args.factors,
@@ -1179,15 +1508,27 @@ def main():
         test_labels = {uid: test_labels[uid] for uid in eval_users_all}
     test_users = sorted(set(test_labels) & set(user2idx))
 
-    pop_scores = feedback_popularity(history_fb)
-    recent_scores = feedback_popularity(recent_fb)
+    if use_marts and feature_marts:
+        repo_feature = feature_marts.get("repo_feature", pd.DataFrame())
+        pop_scores = repo_score_series_from_feature_mart(repo_feature, item2idx, "total_score_42d")
+        recent_scores = repo_score_series_from_feature_mart(repo_feature, item2idx, "total_score_7d")
+    else:
+        pop_scores = feedback_popularity(history_fb)
+        recent_scores = feedback_popularity(recent_fb)
     popularity_candidates = pop_scores[pop_scores.index.isin(item2idx)].head(args.candidate_k + args.hybrid_extra + 500).index.tolist()
     recent_candidates = recent_scores[recent_scores.index.isin(item2idx)].head(args.candidate_k + args.hybrid_extra + 500).index.tolist()
-    related_candidates = load_related_candidates(
-        args.related_path,
-        item2idx,
-        args.related_top_per_anchor,
-    )
+    if use_marts:
+        related_candidates = load_related_candidates_from_mart(
+            args.mart_dir / "repo_repo_related_mart.parquet",
+            item2idx,
+            args.related_top_per_anchor,
+        )
+    else:
+        related_candidates = load_related_candidates(
+            args.related_path,
+            item2idx,
+            args.related_top_per_anchor,
+        )
 
     rank_retrieval = recommend_batch(
         model, train_sparse, user2idx, idx2item, rank_users, args.candidate_k, args.chunk_size
@@ -1235,6 +1576,7 @@ def main():
         model,
         user2idx,
         item2idx,
+        feature_marts,
     )
     feature_names = [
         "als_score",
@@ -1325,7 +1667,10 @@ def main():
         "eval_cold_users": int(sum(1 for uid in test_labels if uid not in user2idx)),
         "ranker": rank_summary,
         "event_weights": event_weights,
+        "use_marts": use_marts,
+        "mart_dir": str(args.mart_dir),
         "related_anchor_count": len(related_candidates),
+        "feature_source": context["feature_source"],
         "feature_names": feature_names,
         "metadata_language_count": len(context["lang2idx"]),
         "elapsed_min": round((time.time() - started) / 60, 2),

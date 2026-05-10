@@ -52,6 +52,40 @@ uv run python scripts/sync_bq_metrics.py \
 
 현재 로컬 parquet 기준 기간은 `2026-02-15`부터 `2026-05-08`까지다.
 
+## 추천 실험용 batch mart
+
+Week 6 추천 실험은 BigQuery 피처 스토어를 만들기 전에 로컬 batch mart로 먼저 고정한다. 핵심은 모든 mart에 `window_end_date` 또는 `snapshot_date`를 둬서 학습/평가 시점 기준으로 재현 가능하게 만드는 것이다.
+
+```bash
+uv run python scripts/week6_build_recsys_marts.py
+```
+
+빠른 검증:
+
+```bash
+uv run python scripts/week6_build_recsys_marts.py --smoke
+```
+
+생성 위치:
+
+| 파일 | grain | 용도 |
+|---|---|---|
+| `data/marts/week6/user_repo_interaction_mart.parquet` | `window_end_date, actor_id, repo_id` | ALS matrix, label 생성, seen filtering |
+| `data/marts/week6/user_profile_mart.parquet` | `window_end_date, actor_id` | 유저 활동량, 이벤트 mix, 최근성 피처 |
+| `data/marts/week6/repo_feature_mart.parquet` | `snapshot_date, repo_id` | repo popularity, growth, metadata 피처 |
+| `data/marts/week6/repo_repo_related_mart.parquet` | `window_end_date, anchor_repo_id, related_repo_id` | related candidate source |
+| `data/marts/week6/experiment_split_mart.parquet` | `experiment_id, split, actor_id, repo_id` | history/rank-label/test split 고정 |
+
+기본 기간은 현재 Week 6 실험과 맞춘다.
+
+| split | 기간 |
+|---|---|
+| history | `2026-03-14` ~ `2026-04-24` |
+| rank-label | `2026-04-25` ~ `2026-05-01` |
+| test | `2026-05-02` ~ `2026-05-08` |
+
+`repo_feature_mart`의 `stars`, `forks`는 로컬 metadata cache의 현재값이다. 그래서 강의/실험 해석에서는 temporal leakage 가능성을 명시해야 한다. 실서비스형 point-in-time mart가 필요하면 GitHub metadata도 `snapshot_date`별로 별도 수집해야 한다.
+
 비용 관리를 위해 기본 Airflow DAG는 전체 83일이 아니라 최근 35일(`2026-04-04` ~ `2026-05-08`)만 처리한다. 또한 기본 DAG는 `--skip-fact`로 raw fact를 BigQuery에 올리지 않고, Metabase가 볼 지표 테이블만 업로드한다. 전체 이력 또는 fact를 올리려면 의도적으로 옵션을 바꿔야 한다.
 
 현재 `bda-coai` 프로젝트는 BigQuery sandbox 제약이 있어서 billing이 켜져 있지 않으면 dataset/table expiration이 필요하다. 그래서 스크립트는 `mart` dataset의 기본 table/partition expiration을 58일로 맞추고, 과거 날짜 데이터를 보존하기 위해 fact table은 날짜 파티션 없이 생성한다. `activity_date` 컬럼은 그대로 있으므로 Metabase 시계열 필터링은 동일하게 가능하다.
