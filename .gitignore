@@ -12,3 +12,9 @@ wheels/
 # Data
 data/
 gcp-key.json
+
+# Local orchestration state
+logs/
+plugins/
+config/
+.env

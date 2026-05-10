@@ -2,9 +2,11 @@
 
 import json
 import logging
+import os
 import sqlite3
+import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -39,6 +41,34 @@ def init_db(db_path: Path) -> sqlite3.Connection:
     conn.execute(_CREATE_TABLE)
     conn.commit()
     return conn
+
+
+def get_github_token() -> str | None:
+    """Return a GitHub token from env or GitHub CLI without logging the value."""
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        return token.strip()
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "token"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    token = result.stdout.strip()
+    return token or None
+
+
+def _parse_cached_at(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def fetch_repo_metadata(
@@ -78,20 +108,56 @@ def fetch_and_cache_repos(
     repo_names: dict[int, str],
     token: str | None = None,
     rate_limit_pause: float = 0.8,
+    refresh_stale_days: int | None = None,
+    force_refresh: bool = False,
+    max_fetch: int | None = None,
+    dry_run: bool = False,
 ) -> pd.DataFrame:
     """Fetch metadata for multiple repos, caching results in SQLite.
 
     repo_names: {repo_id: "owner/repo"} mapping.
     Skips repos already in the database.
     """
-    # Find which repos already cached
-    existing = set()
-    cursor = conn.execute("SELECT repo_id FROM repo_metadata")
-    for (rid,) in cursor:
-        existing.add(rid)
+    existing = {
+        int(row[0]): {
+            "repo_name": row[1],
+            "fetched_at": _parse_cached_at(row[2]),
+            "http_status": int(row[3]) if row[3] is not None else None,
+        }
+        for row in conn.execute(
+            "SELECT repo_id, repo_name, fetched_at, http_status FROM repo_metadata"
+        )
+    }
 
-    to_fetch = {int(rid): name for rid, name in repo_names.items() if int(rid) not in existing}
+    stale_before = None
+    if refresh_stale_days is not None:
+        stale_before = datetime.now(timezone.utc) - timedelta(days=refresh_stale_days)
+
+    missing = {}
+    stale = {}
+    for repo_id, repo_name in repo_names.items():
+        repo_id = int(repo_id)
+        cached = existing.get(repo_id)
+        if cached is None:
+            missing[repo_id] = str(repo_name)
+            continue
+
+        should_refresh = force_refresh
+        if stale_before is not None:
+            fetched_at = cached.get("fetched_at")
+            should_refresh = should_refresh or fetched_at is None or fetched_at < stale_before
+        if should_refresh:
+            stale[repo_id] = str(repo_name)
+
+    to_fetch = {**missing, **stale}
+
+    if max_fetch is not None:
+        to_fetch = dict(list(to_fetch.items())[:max_fetch])
+
     logger.info(f"{len(existing)} cached, {len(to_fetch)} to fetch")
+    if dry_run:
+        logger.info("Dry run. Skipping GitHub API calls.")
+        return get_metadata_df(conn)
 
     session = requests.Session()
     fetched = 0

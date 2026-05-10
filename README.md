@@ -3,6 +3,8 @@
 GitHub Archive(BigQuery) 데이터를 활용한 **repo 추천 시스템** 구축 프로젝트.  
 데이터 추출 → EDA → Popularity baseline → 행렬분해(ALS) → Two-Stage(ALS+LGBM) → Two-Tower(Neural) → FAISS 서빙 → Streamlit 대시보드까지 full pipeline을 다룹니다.
 
+로컬 Airflow + Metabase + BigQuery metric mart 운영 노트는 [docs/data_platform_local.md](docs/data_platform_local.md)에 정리되어 있습니다.
+
 ## 환경 설정
 
 ### 1. uv 설치
@@ -62,7 +64,16 @@ bda-2/
 │       └── metadata.py             # GitHub REST API + SQLite 캐시
 ├── scripts/
 │   ├── eval_full.py                # 전체 데이터 평가 (ALS vs Two-Stage)
+│   ├── sync_bq_metrics.py          # parquet → BigQuery metric mart 동기화
+│   ├── refresh_repo_metadata.py    # GitHub repo metadata cache 갱신
+│   ├── setup_metabase_dashboard.py # Metabase 질문/대시보드 자동 구성
 │   └── train_two_tower.py          # Two-Tower 학습 + ALS 비교
+├── dags/
+│   └── gharchive_platform_metrics.py # Airflow metric/metadata DAG
+├── docker/
+│   └── airflow/Dockerfile          # Airflow 3.2.1 + uv image
+├── docs/
+│   └── data_platform_local.md      # 로컬 데이터 플랫폼 운영 문서
 ├── notebooks/
 │   ├── gharchive/                  # 데이터 파이프라인
 │   └── ghrec/                      # 추천 모델
@@ -147,9 +158,42 @@ uv run streamlit run app_reco.py
 - GitHub API → SQLite 자동 캐싱으로 메타데이터 표시
 - FAISS FlatIP으로 3ms 검색
 
+## 로컬 데이터 플랫폼
+
+Airflow 3.2.1로 metadata cache refresh와 BigQuery metric mart sync를 오케스트레이션하고, Metabase에서 기초 지표와 AI agent trendy repo 대시보드를 확인합니다.
+
+```bash
+docker compose up airflow-apiserver airflow-scheduler airflow-dag-processor metabase
+```
+
+- Airflow: `http://localhost:8080`
+- Metabase: `http://localhost:3001`
+- 운영 문서: [docs/data_platform_local.md](docs/data_platform_local.md)
+
 ## 스크립트
 
 ```bash
+# 최근 35일 parquet에서 aggregate metric만 BigQuery에 업로드
+GCP_KEY_PATH=/path/to/gcp-key.json \
+uv run python scripts/sync_bq_metrics.py \
+  --project bda-coai \
+  --dataset mart \
+  --parquet-dir data/daily_agg \
+  --start 2026-04-04 \
+  --end 2026-05-08 \
+  --max-days 35 \
+  --mode replace-all \
+  --skip-fact \
+  --build-metrics
+
+# repo metadata cache 갱신
+uv run python scripts/refresh_repo_metadata.py \
+  --start 2026-04-04 \
+  --end 2026-05-08 \
+  --top-n 500 \
+  --cache-tier warm \
+  --max-fetch 200
+
 # 전체 데이터 평가 (ALS vs Two-Stage, ~53분)
 uv run python scripts/eval_full.py
 
