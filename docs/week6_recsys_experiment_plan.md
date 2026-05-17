@@ -1,6 +1,6 @@
 # Week 6 추천시스템 실험 계획
 
-최종 수정: 2026-05-10
+최종 수정: 2026-05-17
 
 상세 설명은 `docs/week6_recsys_handoff.md`를 본다. 이 문서는 다음 실험을 놓치지 않기 위한 짧은 체크리스트다.
 
@@ -9,13 +9,21 @@
 - 기준선: `latest`
 - 현재 최고 run: `related80_anchor20_full_als96_i12_lgbm63`
 - 최고 성능: `Two-Stage/Fallback NDCG@10 = 0.016029`, `Recall@100 = 0.074161`
+- 최신 자동화 검증 run: `airflow_20260516_lgbm_eval`
+  - 데이터: 2026-05-16까지, 2026-05-17 제외
+  - split: history `2026-03-22..2026-05-02`, rank `2026-05-03..2026-05-09`, test `2026-05-10..2026-05-16`
+  - 설정: `max_items=100000`, `candidate_k=120`, `hybrid_extra=80`, `related_candidate_cap=30`, `eval_users=3000`
+  - 결과: `Two-Stage/Fallback NDCG@10 = 0.010674`, `Recall@100 = 0.075490`
 - 핵심 해석: 피처/튜닝 개선 위에 item-to-item related 후보 source를 추가하자 기존 최고 full run보다 top-k 품질과 coverage가 모두 크게 올랐다.
 - 피처-only ablation인 `feature_only_like_latest`는 `NDCG@10 = 0.012179`로 `latest`와 거의 같았다. 즉 `tune_full_als96_i12_lgbm63`까지의 개선은 피처 단독 효과가 아니라 튜닝과 함께 해석한다.
 - `--save-user-diagnostics` full 분석 결과, 기존 약점이던 push/PR/comment/issue/high-activity segment가 related source 추가로 가장 크게 개선됐다.
+- MLflow 운영/비교 방법은 `docs/mlflow_recsys_tracking.md`로 분리했다.
 - 코드 기준화 완료:
   - `app_week6_qual_eval.py`는 기본 artifact를 `related80_anchor20_full_als96_i12_lgbm63`로 선택한다.
   - `scripts/week6_two_stage_v2.py --best-full`은 현재 최고 full-run 설정을 재현한다.
   - `scripts/week6_analyze_user_diagnostics.py`는 suffix 생략 시 현재 최고 diagnostics를 분석한다.
+  - `scripts/week6_neural_rankers.py`는 mart/related 후보/ranker feature parquet 재사용을 지원한다.
+  - `scripts/train_two_tower_week6_full_v2.py`는 MLflow logging을 지원한다.
 
 ## 다음 실험 우선순위
 
@@ -24,6 +32,20 @@
 3. `max_items=500000`
 4. `candidate_k=500`
 5. history window 56일/70일
+
+## TODO: neural ranker 학습 데이터 재설계
+
+최신 2026-05-16 run에서는 rank label interaction이 충분히 있어도, candidate set 안에 들어온 positive만 ranker label로 쓰면서 neural ranker positive가 `877`개까지 줄었다. 다음 실험에서는 LGBM LambdaRank는 candidate-conditioned 학습을 유지하되, FM/Deep&Wide/DeepFM/DLRM은 global positive와 mixed negative sampling으로 학습하는 방식을 별도로 비교한다.
+
+아이디어:
+
+- positive: rank-label window의 전체 positive user-repo pair를 사용한다.
+- negative: random catalog negative, popular/recent negative, ALS candidate negative, related candidate negative를 섞는다.
+- 학습: neural ranker는 전체 positive + sampled negative로 scoring model처럼 학습한다.
+- 평가/추론: 기존과 동일하게 retrieval candidate set에만 score를 매겨 re-rank한다.
+- 주의: random negative만 쓰면 너무 쉬운 문제가 되므로 hard negative source 비중을 반드시 기록한다.
+
+이 실험은 현재 결론을 대체하는 것이 아니라, candidate recall 병목 때문에 neural ranker가 충분히 학습하지 못했는지 확인하기 위한 후속 아이디어다.
 
 ## Event weight ablation
 

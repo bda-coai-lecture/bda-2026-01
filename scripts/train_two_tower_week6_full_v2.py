@@ -14,12 +14,15 @@ import argparse
 import json
 import math
 import pickle
+import subprocess
 import time
 from pathlib import Path
 
+import mlflow
 import numpy as np
 import pandas as pd
 import torch
+from mlflow.tracking import MlflowClient
 from scipy import sparse
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -208,6 +211,113 @@ def normalize_dense(values: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndar
     return ((values - mean) / std).astype(np.float32), mean.squeeze(0), std.squeeze(0)
 
 
+def git_metadata() -> dict[str, str | bool]:
+    try:
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        dirty = bool(
+            subprocess.check_output(
+                ["git", "status", "--porcelain"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        )
+    except (OSError, subprocess.CalledProcessError):
+        sha = "unknown"
+        dirty = "unknown"
+    return {"git_sha": sha, "git_dirty": dirty}
+
+
+def set_mlflow_experiment_metadata(experiment_name: str) -> None:
+    mlflow.set_experiment(experiment_name)
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    if experiment is None:
+        return
+    client = MlflowClient(tracking_uri=mlflow.get_tracking_uri())
+    tags = {
+        "experiment_role": "retrieval",
+        "experiment_stage": "two_tower_vs_als_retrieval",
+        "mlflow.note.content": (
+            "Retrieval experiment: compare feature-rich Two-Tower against "
+            "saved ALS and popularity on the Week 6 recommendation split."
+        ),
+    }
+    for key, value in tags.items():
+        client.set_experiment_tag(experiment.experiment_id, key, value)
+
+
+def metric_model_key(model_name: str) -> str:
+    return model_name.lower().replace("-", "_").replace(" ", "_")
+
+
+def log_mlflow_run(
+    args: argparse.Namespace,
+    summary: dict,
+    results: pd.DataFrame,
+    artifact_paths: list[Path],
+) -> None:
+    if args.no_mlflow:
+        return
+
+    mlflow.set_tracking_uri(args.mlflow_tracking_uri)
+    set_mlflow_experiment_metadata(args.mlflow_experiment)
+    with mlflow.start_run(run_name=args.output_suffix) as run:
+        summary["mlflow_run_id"] = run.info.run_id
+        for path in artifact_paths:
+            if path.name.endswith("_summary.json"):
+                path.write_text(
+                    json.dumps(summary, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+        mlflow.set_tags(git_metadata())
+        mlflow.set_tag("script", "scripts/train_two_tower_week6_full_v2.py")
+        mlflow.set_tag("primary_model", "Two-Tower")
+        mlflow.set_tag("source_suffix", args.suffix)
+        mlflow.set_tag("ui_metric_1", "core_ndcg_at_100")
+        mlflow.set_tag("ui_metric_2", "core_recall_at_100")
+        for key in [
+            "suffix",
+            "output_suffix",
+            "epochs",
+            "batch_size",
+            "embed_dim",
+            "temperature",
+            "eval_users",
+            "seed",
+        ]:
+            mlflow.log_param(key, getattr(args, key))
+        mlflow.log_metric("elapsed_min", summary["elapsed_min"])
+        mlflow.log_metric("eval_users", summary["eval_users"])
+        for row in results.itertuples(index=False):
+            if row.model == "Popularity":
+                continue
+            if int(row.k) not in {10, 100}:
+                continue
+            model_key = metric_model_key(str(row.model))
+            if int(row.k) == 100:
+                mlflow.log_metric(f"{model_key}_ndcg_at_100", float(row.ndcg))
+                mlflow.log_metric(f"{model_key}_recall_at_100", float(row.recall))
+                mlflow.log_metric(
+                    f"{model_key}_unique_recommended_at_100",
+                    int(row.unique_recommended),
+                )
+            if row.model == "Two-Tower":
+                if int(row.k) == 10:
+                    mlflow.log_metric("core_ndcg_at_10", float(row.ndcg))
+                if int(row.k) == 100:
+                    mlflow.log_metric("core_ndcg_at_100", float(row.ndcg))
+                    mlflow.log_metric("core_recall_at_100", float(row.recall))
+                    mlflow.log_metric("core_unique_at_100", int(row.unique_recommended))
+        if summary["losses"]:
+            mlflow.log_metric("two_tower_final_train_loss", float(summary["losses"][-1]))
+        for path in artifact_paths:
+            if path.exists():
+                mlflow.log_artifact(str(path))
+
+
 def transform_numeric_frame(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
     out = df[columns].copy()
     for col in columns:
@@ -307,6 +417,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--item-vector-batch-size", type=int, default=50_000)
     parser.add_argument("--user-vector-batch-size", type=int, default=50_000)
     parser.add_argument("--output-suffix", type=str, default="week6_full_v2")
+    parser.add_argument("--mlflow-tracking-uri", type=str, default="sqlite:///mlflow.db")
+    parser.add_argument("--mlflow-experiment", type=str, default="recsys-retrieval")
+    parser.add_argument("--no-mlflow", action="store_true")
     return parser.parse_args()
 
 
@@ -497,30 +610,29 @@ def main() -> None:
         model_path,
     )
     results.to_csv(metrics_path, index=False)
+    summary = {
+        "args": vars(args) | {"mart_dir": str(args.mart_dir), "model_dir": str(args.model_dir)},
+        "git": git_metadata(),
+        "source_suffix": args.suffix,
+        "train_interactions": int(len(train_fb)),
+        "test_interactions": int(len(test_fb)),
+        "eval_users": int(len(eval_users)),
+        "user_feature_columns": USER_DENSE_COLS,
+        "item_feature_columns": ITEM_DENSE_COLS,
+        "language_count": len(lang2idx),
+        "losses": losses,
+        "elapsed_min": round((time.time() - started) / 60, 2),
+        "paths": {
+            "model": str(model_path),
+            "metrics": str(metrics_path),
+            "summary": str(summary_path),
+        },
+    }
     summary_path.write_text(
-        json.dumps(
-            {
-                "args": vars(args) | {"mart_dir": str(args.mart_dir), "model_dir": str(args.model_dir)},
-                "source_suffix": args.suffix,
-                "train_interactions": int(len(train_fb)),
-                "test_interactions": int(len(test_fb)),
-                "eval_users": int(len(eval_users)),
-                "user_feature_columns": USER_DENSE_COLS,
-                "item_feature_columns": ITEM_DENSE_COLS,
-                "language_count": len(lang2idx),
-                "losses": losses,
-                "elapsed_min": round((time.time() - started) / 60, 2),
-                "paths": {
-                    "model": str(model_path),
-                    "metrics": str(metrics_path),
-                    "summary": str(summary_path),
-                },
-            },
-            indent=2,
-            ensure_ascii=False,
-        ),
+        json.dumps(summary, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    log_mlflow_run(args, summary, results, [metrics_path, summary_path, model_path])
     print("\nresults")
     print(results.to_string(index=False))
     print(f"\nsaved model: {model_path}")

@@ -1,0 +1,1456 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Week 7 Deep Recommendation Models</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Ccircle cx='47' cy='17' r='6' fill='%23f59e0b'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial, sans-serif' font-size='18' font-weight='800' fill='white'%3ERec%3C/text%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --paper: #ffffff;
+      --ink: #1b2430;
+      --muted: #5e6978;
+      --line: #d8dee8;
+      --soft: #eef2f7;
+      --teal: #0f766e;
+      --blue: #2563eb;
+      --violet: #6d28d9;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --green: #15803d;
+      --code: #111827;
+      --code-ink: #e5e7eb;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.62;
+      letter-spacing: 0;
+    }
+
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .wrap {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    header {
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+      gap: 34px;
+      align-items: center;
+      min-height: 520px;
+      padding: 52px 0 38px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--teal);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.08;
+      font-weight: 850;
+    }
+
+    .lead {
+      max-width: 760px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 19px;
+    }
+
+    .hero-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      padding: 18px;
+    }
+
+    .flow {
+      display: grid;
+      gap: 10px;
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .flow-tag {
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--soft);
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .flow-box {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      padding: 12px 14px;
+    }
+
+    .flow-box strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 15px;
+    }
+
+    .flow-box span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    main { padding: 38px 0 72px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 28px;
+      align-items: start;
+    }
+
+    nav {
+      position: sticky;
+      top: 16px;
+      padding: 16px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    nav strong {
+      display: block;
+      margin-bottom: 9px;
+      font-size: 14px;
+    }
+
+    nav a {
+      display: block;
+      padding: 6px 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    section {
+      margin-bottom: 34px;
+      padding: 32px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    h2 {
+      margin: 0 0 18px;
+      font-size: 29px;
+      line-height: 1.25;
+    }
+
+    h3 {
+      margin: 34px 0 12px;
+      font-size: 20px;
+      line-height: 1.3;
+    }
+
+    p { margin: 12px 0; }
+    ul { margin: 12px 0 0 22px; padding: 0; }
+    li { margin: 8px 0; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--soft);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 18px 0 22px;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: var(--soft);
+      font-weight: 800;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      padding: 18px;
+    }
+
+    .card h3 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .metric:last-child { border-bottom: 0; }
+    .metric span { color: var(--muted); }
+    .metric strong { font-variant-numeric: tabular-nums; }
+
+    .bar-chart {
+      display: grid;
+      gap: 11px;
+      margin-top: 22px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 145px minmax(0, 1fr) 78px;
+      gap: 10px;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    .track {
+      height: 18px;
+      border-radius: 5px;
+      overflow: hidden;
+      background: var(--soft);
+    }
+
+    .bar {
+      height: 100%;
+      border-radius: 5px;
+      background: var(--blue);
+    }
+
+    .bar.neural { background: var(--violet); }
+    .bar.base { background: var(--teal); }
+    .bar.weak { background: var(--muted); }
+
+    .value {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      color: var(--muted);
+    }
+
+    .note {
+      padding: 14px 16px;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      background: #eff6ff;
+    }
+
+    .warn {
+      border-color: #fed7aa;
+      background: #fff7ed;
+    }
+
+    .good {
+      border-color: #bbf7d0;
+      background: #ecfdf5;
+    }
+
+    .diagram {
+      width: 100%;
+      min-height: 180px;
+      margin: 12px 0 6px;
+    }
+
+    .visual-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin: 22px 0 26px;
+    }
+
+    .visual-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      padding: 16px;
+    }
+
+    .visual-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .visual-card svg {
+      width: 100%;
+      min-height: 220px;
+      display: block;
+    }
+
+    .paper-figures {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin: 20px 0 26px;
+    }
+
+    .paper-figure {
+      margin: 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .paper-figure img {
+      display: block;
+      width: 100%;
+      max-height: 360px;
+      object-fit: contain;
+      background: #fff;
+      border: 1px solid var(--soft);
+      border-radius: 6px;
+    }
+
+    .paper-figure figcaption {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .pill {
+      display: inline-block;
+      margin: 2px 4px 2px 0;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--soft);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .model-detail {
+      margin-top: 30px;
+      padding-top: 30px;
+      border-top: 1px solid var(--line);
+    }
+
+    .model-detail:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .model-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 210px;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 18px;
+    }
+
+    .score-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      padding: 12px;
+    }
+
+    .score-card strong {
+      display: block;
+      font-size: 24px;
+      line-height: 1.2;
+      color: var(--teal);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .score-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .formula {
+      margin: 16px 0 20px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: var(--code);
+      color: var(--code-ink);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      overflow-x: auto;
+    }
+
+    .subgrid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .subbox {
+      min-height: 116px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .subbox strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .subbox p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .step-list {
+      display: grid;
+      gap: 14px;
+      margin: 18px 0 22px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .step strong {
+      color: var(--teal);
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .source-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .source-list a {
+      display: block;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    @media (max-width: 900px) {
+      .hero, .layout, .grid-2, .grid-3, .source-list, .model-head, .subgrid, .visual-grid, .paper-figures, .step {
+        grid-template-columns: 1fr;
+      }
+      nav { position: static; }
+      .bar-row { grid-template-columns: 110px minmax(0, 1fr) 64px; }
+      section {
+        margin-bottom: 26px;
+        padding: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero">
+      <div>
+        <p class="eyebrow">BDA Week 7 · GitHub 이벤트 기반 추천</p>
+        <h1>딥러닝 추천 모델을 왜 넣었고, 우리 데이터에서는 어떻게 작동했나</h1>
+        <p class="lead">
+          결론부터 말하면 neural retrieval은 ALS를 바로 이기지 못했고, neural re-ranker는 ALS 후보를 재정렬할 때 의미가 있었다.
+          이 문서는 Two-Tower, FM, Deep&Wide, DeepFM, DLRM을 원본 논문 아이디어와 우리 실험 결과에 맞춰 설명한다.
+        </p>
+      </div>
+      <div class="hero-panel" aria-label="추천 파이프라인 요약">
+        <div class="flow">
+          <div class="flow-row">
+            <div class="flow-tag">events</div>
+            <div class="flow-box"><strong>GitHub Archive</strong><span>watch, fork, PR, issue, push, comment를 weighted implicit feedback으로 변환</span></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-tag">retrieve</div>
+            <div class="flow-box"><strong>ALS / Popularity / Two-Tower</strong><span>candidate 300개에 popularity/recent 후보 200개를 추가</span></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-tag">features</div>
+            <div class="flow-box"><strong>75개 ranking feature</strong><span>ALS score, factor cosine, popularity, recent growth, user/item event mix, source flag</span></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-tag">re-rank</div>
+            <div class="flow-box"><strong>LGBM / FM / Deep&Wide / DeepFM / DLRM</strong><span>동일 candidate set에서 NDCG@100과 Recall@100 비교</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap layout">
+    <nav>
+      <strong>목차</strong>
+      <a href="#summary">핵심 결론</a>
+      <a href="#data">데이터 패턴</a>
+          <a href="#background">배경 모델</a>
+          <a href="#retrieval">Two-Tower</a>
+      <a href="#rankers">Neural Rankers</a>
+      <a href="#tuning">튜닝한 영역</a>
+      <a href="#performance">성능과 해석</a>
+      <a href="#sources">논문 출처</a>
+    </nav>
+
+    <article>
+      <section id="summary">
+        <h2>핵심 결론</h2>
+        <div class="grid-3">
+          <div class="card">
+            <h3>Retrieval</h3>
+            <p>ALS는 interaction-only 기준선인데도 NDCG@10에서 Two-Tower보다 높았다. Two-Tower는 대신 추천 다양성이 매우 커서 후보 다양화 장치로 보는 게 맞다.</p>
+          </div>
+          <div class="card">
+            <h3>Re-rank</h3>
+            <p>같은 후보군 위에서는 LGBM이 1위였다. 최신 run에서는 neural ranker들이 같은 순위로 수렴해서, 모델 우열보다 학습/튜닝 한계로 보는 게 맞다.</p>
+          </div>
+          <div class="card">
+            <h3>데이터 해석</h3>
+            <p>positive rate가 0.537%라서 deep model이 충분히 학습하기 어렵다. 반면 popularity, recent growth, ALS score 같은 수작업 feature는 즉시 강한 신호가 된다.</p>
+          </div>
+        </div>
+        <div class="note">
+          <strong>이번 구현에서 실제로 반영된 부분</strong>
+          Two-Tower는 repo metadata와 popularity proxy를 tower 입력에 넣고 in-batch negative로 retrieval embedding을 학습했다.
+          re-ranker 쪽은 모두 같은 candidate cache와 같은 75개 feature를 공유하게 만들고, 모델 구조만 LGBM, FM, Deep&Wide, DeepFM, DLRM으로 바꿔 비교했다.
+          그래서 이 문서에서는 “논문 모델을 완전 재현했다”가 아니라 “우리 추천 파이프라인의 어느 단계에 어떤 아이디어를 끼워 넣었는가”로 설명하는 게 정확하다.
+        </div>
+      </section>
+
+      <section id="data">
+        <h2>우리 데이터의 패턴</h2>
+        <p>
+          최신 실험은 2026-03-22부터 2026-05-02까지를 history, 2026-05-03부터 2026-05-09까지를 rank 학습,
+          2026-05-10부터 2026-05-16까지를 test로 나눴다.
+          Airflow가 생성한 최신 feature 기준 history interaction은 2,377,667건, rank label은 361,371건, test label은 331,702건이었다.
+        </p>
+        <div class="grid-2">
+          <div class="card">
+            <h3>학습 난이도</h3>
+            <div class="metric"><span>rank rows</span><strong>163,400</strong></div>
+            <div class="metric"><span>positive labels</span><strong>877</strong></div>
+            <div class="metric"><span>positive rate</span><strong>0.537%</strong></div>
+            <div class="metric"><span>eval users</span><strong>3,000</strong></div>
+          </div>
+          <div class="card">
+            <h3>해석 포인트</h3>
+            <ul>
+              <li>대부분의 user-repo 쌍은 음성이라 BCE 학습에는 <code>pos_weight=185.32</code>가 필요했다.</li>
+              <li>Popularity는 NDCG가 낮고 Unique@100이 105개뿐이라 다양성 한계가 뚜렷했다.</li>
+              <li>ALS는 협업 신호가 있는 warm user에게 강하고, Two-Tower는 feature 기반 확장성과 다양성에서 의미가 있다.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="visual-grid">
+          <div class="visual-card">
+            <strong>Positive label imbalance</strong>
+            <svg viewBox="0 0 520 250" role="img" aria-label="positive label imbalance funnel">
+              <rect x="20" y="30" width="480" height="48" rx="8" fill="#eff6ff" stroke="#bfdbfe"></rect>
+              <text x="260" y="61" text-anchor="middle" font-size="17" font-weight="800" fill="#1b2430">163,400 rank rows</text>
+              <path d="M95 90 L425 90 L345 145 L175 145 Z" fill="#e0f2fe" stroke="#93c5fd"></path>
+              <text x="260" y="124" text-anchor="middle" font-size="15" font-weight="700" fill="#1b2430">candidate pairs after retrieval</text>
+              <path d="M175 158 L345 158 L288 213 L232 213 Z" fill="#fee2e2" stroke="#fecaca"></path>
+              <text x="260" y="190" text-anchor="middle" font-size="18" font-weight="800" fill="#991b1b">877 positives</text>
+              <text x="260" y="232" text-anchor="middle" font-size="14" fill="#5e6978">positive rate = 0.537%, pos_weight = 185.32</text>
+            </svg>
+          </div>
+          <div class="visual-card">
+            <strong>Feature groups used by every re-ranker</strong>
+            <svg viewBox="0 0 520 250" role="img" aria-label="feature group map">
+              <circle cx="260" cy="125" r="42" fill="#ffffff" stroke="#d8dee8" stroke-width="2"></circle>
+              <text x="260" y="119" text-anchor="middle" font-size="16" font-weight="800" fill="#1b2430">75</text>
+              <text x="260" y="140" text-anchor="middle" font-size="13" fill="#5e6978">features</text>
+              <g font-size="13" font-weight="700" fill="#1b2430">
+                <rect x="35" y="36" width="150" height="48" rx="8" fill="#eff6ff" stroke="#bfdbfe"></rect>
+                <text x="110" y="65" text-anchor="middle">ALS signals</text>
+                <rect x="335" y="36" width="150" height="48" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+                <text x="410" y="65" text-anchor="middle">Popularity</text>
+                <rect x="35" y="166" width="150" height="48" rx="8" fill="#fff7ed" stroke="#fed7aa"></rect>
+                <text x="110" y="195" text-anchor="middle">User behavior</text>
+                <rect x="335" y="166" width="150" height="48" rx="8" fill="#f5f3ff" stroke="#ddd6fe"></rect>
+                <text x="410" y="195" text-anchor="middle">Candidate source</text>
+              </g>
+              <g stroke="#94a3b8" stroke-width="2">
+                <line x1="185" y1="60" x2="225" y2="102"></line>
+                <line x1="335" y1="60" x2="295" y2="102"></line>
+                <line x1="185" y1="190" x2="225" y2="148"></line>
+                <line x1="335" y1="190" x2="295" y2="148"></line>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <section id="background">
+        <h2>배경 모델: MF에서 neural CF로</h2>
+        <p>
+          이번 repo에서 실제 production 후보 생성 기준선은 ALS이고, NCF는 직접 학습한 모델은 아니다.
+          그래도 딥러닝 추천 모델의 배경을 설명할 때는 MF의 내적을 신경망으로 대체하려는 NCF 흐름을 짚는 게 좋다.
+        </p>
+        <div class="grid-2">
+          <div class="card">
+            <h3>ALS implicit MF</h3>
+            <p>
+              GitHub 이벤트를 user-repo 행렬로 만들고, 관측된 행동을 선호와 confidence로 해석한다.
+              최신 re-rank run에서는 <code>factors=48</code>, <code>iterations=4</code>, <code>regularization=0.03</code>을 retrieval 기준으로 썼다.
+            </p>
+            <span class="pill">collaborative retrieval</span><span class="pill">warm user 강점</span>
+          </div>
+          <div class="card">
+            <h3>NCF</h3>
+            <p>
+              NCF는 user embedding과 item embedding의 단순 내적 대신 MLP가 interaction function을 학습한다.
+              현재 문서에서는 “왜 딥러닝 추천이 등장했는가”를 설명하는 배경으로만 다루고, 실험 성능 비교에는 포함하지 않는다.
+            </p>
+            <span class="pill">background only</span><span class="pill">non-linear interaction</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="retrieval">
+        <h2>Two-Tower: 후보를 넓히는 retrieval 모델</h2>
+        <p>
+          Two-Tower는 user tower와 item tower를 따로 학습해 같은 embedding 공간에 올린 뒤, inner product나 cosine similarity로 빠르게 nearest neighbor search를 하는 구조다.
+          DSSM 계열의 query-document matching 아이디어를 추천의 user-repo matching으로 옮긴 형태로 보면 된다.
+        </p>
+        <svg class="diagram" viewBox="0 0 860 230" role="img" aria-label="Two-Tower 구조">
+          <rect x="20" y="24" width="200" height="74" rx="8" fill="#eff6ff" stroke="#bfdbfe"></rect>
+          <text x="120" y="55" text-anchor="middle" font-size="16" font-weight="700" fill="#1b2430">User tower</text>
+          <text x="120" y="78" text-anchor="middle" font-size="13" fill="#5e6978">ID embedding + user features</text>
+          <rect x="20" y="132" width="200" height="74" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+          <text x="120" y="163" text-anchor="middle" font-size="16" font-weight="700" fill="#1b2430">Item tower</text>
+          <text x="120" y="186" text-anchor="middle" font-size="13" fill="#5e6978">repo embedding + lang + item features</text>
+          <line x1="220" y1="61" x2="365" y2="95" stroke="#94a3b8" stroke-width="2"></line>
+          <line x1="220" y1="169" x2="365" y2="135" stroke="#94a3b8" stroke-width="2"></line>
+          <rect x="365" y="72" width="150" height="86" rx="8" fill="#ffffff" stroke="#d8dee8"></rect>
+          <text x="440" y="105" text-anchor="middle" font-size="16" font-weight="700" fill="#1b2430">normalized vectors</text>
+          <text x="440" y="129" text-anchor="middle" font-size="13" fill="#5e6978">64 dim, dot product</text>
+          <line x1="515" y1="115" x2="640" y2="115" stroke="#94a3b8" stroke-width="2"></line>
+          <rect x="640" y="72" width="190" height="86" rx="8" fill="#fff7ed" stroke="#fed7aa"></rect>
+          <text x="735" y="105" text-anchor="middle" font-size="16" font-weight="700" fill="#1b2430">FAISS FlatIP</text>
+          <text x="735" y="129" text-anchor="middle" font-size="13" fill="#5e6978">top-K repo retrieval</text>
+        </svg>
+        <p>
+          적용은 <code>scripts/train_two_tower_week6_full_v2.py</code>에서 했다. user feature는 total score, active days, event share, entropy, growth를 쓰고,
+          item feature는 7/28/42일 repo 활동량, language, stars, forks, archived 등을 썼다.
+          학습은 batch 내부의 positive item을 정답으로 두는 in-batch softmax 방식이며, temperature는 <code>0.05</code>, embedding dim은 <code>64</code>다.
+        </p>
+        <div class="grid-2">
+          <div class="card">
+            <h3>Positive item 정의</h3>
+            <p>
+              Two-Tower에서 positive item은 해당 user가 history 기간에 실제 GitHub 이벤트를 남긴 repo다.
+              <code>train_fb</code>의 각 <code>(actor_id, repo_id)</code> row가 positive pair가 되고,
+              이 pair는 watch, fork, PR, issue, push, comment 같은 행동을 weighted implicit feedback으로 바꾼 결과다.
+            </p>
+            <span class="pill">observed interaction</span><span class="pill">implicit positive</span>
+          </div>
+          <div class="card">
+            <h3>Negative sample 방식</h3>
+            <p>
+              별도 negative sampling table을 만들지는 않았다. batch 안에서 <code>i</code>번째 user의 정답은 <code>i</code>번째 item이고,
+              나머지 item들은 그 user 입장에서 negative처럼 쓰인다. 즉 <code>batch_size=2048</code>이면 user당 최대 2047개의 in-batch negative가 생긴다.
+            </p>
+            <span class="pill">in-batch negative</span><span class="pill">false negative 가능</span>
+          </div>
+        </div>
+        <svg class="diagram" viewBox="0 0 860 230" role="img" aria-label="Two-Tower positive and in-batch negative">
+          <rect x="25" y="25" width="150" height="46" rx="8" fill="#eff6ff" stroke="#bfdbfe"></rect>
+          <text x="100" y="54" text-anchor="middle" font-size="14" font-weight="800">user_0</text>
+          <rect x="25" y="92" width="150" height="46" rx="8" fill="#eff6ff" stroke="#bfdbfe"></rect>
+          <text x="100" y="121" text-anchor="middle" font-size="14" font-weight="800">user_1</text>
+          <rect x="25" y="159" width="150" height="46" rx="8" fill="#eff6ff" stroke="#bfdbfe"></rect>
+          <text x="100" y="188" text-anchor="middle" font-size="14" font-weight="800">user_2</text>
+          <rect x="350" y="25" width="150" height="46" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+          <text x="425" y="54" text-anchor="middle" font-size="14" font-weight="800">item_0</text>
+          <rect x="350" y="92" width="150" height="46" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+          <text x="425" y="121" text-anchor="middle" font-size="14" font-weight="800">item_1</text>
+          <rect x="350" y="159" width="150" height="46" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+          <text x="425" y="188" text-anchor="middle" font-size="14" font-weight="800">item_2</text>
+          <line x1="175" y1="48" x2="350" y2="48" stroke="#15803d" stroke-width="4"></line>
+          <line x1="175" y1="115" x2="350" y2="115" stroke="#15803d" stroke-width="4"></line>
+          <line x1="175" y1="182" x2="350" y2="182" stroke="#15803d" stroke-width="4"></line>
+          <line x1="175" y1="48" x2="350" y2="115" stroke="#b91c1c" stroke-width="2" stroke-dasharray="6 5"></line>
+          <line x1="175" y1="48" x2="350" y2="182" stroke="#b91c1c" stroke-width="2" stroke-dasharray="6 5"></line>
+          <rect x="610" y="47" width="210" height="136" rx="8" fill="#fff7ed" stroke="#fed7aa"></rect>
+          <text x="715" y="83" text-anchor="middle" font-size="15" font-weight="800">cross entropy target</text>
+          <text x="715" y="111" text-anchor="middle" font-size="13" fill="#5e6978">diagonal = positive</text>
+          <text x="715" y="135" text-anchor="middle" font-size="13" fill="#5e6978">off-diagonal = in-batch negative</text>
+          <text x="715" y="159" text-anchor="middle" font-size="13" fill="#5e6978">not observed does not mean disliked</text>
+        </svg>
+        <div class="note">
+          <strong>Popularity는 어떻게 반영됐나</strong>
+          인기 repo는 여러 user의 positive pair로 더 자주 등장하기 때문에 item embedding이 더 많이 업데이트된다.
+          동시에 v2 item tower에는 <code>total_score_7d/28d/42d</code>, <code>unique_users_7d/28d/42d</code>,
+          <code>stars</code>, <code>forks</code> 같은 popularity proxy가 feature로 직접 들어간다.
+          그래서 popularity는 학습 row 빈도와 item feature 두 경로로 반영됐다.
+        </div>
+        <div class="note good">
+          <strong>Two-Tower가 특히 강해지는 구간</strong>
+          Two-Tower는 초기 유저나 정보가 적은 유저, 그리고 새로 들어온 item처럼 cold-start가 중요한 상황에서 강해질 수 있다.
+          ALS는 충분한 user-item interaction이 쌓여야 유저/아이템 latent vector가 안정적으로 잡히지만,
+          Two-Tower는 연령대, 성별, 지역, 선호 카테고리 같은 user metadata와 카테고리, 브랜드, 가격대, 텍스트/이미지 embedding 같은 item metadata를 tower 입력에 바로 넣을 수 있다.
+          그래서 interaction이 적어도 metadata가 풍부하면 “비슷한 프로필의 유저가 좋아한 item”이나 “비슷한 속성의 item”을 retrieval 단계에서 꺼내기 쉽다.
+          이번 GitHub 데이터에서는 개인정보나 상품 카테고리처럼 강한 side feature가 없고, repo metadata도 language, stars/forks, 활동량 중심이라 이 장점이 제한적으로만 드러났다.
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <h3>이커머스 예시</h3>
+            <p>
+              새 유저가 회원가입 직후 “Python, 데이터, 저가형 노트북” 같은 관심사만 남겼다고 하자.
+              ALS는 아직 구매/클릭 history가 부족해서 유저 벡터가 약하지만, Two-Tower는 이 관심사를 user feature로 넣고
+              item tower의 카테고리, 가격대, 브랜드, 텍스트 embedding과 바로 매칭할 수 있다.
+            </p>
+          </div>
+          <div class="card">
+            <h3>우리 데이터에서의 대응</h3>
+            <p>
+              GitHub에서는 user profile이 거의 없으므로 user tower는 이벤트 비중, 활동일수, growth 같은 행동 요약에 의존했다.
+              item tower는 language, stars, forks, 최근 활동량을 썼다. 즉 cold-start 장점은 넣었지만, 이커머스만큼 풍부한 metadata는 없었다.
+            </p>
+          </div>
+        </div>
+        <p>
+          참고로 <code>notebooks/ghrec/09_two_tower.ipynb</code>의 5% sample 실험에서는 Two-Tower가 ALS보다 높게 나온 구간도 있었다.
+          하지만 2026-05-16 기준 최신 feature와 100k item catalog로 다시 비교했을 때는 ALS가 NDCG 기준으로 앞섰고, Two-Tower는 다양성 보강 역할로 결론이 바뀌었다.
+        </p>
+        <div class="note warn">
+          <strong>왜 ALS보다 낮았나</strong>
+          Two-Tower는 side feature를 넣을 수 있지만, 이 데이터에서는 repo interaction이 극도로 sparse하고 인기 repo로 신호가 쏠린다.
+          ALS는 바로 user-item interaction 행렬을 factorize하기 때문에 warm user의 협업 신호를 더 직접적으로 잡는다.
+          Two-Tower의 장점은 정확도 1위가 아니라 Unique@100 70,537개로 후보 다양성을 크게 늘리는 쪽이었다.
+        </div>
+      </section>
+
+      <section id="rankers">
+        <h2>Neural re-ranker: 같은 후보군을 더 잘 정렬하기</h2>
+        <p>
+          re-rank 실험은 ALS/popularity/recent/related 기반 hybrid candidate를 만든 뒤, 75개 feature를 사용해 후보 순서를 다시 매겼다.
+          딥러닝 모델은 후보 생성기가 아니라 후보 정렬기로 넣었다. 즉 모델이 모든 repo를 직접 검색하는 것이 아니라, 이미 좁혀진 후보 300~500개 안에서
+          “이번 user에게 어떤 repo를 더 위에 둘 것인가”를 학습한다.
+        </p>
+        <div class="note">
+          <strong>공통 입력</strong>
+          모든 re-ranker는 같은 75개 feature를 받는다. 주요 feature는 <code>als_score</code>, <code>factor_cosine</code>,
+          <code>log_popularity</code>, <code>log_recent_popularity</code>, <code>pop_growth</code>, repo event share, user event share,
+          <code>event_match_dot</code>, <code>seen_max_cosine</code>, 그리고 후보 출처 flag(<code>source_is_als</code>,
+          <code>source_is_recent</code>, <code>source_is_popular</code>)다.
+        </div>
+        <div class="note warn">
+          <strong>학습 loss와 평가 지표는 다르다</strong>
+          LGBM은 <code>metric=ndcg</code>로 평가하지만 실제 objective는 <code>lambdarank</code>다. 후보 pair의 순서를 바꾸는 방향으로 학습하되, 그 pair가 NDCG에 미치는 영향이 클수록 더 큰 gradient를 준다.
+          반면 FM, Deep&Wide, DeepFM, DLRM은 모두 <code>BCEWithLogitsLoss(pos_weight=185.32)</code>로 학습했다. 즉 후보별 positive 확률을 맞추는 binary classification loss로 학습한 뒤, inference 때 logit score로 후보를 정렬해 NDCG@K와 Recall@K를 평가했다.
+          이 차이 때문에 LGBM은 Top-K ranking 목적과 더 직접적으로 맞고, neural ranker들은 NDCG와 objective 사이에 간극이 있다.
+        </div>
+
+        <div class="model-detail">
+          <div class="model-head">
+            <div>
+              <h3>LGBM LambdaRank: tabular ranking 기준선</h3>
+              <p>
+                LGBM은 딥러닝 모델은 아니지만 re-rank 비교의 가장 중요한 기준선이다.
+                LambdaRank objective는 같은 user의 후보 리스트를 하나의 group으로 보고, 정답 repo가 위로 올라갈 때 NDCG가 얼마나 좋아지는지를 학습 신호로 반영한다.
+                그래서 후보별 독립 분류보다 Top-K ranking metric과 더 직접적으로 맞는다.
+              </p>
+            </div>
+            <div class="score-card">
+              <strong>0.022160</strong>
+              <span>NDCG@100, 전체 1위</span>
+            </div>
+          </div>
+          <div class="formula">score = sum(tree_t(feature_vector, split_rules))</div>
+          <svg class="diagram" viewBox="0 0 860 240" role="img" aria-label="LGBM LambdaRank tree 구조">
+            <rect x="330" y="18" width="200" height="48" rx="8" fill="#eff6ff" stroke="#bfdbfe"></rect>
+            <text x="430" y="48" text-anchor="middle" font-size="14" font-weight="800">als_score &gt; threshold?</text>
+            <line x1="380" y1="66" x2="245" y2="112" stroke="#94a3b8" stroke-width="2"></line>
+            <line x1="480" y1="66" x2="615" y2="112" stroke="#94a3b8" stroke-width="2"></line>
+            <rect x="115" y="112" width="260" height="48" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+            <text x="245" y="142" text-anchor="middle" font-size="14" font-weight="800">recent_popularity high?</text>
+            <rect x="485" y="112" width="260" height="48" rx="8" fill="#fff7ed" stroke="#fed7aa"></rect>
+            <text x="615" y="142" text-anchor="middle" font-size="14" font-weight="800">source_is_popular?</text>
+            <line x1="185" y1="160" x2="125" y2="200" stroke="#94a3b8" stroke-width="2"></line>
+            <line x1="305" y1="160" x2="365" y2="200" stroke="#94a3b8" stroke-width="2"></line>
+            <line x1="555" y1="160" x2="495" y2="200" stroke="#94a3b8" stroke-width="2"></line>
+            <line x1="675" y1="160" x2="735" y2="200" stroke="#94a3b8" stroke-width="2"></line>
+            <g font-size="13" font-weight="700">
+              <rect x="50" y="188" width="150" height="38" rx="8" fill="#ffffff" stroke="#d8dee8"></rect>
+              <text x="125" y="212" text-anchor="middle">strong rerank up</text>
+              <rect x="290" y="188" width="150" height="38" rx="8" fill="#ffffff" stroke="#d8dee8"></rect>
+              <text x="365" y="212" text-anchor="middle">medium score</text>
+              <rect x="420" y="188" width="150" height="38" rx="8" fill="#ffffff" stroke="#d8dee8"></rect>
+              <text x="495" y="212" text-anchor="middle">popular fallback</text>
+              <rect x="660" y="188" width="150" height="38" rx="8" fill="#ffffff" stroke="#d8dee8"></rect>
+              <text x="735" y="212" text-anchor="middle">rank down</text>
+            </g>
+          </svg>
+          <div class="subgrid">
+            <div class="subbox">
+              <strong>핵심 아이디어</strong>
+              <p>feature threshold 조합을 tree split으로 찾는다. 예를 들어 ALS score가 높고 recent popularity도 높은 후보를 별도 leaf로 보낼 수 있다.</p>
+            </div>
+            <div class="subbox">
+              <strong>우리 적용</strong>
+              <p><code>objective=lambdarank</code>, <code>n_estimators=120</code>, <code>learning_rate=0.05</code>, <code>num_leaves=31</code>.</p>
+            </div>
+            <div class="subbox">
+              <strong>왜 강했나</strong>
+              <p>positive label이 0.24%뿐이라 deep model이 interaction을 충분히 배우기 어렵다. LGBM은 적은 label에서도 강한 tabular rule을 빨리 잡는다.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="model-detail">
+          <div class="model-head">
+            <div>
+              <h3>DLRM-style: field embedding과 pairwise dot interaction</h3>
+              <p>
+                DLRM은 Meta/Facebook의 추천 모델로, sparse categorical field는 embedding table로 바꾸고 dense feature는 MLP로 처리한 뒤
+                field embedding 사이의 pairwise dot product를 만든다. 추천/광고처럼 field가 많고 interaction이 중요한 문제에 맞춘 구조다.
+                우리 구현은 원본 DLRM을 그대로 재현한 것이 아니라, 75개 dense scalar feature를 각각 하나의 field로 보고 <code>embedding_dim=16</code> 공간에 투영한 DLRM-style ranker다.
+              </p>
+            </div>
+            <div class="score-card">
+              <strong>0.015860</strong>
+              <span>NDCG@100, neural ranker 공통값</span>
+            </div>
+          </div>
+          <div class="paper-figures">
+            <figure class="paper-figure">
+              <img src="https://ar5iv.labs.arxiv.org/html/1906.00091/assets/net.png" alt="DLRM original paper architecture figure">
+              <figcaption>
+                DLRM 원 논문 Figure 1. Dense feature는 bottom MLP로, sparse feature는 embedding lookup으로 처리한 뒤 interaction layer와 top MLP로 이어진다.
+                출처: <a href="https://arxiv.org/abs/1906.00091">Naumov et al., 2019</a>.
+              </figcaption>
+            </figure>
+            <figure class="paper-figure">
+              <img src="https://developer.nvidia.com/blog/wp-content/uploads/2020/06/dlrm-architecture-1-625x581.png" alt="NVIDIA DLRM architecture diagram">
+              <figcaption>
+                NVIDIA DLRM reference diagram. Numerical feature, categorical embedding table, pairwise interaction, concat, top MLP 흐름이 더 명확하게 표시된다.
+                출처: <a href="https://developer.nvidia.com/blog/optimizing-dlrm-on-nvidia-gpus/">NVIDIA Technical Blog</a>.
+              </figcaption>
+            </figure>
+          </div>
+          <div class="formula">field_i = x_i * W_i + b_i, interaction_ij = dot(field_i, field_j), logit = MLP([x, interactions])</div>
+          <svg class="diagram" viewBox="0 0 860 210" role="img" aria-label="DLRM-style 구조">
+            <rect x="25" y="72" width="150" height="58" rx="8" fill="#eff6ff" stroke="#bfdbfe"></rect>
+            <text x="100" y="105" text-anchor="middle" font-size="14" font-weight="700">32 scalar fields</text>
+            <line x1="175" y1="101" x2="285" y2="101" stroke="#94a3b8" stroke-width="2"></line>
+            <rect x="285" y="45" width="170" height="112" rx="8" fill="#f5f3ff" stroke="#ddd6fe"></rect>
+            <text x="370" y="84" text-anchor="middle" font-size="14" font-weight="700">field projection</text>
+            <text x="370" y="110" text-anchor="middle" font-size="13" fill="#5e6978">32 x 16 embeddings</text>
+            <text x="370" y="134" text-anchor="middle" font-size="13" fill="#5e6978">496 dot pairs</text>
+            <line x1="455" y1="101" x2="570" y2="101" stroke="#94a3b8" stroke-width="2"></line>
+            <rect x="570" y="45" width="125" height="112" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+            <text x="632" y="94" text-anchor="middle" font-size="14" font-weight="700">concat</text>
+            <text x="632" y="118" text-anchor="middle" font-size="13" fill="#5e6978">x + pairs</text>
+            <line x1="695" y1="101" x2="760" y2="101" stroke="#94a3b8" stroke-width="2"></line>
+            <rect x="760" y="72" width="78" height="58" rx="8" fill="#fff7ed" stroke="#fed7aa"></rect>
+            <text x="799" y="105" text-anchor="middle" font-size="14" font-weight="700">MLP</text>
+          </svg>
+          <div class="subgrid">
+            <div class="subbox">
+              <strong>핵심 아이디어</strong>
+              <p>feature pair를 그냥 곱하지 않고, 각 feature를 embedding field로 올린 뒤 dot product로 관계를 표현한다.</p>
+            </div>
+            <div class="subbox">
+              <strong>우리 적용</strong>
+              <p>75개 feature면 pairwise interaction은 <code>75 * 74 / 2 = 2775</code>개다. 여기에 원 feature 75개를 붙여 MLP에 넣는다.</p>
+            </div>
+            <div class="subbox">
+              <strong>성능 해석</strong>
+              <p>최신 run에서는 다른 neural ranker와 같은 순위로 수렴했다. 구조 자체는 feature pair를 명시적으로 보지만, 이번 학습 budget에서는 우열을 만들 만큼 분화하지 않았다.</p>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="card">
+              <h3>쉽게 보면: “조합 점수표”를 자동으로 만드는 모델</h3>
+              <p>
+                단일 feature만 보면 <code>recent_popularity</code>가 높은 repo는 대체로 좋아 보인다.
+                하지만 어떤 유저에게는 “최근 뜬 repo”보다 “내가 자주 쓰는 language와 맞고, 이미 본 repo와 embedding이 가까운 repo”가 더 중요할 수 있다.
+                DLRM-style interaction은 이런 <code>최근성 x 언어/행동 일치 x 후보 출처</code> 조합을 496개 pair score로 펼쳐서 MLP가 보게 만든다.
+              </p>
+            </div>
+            <div class="card">
+              <h3>코드에 반영된 부분</h3>
+              <p>
+                <code>DenseDLRM</code>은 원 feature 75개를 그대로 버리지 않고, 각 scalar를 <code>field_weight</code>와 <code>field_bias</code>로 16차원 field embedding에 투영한다.
+                그다음 upper-triangle dot product만 뽑아 원 feature와 concat한다. 이 구현은 원 논문식 sparse embedding lookup 대신 dense feature field projection을 쓴 변형이다.
+              </p>
+            </div>
+          </div>
+          <div class="note good">
+            <strong>DLRM이 보통 성공적인 조건</strong>
+            DLRM은 광고 CTR, 이커머스 추천, 앱 추천처럼 user, item, context categorical feature가 많고 cardinality가 큰 환경에서 특히 잘 맞는다.
+            예를 들어 user id, item id, 카테고리, 브랜드, 지역, 디바이스, 시간대, 캠페인, 세션 정보 같은 field가 많고,
+            <code>20대 남성 x 게임 카테고리</code>, <code>서울 x 점심시간 x 배달 카테고리</code>,
+            <code>최근 fork 많이 한 유저 x fast-growing repo</code>처럼 feature 조합이 클릭/구매/interaction 확률을 좌우할 때 강하다.
+            보통은 retrieval이 후보 수백~수천 개를 먼저 줄이고, DLRM이 그 후보들을 user-item-context feature로 re-rank하는 구조에서 쓰인다.
+          </div>
+          <div class="note warn">
+            <strong>우리 실험과 원래 DLRM setting의 차이</strong>
+            원래 DLRM은 많은 sparse categorical field를 embedding table로 처리하는 모델이다.
+            이번 프로젝트의 구현은 원본 DLRM을 그대로 재현한 것이 아니라, 이미 만들어진 75개 dense candidate feature를 각각 field처럼 보고 projection한 DLRM-style 모델이다.
+            따라서 거대한 user/item/category embedding table을 학습한 것은 아니고, positive label도 877개로 많지 않았다.
+            최신 run에서 DLRM이 다른 neural ranker와 같은 결과로 수렴한 것은 <code>event_match_dot</code>, <code>pop_growth</code>,
+            <code>source_is_als</code>, <code>recent_popularity</code>, user activity 같은 feature 조합을 충분히 분리해 학습하기에는 label과 tuning budget이 부족했기 때문으로 해석하는 편이 안전하다.
+          </div>
+        </div>
+
+        <div class="model-detail">
+          <div class="model-head">
+            <div>
+              <h3>Deep&Wide: 외운 규칙과 일반화 규칙을 같이 쓰기</h3>
+              <p>
+                Wide & Deep은 “자주 본 조합은 wide linear path로 외우고, 못 본 조합은 deep MLP로 일반화한다”는 구조다.
+                원래 논문은 app recommendation에서 cross-product feature와 embedding을 함께 쓰지만, 여기서는 이미 만든 75개 dense feature를 wide path와 deep path에 동시에 넣었다.
+              </p>
+            </div>
+            <div class="score-card">
+              <strong>0.015860</strong>
+              <span>NDCG@100, DeepFM과 사실상 동률</span>
+            </div>
+          </div>
+          <div class="paper-figures">
+            <figure class="paper-figure">
+              <img src="https://ar5iv.labs.arxiv.org/html/1606.07792/assets/x1.png" alt="Wide and Deep model spectrum from the paper">
+              <figcaption>
+                Wide & Deep 원 논문 Figure 1. Wide-only, Wide & Deep, Deep-only 모델의 spectrum을 비교한다.
+                출처: <a href="https://arxiv.org/abs/1606.07792">Cheng et al., 2016</a>.
+              </figcaption>
+            </figure>
+            <figure class="paper-figure">
+              <img src="https://ar5iv.labs.arxiv.org/html/1606.07792/assets/x4.png" alt="Wide and Deep production model structure">
+              <figcaption>
+                Wide & Deep 원 논문 Figure 4. Google Play app ranking에서 sparse/dense feature, embedding, ReLU layer, cross-product transformation을 함께 쓰는 구조다.
+                출처: <a href="https://arxiv.org/abs/1606.07792">Cheng et al., 2016</a>.
+              </figcaption>
+            </figure>
+          </div>
+          <div class="formula">logit = Linear(x) + MLP_128_64(x)</div>
+          <svg class="diagram" viewBox="0 0 860 190" role="img" aria-label="Deep and Wide 구조">
+            <rect x="25" y="66" width="170" height="58" rx="8" fill="#eff6ff" stroke="#bfdbfe"></rect>
+            <text x="110" y="99" text-anchor="middle" font-size="14" font-weight="700">feature vector x</text>
+            <line x1="195" y1="95" x2="315" y2="55" stroke="#94a3b8" stroke-width="2"></line>
+            <line x1="195" y1="95" x2="315" y2="133" stroke="#94a3b8" stroke-width="2"></line>
+            <rect x="315" y="30" width="190" height="50" rx="8" fill="#ffffff" stroke="#d8dee8"></rect>
+            <text x="410" y="60" text-anchor="middle" font-size="14" font-weight="800">wide linear path</text>
+            <rect x="315" y="108" width="80" height="50" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+            <text x="355" y="138" text-anchor="middle" font-size="13" font-weight="800">128</text>
+            <rect x="415" y="108" width="80" height="50" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+            <text x="455" y="138" text-anchor="middle" font-size="13" font-weight="800">64</text>
+            <rect x="515" y="108" width="80" height="50" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+            <text x="555" y="138" text-anchor="middle" font-size="13" font-weight="800">out</text>
+            <line x1="505" y1="55" x2="665" y2="86" stroke="#94a3b8" stroke-width="2"></line>
+            <line x1="595" y1="133" x2="665" y2="103" stroke="#94a3b8" stroke-width="2"></line>
+            <rect x="665" y="68" width="170" height="58" rx="8" fill="#fff7ed" stroke="#fed7aa"></rect>
+            <text x="750" y="101" text-anchor="middle" font-size="14" font-weight="800">sum logits</text>
+          </svg>
+          <div class="subgrid">
+            <div class="subbox">
+              <strong>핵심 아이디어</strong>
+              <p>wide path는 강한 단일 feature 신호를 보존하고, deep path는 비선형 조합을 학습한다.</p>
+            </div>
+            <div class="subbox">
+              <strong>우리 적용</strong>
+              <p>MLP는 <code>Linear -> ReLU -> BatchNorm1d -> Dropout</code>을 두 번 쌓고 hidden dim은 <code>128,64</code>다.</p>
+            </div>
+            <div class="subbox">
+              <strong>성능 해석</strong>
+              <p>최신 run에서는 FM/DeepFM/DLRM과 같은 값으로 수렴했다. 구조 차이보다 label 희소성과 공통 BCE 학습 설정의 영향이 더 컸다.</p>
+            </div>
+          </div>
+          <div class="note good">
+            <strong>Deep&Wide가 잘 맞는 조건</strong>
+            반복적으로 잘 먹히는 feature rule과 새로운 조합을 동시에 다뤄야 할 때 좋다.
+            예를 들어 <code>source_is_als=1</code>이고 <code>als_score</code>가 높으면 wide path가 안정적으로 높은 점수를 줄 수 있고,
+            <code>push 중심 유저 x 최근 issue가 늘어난 repo x language match</code>처럼 명시적으로 만들지 않은 조합은 deep path가 배울 수 있다.
+            우리 구현은 cross-product sparse feature를 별도로 만들지 않았기 때문에, 원 논문보다 wide path의 “암기” 역할은 약하고 dense feature의 linear shortcut에 가깝다.
+          </div>
+        </div>
+
+        <div class="model-detail">
+          <div class="model-head">
+            <div>
+              <h3>DeepFM: FM interaction과 deep interaction을 결합</h3>
+              <p>
+                DeepFM은 FM의 low-order interaction과 deep network의 high-order interaction을 합친 모델이다.
+                원 논문에서는 sparse categorical field embedding을 FM part와 deep part가 공유해서 feature engineering 없이 CTR feature interaction을 학습하는 것이 핵심이다.
+                우리 구현은 categorical embedding table을 새로 만들지는 않고, 표준화된 dense candidate feature를 FM과 MLP에 같이 넣는 간소화 버전이다.
+              </p>
+            </div>
+            <div class="score-card">
+              <strong>0.015860</strong>
+              <span>NDCG@100, Deep&Wide와 거의 동일</span>
+            </div>
+          </div>
+          <div class="paper-figures">
+            <figure class="paper-figure">
+              <img src="https://ar5iv.labs.arxiv.org/html/1703.04247/assets/img/architecture-deepfm.png" alt="DeepFM architecture from the original paper">
+              <figcaption>
+                DeepFM 원 논문 Figure 1. FM layer와 deep neural network가 같은 raw feature embedding을 공유하면서 low-order와 high-order interaction을 함께 학습한다.
+                출처: <a href="https://arxiv.org/abs/1703.04247">Guo et al., 2017</a>.
+              </figcaption>
+            </figure>
+            <figure class="paper-figure">
+              <img src="https://ar5iv.labs.arxiv.org/html/1703.04247/assets/img/Other-model.png" alt="Existing deep CTR models compared in DeepFM paper">
+              <figcaption>
+                DeepFM 원 논문 Figure 5. FNN, PNN, Wide & Deep 등 기존 CTR deep model과 DeepFM의 차이를 설명할 때 함께 보기 좋은 비교 그림이다.
+                출처: <a href="https://arxiv.org/abs/1703.04247">Guo et al., 2017</a>.
+              </figcaption>
+            </figure>
+          </div>
+          <div class="formula">logit = FM(x) + MLP_128_64(x)</div>
+          <svg class="diagram" viewBox="0 0 860 190" role="img" aria-label="DeepFM 구조">
+            <rect x="25" y="65" width="170" height="58" rx="8" fill="#eff6ff" stroke="#bfdbfe"></rect>
+            <text x="110" y="98" text-anchor="middle" font-size="14" font-weight="700">feature vector x</text>
+            <line x1="195" y1="94" x2="310" y2="55" stroke="#94a3b8" stroke-width="2"></line>
+            <line x1="195" y1="94" x2="310" y2="132" stroke="#94a3b8" stroke-width="2"></line>
+            <rect x="310" y="28" width="185" height="54" rx="8" fill="#f5f3ff" stroke="#ddd6fe"></rect>
+            <text x="402" y="60" text-anchor="middle" font-size="14" font-weight="700">FM: low-order</text>
+            <rect x="310" y="105" width="185" height="54" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+            <text x="402" y="137" text-anchor="middle" font-size="14" font-weight="700">MLP: high-order</text>
+            <line x1="495" y1="55" x2="625" y2="88" stroke="#94a3b8" stroke-width="2"></line>
+            <line x1="495" y1="132" x2="625" y2="101" stroke="#94a3b8" stroke-width="2"></line>
+            <rect x="625" y="66" width="190" height="58" rx="8" fill="#fff7ed" stroke="#fed7aa"></rect>
+            <text x="720" y="99" text-anchor="middle" font-size="14" font-weight="700">sum logits</text>
+          </svg>
+          <div class="subgrid">
+            <div class="subbox">
+              <strong>핵심 아이디어</strong>
+              <p>FM이 2차 조합을 안정적으로 담당하고, MLP가 3차 이상의 feature 조합을 담당한다.</p>
+            </div>
+            <div class="subbox">
+              <strong>우리 적용</strong>
+              <p><code>DenseFM(n_features, 16)</code>와 <code>make_mlp(75, 128,64)</code>의 출력을 더한다.</p>
+            </div>
+            <div class="subbox">
+              <strong>성능 해석</strong>
+              <p>Deep&Wide와 거의 같았다. 이미 feature engineering이 강해서 FM part가 추가로 주는 이득이 제한적이었다.</p>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="card">
+              <h3>DeepFM이 잘 되는 조건</h3>
+              <p>
+                원래 DeepFM은 광고/이커머스 CTR처럼 user id, item id, 카테고리, 브랜드, context 같은 sparse field가 많고
+                2차 조합과 고차 조합이 둘 다 중요한 문제에서 강하다. feature engineering 없이 embedding을 공유하며
+                <code>user segment x category</code>, <code>brand x price bucket x time</code> 같은 조합을 같이 배운다는 점이 핵심이다.
+              </p>
+            </div>
+            <div class="card">
+              <h3>우리 DeepFM의 한계와 해석</h3>
+              <p>
+                이번 구현은 sparse categorical embedding을 새로 만들지 않고, 이미 가공된 75개 dense feature를 FM과 MLP에 넣었다.
+                그래서 DeepFM의 장점인 “raw sparse field에서 interaction을 직접 학습”하는 효과는 약했다.
+                성능이 Deep&Wide와 거의 같은 이유도, 두 모델이 같은 dense feature와 같은 MLP 설정을 공유했기 때문이다.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="model-detail">
+          <div class="model-head">
+            <div>
+              <h3>FM: pairwise interaction을 가장 작게 넣는 모델</h3>
+              <p>
+                Factorization Machine은 선형 모델에 feature 간 2차 interaction을 더한다.
+                모든 feature 쌍마다 별도 weight를 두면 parameter가 너무 많아지므로, 각 feature에 작은 latent vector를 주고 두 vector의 내적으로 interaction strength를 계산한다.
+              </p>
+            </div>
+            <div class="score-card">
+              <strong>0.015860</strong>
+              <span>NDCG@100, neural 계열 시작점</span>
+            </div>
+          </div>
+          <div class="formula">y = w0 + sum(w_i x_i) + 0.5 * sum((xV)^2 - (x^2)(V^2))</div>
+          <svg class="diagram" viewBox="0 0 860 160" role="img" aria-label="FM 구조">
+            <rect x="25" y="45" width="170" height="58" rx="8" fill="#eff6ff" stroke="#bfdbfe"></rect>
+            <text x="110" y="78" text-anchor="middle" font-size="14" font-weight="700">75 candidate features</text>
+            <line x1="195" y1="74" x2="310" y2="74" stroke="#94a3b8" stroke-width="2"></line>
+            <rect x="310" y="25" width="180" height="48" rx="8" fill="#ffffff" stroke="#d8dee8"></rect>
+            <text x="400" y="55" text-anchor="middle" font-size="14" font-weight="700">linear term</text>
+            <rect x="310" y="90" width="180" height="48" rx="8" fill="#f5f3ff" stroke="#ddd6fe"></rect>
+            <text x="400" y="120" text-anchor="middle" font-size="14" font-weight="700">factor interaction</text>
+            <line x1="490" y1="49" x2="620" y2="74" stroke="#94a3b8" stroke-width="2"></line>
+            <line x1="490" y1="114" x2="620" y2="86" stroke="#94a3b8" stroke-width="2"></line>
+            <rect x="620" y="50" width="190" height="58" rx="8" fill="#ecfdf5" stroke="#bbf7d0"></rect>
+            <text x="715" y="83" text-anchor="middle" font-size="14" font-weight="700">repo score logit</text>
+          </svg>
+          <div class="subgrid">
+            <div class="subbox">
+              <strong>핵심 아이디어</strong>
+              <p><code>als_score x source_is_als</code>, <code>recent_popularity x pop_growth</code> 같은 2차 조합을 자동으로 잡는다.</p>
+            </div>
+            <div class="subbox">
+              <strong>우리 적용</strong>
+              <p><code>factor_dim=16</code>. 입력은 one-hot sparse field가 아니라 표준화된 dense feature 75개다.</p>
+            </div>
+            <div class="subbox">
+              <strong>성능 해석</strong>
+              <p>최신 run에서는 다른 neural ranker와 같은 값으로 수렴했고 ALS/Fallback보다 낮았다. 2차 interaction만으로는 LGBM의 ranking objective를 넘지 못했다.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="note warn">
+          <strong>왜 neural ranker가 LGBM을 못 넘었나</strong>
+          이번 데이터는 rank row가 16.3만 개이고 positive label은 877개뿐이다.
+          deep model은 많은 negative 사이에서 미세한 ranking 차이를 배워야 하고, weighted BCE는 NDCG 자체를 직접 최적화하지 않는다.
+          반면 LGBM LambdaRank는 user별 group ranking objective로 학습하고, feature threshold가 강한 GitHub popularity/recentness 패턴에 잘 맞았다.
+        </div>
+        <div class="visual-grid">
+          <div class="visual-card">
+            <strong>Training loss curves, 3 epochs</strong>
+            <svg viewBox="0 0 520 280" role="img" aria-label="neural ranker training loss curves">
+              <line x1="55" y1="230" x2="485" y2="230" stroke="#cbd5e1"></line>
+              <line x1="55" y1="35" x2="55" y2="230" stroke="#cbd5e1"></line>
+              <g fill="#5e6978" font-size="12">
+                <text x="50" y="250" text-anchor="middle">1</text>
+                <text x="270" y="250" text-anchor="middle">2</text>
+                <text x="485" y="250" text-anchor="middle">3</text>
+                <text x="38" y="231" text-anchor="end">0.75</text>
+                <text x="38" y="156" text-anchor="end">1.00</text>
+                <text x="38" y="82" text-anchor="end">1.25</text>
+              </g>
+              <polyline points="55,58 270,154 485,171" fill="none" stroke="#6d28d9" stroke-width="3"></polyline>
+              <polyline points="55,162 270,206 485,214" fill="none" stroke="#2563eb" stroke-width="3"></polyline>
+              <polyline points="55,147 270,203 485,211" fill="none" stroke="#0f766e" stroke-width="3"></polyline>
+              <polyline points="55,173 270,210 485,220" fill="none" stroke="#b45309" stroke-width="3"></polyline>
+              <g font-size="12" font-weight="700">
+                <circle cx="320" cy="48" r="5" fill="#6d28d9"></circle><text x="332" y="52">FM 1.327 -> 0.867</text>
+                <circle cx="320" cy="72" r="5" fill="#2563eb"></circle><text x="332" y="76">Deep&Wide 0.973 -> 0.799</text>
+                <circle cx="320" cy="96" r="5" fill="#0f766e"></circle><text x="332" y="100">DeepFM 1.023 -> 0.809</text>
+                <circle cx="320" cy="120" r="5" fill="#b45309"></circle><text x="332" y="124">DLRM 0.935 -> 0.781</text>
+              </g>
+            </svg>
+          </div>
+          <div class="visual-card">
+            <strong>Re-rank model trade-off map</strong>
+            <svg viewBox="0 0 520 280" role="img" aria-label="rerank tradeoff scatter plot">
+              <line x1="62" y1="230" x2="480" y2="230" stroke="#cbd5e1"></line>
+              <line x1="62" y1="35" x2="62" y2="230" stroke="#cbd5e1"></line>
+              <text x="270" y="262" text-anchor="middle" font-size="13" fill="#5e6978">Unique@100</text>
+              <text x="18" y="135" transform="rotate(-90 18 135)" text-anchor="middle" font-size="13" fill="#5e6978">NDCG@100</text>
+              <g font-size="12" font-weight="800">
+                <circle cx="62" cy="230" r="7" fill="#94a3b8"></circle><text x="75" y="234">Popularity</text>
+                <circle cx="350" cy="118" r="8" fill="#0f766e"></circle><text x="363" y="122">LGBM</text>
+                <circle cx="432" cy="153" r="8" fill="#6d28d9"></circle><text x="445" y="157">FM</text>
+                <circle cx="374" cy="131" r="8" fill="#2563eb"></circle><text x="387" y="135">Deep&Wide</text>
+                <circle cx="365" cy="131" r="8" fill="#15803d"></circle><text x="378" y="151">DeepFM</text>
+                <circle cx="397" cy="122" r="8" fill="#b45309"></circle><text x="410" y="102">DLRM</text>
+              </g>
+              <rect x="300" y="68" width="185" height="42" rx="8" fill="#fff7ed" stroke="#fed7aa"></rect>
+              <text x="392" y="93" text-anchor="middle" font-size="13" font-weight="800" fill="#1b2430">upper-right is better</text>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <section id="tuning">
+        <h2>튜닝한 영역과 남은 선택지</h2>
+        <p>
+          이번 실험은 모든 하이퍼파라미터를 대규모 grid search로 훑은 작업은 아니다.
+          비교 목적에 맞춰 먼저 같은 candidate set과 같은 feature cache를 고정하고, 모델 구조만 바꿔 공정하게 비교하는 쪽을 우선했다.
+          그다음 로컬 16GB Mac에서 끝까지 재현 가능한 설정으로 batch size, epoch, cache 재사용 전략을 조정했다.
+        </p>
+        <div class="step-list">
+          <div class="step">
+            <strong>Step 1</strong>
+            <p>smoke run으로 LGBM, FM, Deep&Wide, DeepFM, DLRM 코드 경로가 모두 돌아가는지 확인했다. 이 단계의 수치는 성능 결론에 쓰지 않고 실행 검증용으로만 봤다.</p>
+          </div>
+          <div class="step">
+            <strong>Step 2</strong>
+            <p><code>hist28_mini</code>, <code>hist28_mid</code>처럼 작은 catalog와 짧은 epoch로 후보 생성, feature matrix, neural training 비용을 확인했다.</p>
+          </div>
+          <div class="step">
+            <strong>Step 3</strong>
+            <p>최신 run에서는 Airflow가 만든 ranker feature parquet를 먼저 재사용했다. ALS retrieval과 feature 생성을 매번 반복하면 로컬 Docker 메모리 한계에 걸리기 쉽기 때문이다.</p>
+          </div>
+          <div class="step">
+            <strong>Step 4</strong>
+            <p><code>batch_size=8192</code>는 너무 느렸고 <code>65536</code>은 PyTorch segfault가 나서, 최종 완료 run은 <code>32768</code>, <code>torch_threads=1</code>, CPU로 고정했다.</p>
+          </div>
+        </div>
+        <div class="note">
+          <strong>DeepFM 같은 neural ranker의 튜닝 방식</strong>
+          DeepFM만 따로 과하게 튜닝하면 비교가 흐려지므로, FM/Deep&Wide/DeepFM/DLRM은 공통 training budget을 맞췄다.
+          공통값은 <code>epochs=3</code>, <code>lr=1e-3</code>, <code>weight_decay=1e-5</code>, <code>dropout=0.1</code>,
+          <code>hidden_dims=128,64</code>, <code>batch_size=32768</code>이고, DeepFM의 FM factor는 <code>16</code>이다.
+          이 설정은 “최적 DeepFM”이라기보다 같은 조건에서 DeepFM 구조가 추가 이득을 내는지 보는 비교 기준이다.
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>영역</th>
+              <th>이번 설정</th>
+              <th>이유</th>
+              <th>다음 튜닝 후보</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>ALS baseline</td>
+              <td><code>factors=48</code>, <code>iterations=4</code>, <code>regularization=0.03</code></td>
+              <td>대규모 sparse implicit feedback에서 빠른 후보 생성을 위한 기준선.</td>
+              <td>factors 96/128, confidence scaling, event weight 재조정.</td>
+            </tr>
+            <tr>
+              <td>activation</td>
+              <td><code>ReLU</code></td>
+              <td>dense tabular feature에서 빠르고 안정적인 기본값. BatchNorm과 같이 쓰기 쉽다.</td>
+              <td>GELU, SiLU. 단, 데이터가 sparse해서 모델 복잡도 증가가 성능으로 이어지는지 검증 필요.</td>
+            </tr>
+            <tr>
+              <td>layer 수</td>
+              <td><code>128,64</code> 2-layer MLP</td>
+              <td>positive label이 877개라 깊게 쌓으면 과적합 위험이 크다.</td>
+              <td><code>256,128,64</code>, <code>64,32</code> 비교. NDCG@100과 calibration을 함께 확인.</td>
+            </tr>
+            <tr>
+              <td>dropout / weight decay</td>
+              <td><code>dropout=0.1</code>, <code>weight_decay=1e-5</code></td>
+              <td>positive label이 적어 neural ranker가 특정 popularity/source rule에 과하게 붙는 것을 줄이기 위한 기본 regularization.</td>
+              <td><code>dropout=0.0/0.2</code>, <code>weight_decay=1e-4</code>, early stopping.</td>
+            </tr>
+            <tr>
+              <td>embedding/factor dim</td>
+              <td>Two-Tower <code>64</code>, FM/DLRM <code>16</code></td>
+              <td>CPU 실험 시간과 sparse label 수를 고려한 보수적 설정.</td>
+              <td>Two-Tower 128, DLRM 8/32, feature field grouping.</td>
+            </tr>
+            <tr>
+              <td>loss</td>
+              <td>Two-Tower는 in-batch cross entropy, ranker는 weighted BCE</td>
+              <td>retrieval은 vector similarity 학습, re-rank는 후보별 positive 확률 학습으로 역할이 다르다.</td>
+              <td>BPR, sampled softmax, LambdaRank-style neural loss.</td>
+            </tr>
+            <tr>
+              <td>LGBM LambdaRank</td>
+              <td><code>n_estimators=120</code>, <code>learning_rate=0.05</code>, <code>num_leaves=31</code></td>
+              <td>적은 positive label에서도 tabular feature의 threshold rule을 안정적으로 학습한다.</td>
+              <td><code>num_leaves</code>, <code>min_child_samples</code>, <code>lambdarank_truncation_level</code>, candidate group 설계.</td>
+            </tr>
+            <tr>
+              <td>class imbalance</td>
+              <td><code>pos_weight=185.32</code></td>
+              <td>positive rate 0.537%라 그대로 학습하면 대부분 negative로 예측하기 쉽다.</td>
+              <td>hard negative mining, per-user negative sampling, candidate source별 weighting.</td>
+            </tr>
+            <tr>
+              <td>candidate set</td>
+              <td><code>candidate_k=120</code>, <code>hybrid_extra=80</code>, <code>related_candidate_cap=30</code></td>
+              <td>ALS 후보에 popularity/recent/related 후보를 섞어 recall과 cold coverage를 보완했다.</td>
+              <td>Two-Tower 후보를 hybrid에 추가하고 source flag를 분리.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="grid-2">
+          <div class="card">
+            <h3>우리 코드에서 가장 크게 반영된 것</h3>
+            <ul>
+              <li>shared candidate cache로 모델별 후보군 차이를 제거했다.</li>
+              <li>ranker 입력 feature를 표준화해 neural 모델 학습을 안정화했다.</li>
+              <li>positive imbalance를 <code>pos_weight</code>로 보정했다.</li>
+              <li>MLflow에 <code>exp_*</code>, <code>core_*</code> param/metric을 남겨 run 비교가 가능하게 했다.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>아직 하지 않은 튜닝</h3>
+            <ul>
+              <li>DeepFM의 <code>factor_dim</code> 8/32/64 비교.</li>
+              <li>DeepFM/Deep&Wide의 layer width와 dropout 조합 grid.</li>
+              <li>weighted BCE 대신 listwise/pairwise ranking loss 적용.</li>
+              <li>candidate source별 hard negative를 따로 샘플링하는 방식.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="performance">
+        <h2>성능과 이유</h2>
+        <h3>Retrieval: ALS vs Two-Tower</h3>
+        <div class="bar-chart" aria-label="Two-Tower retrieval NDCG@10">
+          <div class="bar-row"><strong>Popularity</strong><div class="track"><div class="bar weak" style="width:26%"></div></div><div class="value">0.00240</div></div>
+          <div class="bar-row"><strong>ALS</strong><div class="track"><div class="bar base" style="width:100%"></div></div><div class="value">0.00914</div></div>
+          <div class="bar-row"><strong>Two-Tower</strong><div class="track"><div class="bar neural" style="width:38%"></div></div><div class="value">0.00351</div></div>
+        </div>
+        <p>
+          NDCG@10은 ALS가 가장 높았지만, Unique@100은 ALS 7,136개 대비 Two-Tower 70,537개였다.
+          즉 Two-Tower는 지금 설정에서 정확도 기준으로 ALS를 대체하기보다 long-tail repo 후보를 더 넓게 공급하는 모델이다.
+        </p>
+
+        <h3>Re-rank: NDCG@100</h3>
+        <div class="bar-chart" aria-label="Re-ranker NDCG@100">
+          <div class="bar-row"><strong>LGBM</strong><div class="track"><div class="bar" style="width:100%"></div></div><div class="value">0.02216</div></div>
+          <div class="bar-row"><strong>ALS/Fallback</strong><div class="track"><div class="bar base" style="width:83%"></div></div><div class="value">0.01846</div></div>
+          <div class="bar-row"><strong>DLRM</strong><div class="track"><div class="bar neural" style="width:72%"></div></div><div class="value">0.01586</div></div>
+          <div class="bar-row"><strong>Deep&Wide</strong><div class="track"><div class="bar neural" style="width:72%"></div></div><div class="value">0.01586</div></div>
+          <div class="bar-row"><strong>DeepFM</strong><div class="track"><div class="bar neural" style="width:72%"></div></div><div class="value">0.01586</div></div>
+          <div class="bar-row"><strong>FM</strong><div class="track"><div class="bar neural" style="width:72%"></div></div><div class="value">0.01586</div></div>
+          <div class="bar-row"><strong>Popularity</strong><div class="track"><div class="bar weak" style="width:64%"></div></div><div class="value">0.01423</div></div>
+        </div>
+        <div class="visual-card">
+          <strong>Metric heatmap: NDCG@10, NDCG@100, Recall@100, Unique@100</strong>
+          <svg viewBox="0 0 860 310" role="img" aria-label="metric heatmap for rerank models">
+            <g font-size="12" fill="#5e6978" font-weight="700">
+              <text x="170" y="30" text-anchor="middle">NDCG@10</text>
+              <text x="320" y="30" text-anchor="middle">NDCG@100</text>
+              <text x="470" y="30" text-anchor="middle">Recall@100</text>
+              <text x="620" y="30" text-anchor="middle">Unique@100</text>
+            </g>
+            <g font-size="13" font-weight="800" fill="#1b2430">
+              <text x="30" y="70">Popularity</text>
+              <text x="30" y="108">ALS/Fallback</text>
+              <text x="30" y="146">LGBM</text>
+              <text x="30" y="184">FM</text>
+              <text x="30" y="222">Deep&Wide</text>
+              <text x="30" y="260">DeepFM</text>
+              <text x="30" y="298">DLRM</text>
+            </g>
+            <g font-size="12" font-weight="800" text-anchor="middle">
+              <rect x="125" y="48" width="90" height="28" rx="5" fill="#dbeafe"></rect><text x="170" y="67">0.0042</text>
+              <rect x="275" y="48" width="90" height="28" rx="5" fill="#dbeafe"></rect><text x="320" y="67">0.0142</text>
+              <rect x="425" y="48" width="90" height="28" rx="5" fill="#dbeafe"></rect><text x="470" y="67">0.0649</text>
+              <rect x="575" y="48" width="90" height="28" rx="5" fill="#eff6ff"></rect><text x="620" y="67">105</text>
+              <rect x="125" y="86" width="90" height="28" rx="5" fill="#bfdbfe"></rect><text x="170" y="105">0.0083</text>
+              <rect x="275" y="86" width="90" height="28" rx="5" fill="#bfdbfe"></rect><text x="320" y="105">0.0185</text>
+              <rect x="425" y="86" width="90" height="28" rx="5" fill="#bfdbfe"></rect><text x="470" y="105">0.0657</text>
+              <rect x="575" y="86" width="90" height="28" rx="5" fill="#bfdbfe"></rect><text x="620" y="105">6,644</text>
+              <rect x="125" y="124" width="90" height="28" rx="5" fill="#1d4ed8"></rect><text x="170" y="143" fill="#fff">0.0110</text>
+              <rect x="275" y="124" width="90" height="28" rx="5" fill="#1d4ed8"></rect><text x="320" y="143" fill="#fff">0.0222</text>
+              <rect x="425" y="124" width="90" height="28" rx="5" fill="#1d4ed8"></rect><text x="470" y="143" fill="#fff">0.0758</text>
+              <rect x="575" y="124" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="620" y="143">4,983</text>
+              <rect x="125" y="162" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="170" y="181">0.0068</text>
+              <rect x="275" y="162" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="320" y="181">0.0159</text>
+              <rect x="425" y="162" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="470" y="181">0.0577</text>
+              <rect x="575" y="162" width="90" height="28" rx="5" fill="#60a5fa"></rect><text x="620" y="181">6,838</text>
+              <rect x="125" y="200" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="170" y="219">0.0068</text>
+              <rect x="275" y="200" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="320" y="219">0.0159</text>
+              <rect x="425" y="200" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="470" y="219">0.0577</text>
+              <rect x="575" y="200" width="90" height="28" rx="5" fill="#60a5fa"></rect><text x="620" y="219">6,838</text>
+              <rect x="125" y="238" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="170" y="257">0.0068</text>
+              <rect x="275" y="238" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="320" y="257">0.0159</text>
+              <rect x="425" y="238" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="470" y="257">0.0577</text>
+              <rect x="575" y="238" width="90" height="28" rx="5" fill="#60a5fa"></rect><text x="620" y="257">6,838</text>
+              <rect x="125" y="276" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="170" y="295">0.0068</text>
+              <rect x="275" y="276" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="320" y="295">0.0159</text>
+              <rect x="425" y="276" width="90" height="28" rx="5" fill="#93c5fd"></rect><text x="470" y="295">0.0577</text>
+              <rect x="575" y="276" width="90" height="28" rx="5" fill="#60a5fa"></rect><text x="620" y="295">6,838</text>
+            </g>
+            <text x="735" y="126" font-size="12" fill="#5e6978">darker = stronger</text>
+          </svg>
+        </div>
+        <div class="note good">
+          <strong>해석</strong>
+          LGBM은 tabular feature의 threshold split에 강해서 적은 positive label에서도 안정적이었다.
+          neural ranker들은 모두 같은 값으로 수렴했다.
+          이미 feature engineering이 강한 상태에서 positive label이 적고 BCE objective를 쓴 영향 때문에, deep path가 추가로 배울 여지가 제한적이었을 가능성이 크다.
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>모델</th>
+              <th>NDCG@10</th>
+              <th>NDCG@100</th>
+              <th>Recall@100</th>
+              <th>Unique@100</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Two-Stage/LGBM</td><td>0.010989</td><td>0.022160</td><td>0.075824</td><td>4,983</td></tr>
+            <tr><td>ALS/Fallback</td><td>0.008321</td><td>0.018460</td><td>0.065736</td><td>6,644</td></tr>
+            <tr><td>DLRM</td><td>0.006771</td><td>0.015860</td><td>0.057748</td><td>6,838</td></tr>
+            <tr><td>Deep&Wide</td><td>0.006771</td><td>0.015860</td><td>0.057748</td><td>6,838</td></tr>
+            <tr><td>DeepFM</td><td>0.006771</td><td>0.015860</td><td>0.057748</td><td>6,838</td></tr>
+            <tr><td>FM</td><td>0.006771</td><td>0.015860</td><td>0.057748</td><td>6,838</td></tr>
+            <tr><td>Popularity</td><td>0.004185</td><td>0.014227</td><td>0.064901</td><td>105</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="sources">
+        <h2>논문 출처와 로컬 근거</h2>
+        <p>
+          이 문서는 원 논문 아이디어를 현재 repo의 실제 구현과 실험 산출물에 맞춰 재구성했다.
+          로컬 근거는 <code>scripts/train_two_tower_week6_full_v2.py</code>, <code>scripts/week6_neural_rankers.py</code>,
+          <code>docs/week7_recsys_deep_models.md</code>, <code>docs/week6_neural_ranker_run_log.md</code>다.
+        </p>
+        <div class="source-list">
+          <a href="https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/cikm2013_DSSM_fullversion.pdf">DSSM: Learning Deep Structured Semantic Models for Web Search using Clickthrough Data</a>
+          <a href="https://arxiv.org/abs/1708.05031">Neural Collaborative Filtering</a>
+          <a href="https://arxiv.org/abs/1606.07792">Wide & Deep Learning for Recommender Systems</a>
+          <a href="https://arxiv.org/abs/1703.04247">DeepFM: A Factorization-Machine based Neural Network for CTR Prediction</a>
+          <a href="https://arxiv.org/abs/1906.00091">DLRM: Deep Learning Recommendation Model for Personalization and Recommendation Systems</a>
+          <a href="https://developer.nvidia.com/blog/optimizing-dlrm-on-nvidia-gpus/">NVIDIA Technical Blog: Optimizing DLRM on NVIDIA GPUs</a>
+          <a href="https://papers.nips.cc/paper/6907-lightgbm-a-highly-efficient-gradient-boosting-decision-tree">LightGBM: A Highly Efficient Gradient Boosting Decision Tree</a>
+          <a href="https://doi.org/10.1109/ICDM.2010.127">Factorization Machines, Rendle 2010</a>
+          <a href="https://doi.org/10.1109/ICDM.2008.22">Collaborative Filtering for Implicit Feedback Datasets, Hu/Koren/Volinsky 2008</a>
+        </div>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

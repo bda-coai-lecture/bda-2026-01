@@ -563,8 +563,8 @@
           two-stage 추천 실험과 neural re-rank 비교 실험을 서로 다른 experiment로 나눈다.
         </p>
         <ul>
-          <li><code>bda-week6-two-stage</code>: ALS candidate 생성과 LGBM re-ranker 중심 실험</li>
-          <li><code>bda-week7-recsys-re-rank</code>: LGBM, FM, Deep&Wide, DeepFM, DLRM re-rank 비교 실험</li>
+          <li><code>recsys-two-stage</code>: ALS candidate 생성과 LGBM re-ranker 중심 실험</li>
+          <li><code>recsys-rerank</code>: LGBM, FM, Deep&Wide, DeepFM, DLRM re-rank 비교 실험</li>
         </ul>
 
         <h3>Run</h3>
@@ -594,7 +594,7 @@
             <tr>
               <td>Metric</td>
               <td>그 결과 무엇이 달라졌나?</td>
-              <td><code>primary_ndcg_at_10=0.016</code>, <code>primary_recall_at_100=0.074</code></td>
+              <td><code>core_ndcg_at_10=0.016</code>, <code>core_recall_at_100=0.074</code></td>
             </tr>
           </tbody>
         </table>
@@ -607,7 +607,7 @@
           <li><code>metrics.csv</code>: 모델별 NDCG, Recall, Precision, coverage</li>
           <li><code>summary.json</code>: 데이터 규모, split, feature, 경로 정보</li>
           <li><code>week6_user_diagnostics_*.parquet</code>: 유저별 hit, NDCG, source mix</li>
-          <li><code>week6_segment_summary_*.csv</code>: segment별 평균 성능</li>
+          <li><code>diagnostics/*_by_*.csv</code>, <code>week6_segment_summary_*.csv</code>: segment별 평균 성능</li>
           <li><code>lgbm_ranker_*.txt</code>, <code>*.pt</code>: 저장된 모델</li>
         </ul>
       </section>
@@ -690,7 +690,7 @@
             <tr>
               <td>진단 자료</td>
               <td>user diagnostics, segment summary</td>
-              <td>artifact와 segment metric으로 기록한다.</td>
+              <td>artifact로 기록하고 필요할 때 파일을 열어 확인한다.</td>
             </tr>
           </tbody>
         </table>
@@ -725,7 +725,7 @@
             <div class="arrow">→</div>
             <div class="node blue">
               <strong>Evaluation</strong>
-              NDCG@K, Recall@K, unique@K, segment metric을 비교한다.
+              NDCG@K, Recall@K, unique@K를 비교하고 segment 진단은 artifact에서 본다.
             </div>
           </div>
         </div>
@@ -758,12 +758,12 @@
             <tr>
               <td>주요 성능</td>
               <td>상단 품질과 candidate 회수</td>
-              <td><code>primary_ndcg_at_10</code>, <code>primary_recall_at_100</code></td>
+              <td><code>core_ndcg_at_10</code>, <code>core_recall_at_100</code></td>
             </tr>
             <tr>
               <td>진단 성능</td>
               <td>push, PR, high-activity 유저군의 성능</td>
-              <td><code>segment_dominant_event_push_ts_ndcg_at_10</code></td>
+              <td><code>diagnostics/*_by_*.csv</code> artifact</td>
             </tr>
           </tbody>
         </table>
@@ -800,14 +800,19 @@ uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000</code></pre
           </thead>
           <tbody>
             <tr>
-              <td><code>bda-week6-two-stage</code></td>
+              <td><code>recsys-two-stage</code></td>
               <td>ALS retrieval + LGBM re-rank 실험</td>
               <td>candidate source, related cap, segment diagnostics</td>
             </tr>
             <tr>
-              <td><code>bda-week7-recsys-re-rank</code></td>
+              <td><code>recsys-rerank</code></td>
               <td>LGBM/FM/Deep&Wide/DeepFM/DLRM re-rank 비교</td>
               <td>같은 candidate set에서 re-rank 모델별 NDCG/Recall 비교</td>
+            </tr>
+            <tr>
+              <td><code>recsys-retrieval-legacy</code></td>
+              <td>Two-Tower retrieval 비교</td>
+              <td><code>core_*</code>는 Two-Tower 기준이다. ALS baseline은 모델별 metric이나 artifact에서 본다.</td>
             </tr>
           </tbody>
         </table>
@@ -830,22 +835,29 @@ uv run python scripts/week6_neural_rankers.py \
           <code>--no-mlflow</code>를 붙인다.
         </p>
 
+        <h3>기존 산출물 재적재</h3>
+        <pre><code>uv run python scripts/backfill_mlflow_from_week6_artifacts.py</code></pre>
+        <p>
+          이미 문서에 정리된 과거 실험 결과는 재학습하지 않고 metrics CSV와 summary JSON에서
+          MLflow run으로 다시 적재할 수 있다. 이 명령은 two-stage candidate 실험, re-rank 비교,
+          Two-Tower retrieval 결과를 판단 가능한 run table로 복원한다.
+        </p>
+
         <h3>현재 repo의 MLflow 설계</h3>
         <p>
-          전체 args는 그대로 남기되, 수업과 실험 비교에서 자주 보는 핵심 설정은
-          <code>exp_*</code> prefix로 한 번 더 기록한다. 이렇게 하면 MLflow UI에서 열을 고르거나
-          필터를 걸 때 훨씬 읽기 쉽다.
+          MLflow run table은 강의 판단에 필요한 컬럼만 남긴다.
+          전체 args와 상세 모델별 metric은 artifact의 summary JSON과 metrics CSV에서 확인한다.
         </p>
         <p>
           추천 실험에서 대표로 볼 key는 다음과 같다.
         </p>
         <p>
-          <span class="tag">exp_data_*</span>
           <span class="tag">exp_candidate_*</span>
+          <span class="tag">exp_data_sample_ratio</span>
           <span class="tag">exp_ranker_* (re-rank)</span>
-          <span class="tag">primary_ndcg_at_*</span>
-          <span class="tag">primary_recall_at_*</span>
-          <span class="tag">segment_*</span>
+          <span class="tag">core_ndcg_at_*</span>
+          <span class="tag">core_recall_at_100</span>
+          <span class="tag">artifact diagnostics</span>
         </p>
       </section>
 
@@ -861,8 +873,8 @@ uv run python scripts/week6_neural_rankers.py \
         </div>
         <div class="callout">
           <strong>지표가 많아 보일 때</strong>
-          UI에서는 <code>core_*</code> metric부터 본다. 상세 모델별 표와 segment 진단은 metric 목록이 아니라
-          artifact의 <code>metrics.csv</code>, <code>segment_summary.csv</code>에서 확인한다.
+          UI 첫 화면에서는 <code>core_*</code> metric만 본다. ALS, Popularity, 모델별 상세 metric과
+          segment 진단은 artifact의 <code>metrics.csv</code>, <code>diagnostics/*_by_*.csv</code>에서 확인한다.
         </div>
 
         <h3>처음 5분 순서</h3>
@@ -877,11 +889,11 @@ uv run python scripts/week6_neural_rankers.py \
           </div>
           <div class="step">
             <strong>3. Columns</strong>
-            데이터, candidate, re-rank, primary metric 열을 켠다.
+            candidate 설정과 <code>core_*</code> metric만 켠다.
           </div>
           <div class="step">
             <strong>4. Sort</strong>
-            <code>primary_ndcg_at_10</code> 또는 <code>ndcg_at_100</code>으로 정렬한다.
+            <code>core_recall_at_100</code> 또는 <code>core_ndcg_at_100</code>으로 정렬한다.
           </div>
           <div class="step">
             <strong>5. Artifacts</strong>
@@ -894,8 +906,8 @@ uv run python scripts/week6_neural_rankers.py \
           <div class="screen">
             <div class="screen-side">
               <strong>Experiments</strong>
-              <p><code>bda-week6-two-stage</code></p>
-              <p><code>bda-week7-recsys-re-rank</code></p>
+              <p><code>recsys-two-stage</code></p>
+              <p><code>recsys-rerank</code></p>
             </div>
             <div class="screen-main">
               <div class="screen-row">
@@ -926,7 +938,7 @@ uv run python scripts/week6_neural_rankers.py \
           </div>
         </div>
 
-        <h3>켜야 하는 column</h3>
+        <h3>첫 화면 column</h3>
         <table>
           <thead>
             <tr>
@@ -937,9 +949,9 @@ uv run python scripts/week6_neural_rankers.py \
           </thead>
           <tbody>
             <tr>
-              <td>데이터 조건 확인</td>
-              <td><code>params.exp_data_history_start</code>, <code>params.exp_data_test_end</code></td>
-              <td>다른 기간의 run은 성능 비교에서 분리한다.</td>
+              <td>데이터 규모</td>
+              <td><code>params.exp_data_sample_ratio</code>, <code>metrics.eval_users</code></td>
+              <td>screening run과 full run을 섞어 비교하지 않는다.</td>
             </tr>
             <tr>
               <td>candidate 생성 비교</td>
@@ -947,18 +959,23 @@ uv run python scripts/week6_neural_rankers.py \
               <td>Recall@100 변화가 candidate pool 변화 때문인지 확인한다.</td>
             </tr>
             <tr>
-              <td>Re-rank 비교</td>
-              <td><code>params.exp_ranker_names</code>, <code>params.exp_run_feature_cache_source</code></td>
-              <td>같은 cache에서 re-rank 모델만 바뀐 run끼리 비교한다.</td>
+              <td>관련 후보 설정</td>
+              <td><code>params.exp_candidate_related_top_per_anchor</code>, <code>params.exp_candidate_related_max_seen_anchors</code></td>
+              <td>related source를 넣은 run끼리 세부 설정을 맞춘다.</td>
             </tr>
             <tr>
-              <td>1차 성능 판단</td>
-              <td><code>metrics.primary_ndcg_at_10</code>, <code>metrics.primary_recall_at_100</code></td>
-              <td>상단 품질과 candidate 회수를 같이 본다.</td>
+              <td>품질 판단</td>
+              <td><code>metrics.core_ndcg_at_10</code>, <code>metrics.core_ndcg_at_100</code></td>
+              <td>상단 품질과 전체 ranking 품질을 같이 본다.</td>
             </tr>
             <tr>
-              <td>운영 관점 확인</td>
-              <td><code>metrics.elapsed_min</code>, <code>metrics.*unique_recommended_at_100</code></td>
+              <td>회수와 다양성</td>
+              <td><code>metrics.core_recall_at_100</code>, <code>metrics.core_unique_at_100</code></td>
+              <td>정답 후보 회수와 추천 쏠림을 같이 본다.</td>
+            </tr>
+            <tr>
+              <td>비용</td>
+              <td><code>metrics.elapsed_min</code></td>
               <td>성능이 좋아도 너무 느리거나 추천이 쏠리면 보류한다.</td>
             </tr>
           </tbody>
@@ -985,25 +1002,25 @@ uv run python scripts/week6_neural_rankers.py \
               <td>related source가 도움이 됐나?</td>
               <td>split, ALS/LGBM 설정</td>
               <td><code>exp_candidate_related_cap</code></td>
-              <td><code>primary_ndcg_at_10</code>, <code>primary_recall_at_100</code>, coverage</td>
+              <td><code>core_ndcg_at_10</code>, <code>core_recall_at_100</code>, coverage</td>
             </tr>
             <tr>
               <td>LGBM 튜닝이 도움이 됐나?</td>
               <td>candidate set</td>
               <td>LGBM params</td>
-              <td><code>primary_ndcg_at_10</code>, <code>primary_ndcg_at_100</code></td>
+              <td><code>core_ndcg_at_10</code>, <code>core_ndcg_at_100</code></td>
             </tr>
             <tr>
               <td>neural re-rank가 LGBM보다 좋은가?</td>
               <td>candidate cache, split</td>
               <td><code>exp_ranker_names</code></td>
-              <td>모델별 <code>ndcg_at_100</code>, <code>recall_at_100</code></td>
+              <td><code>core_ndcg_at_100</code>, 모델별 상세는 metrics artifact</td>
             </tr>
             <tr>
               <td>어떤 유저군이 약한가?</td>
               <td>best run</td>
               <td>segment</td>
-              <td><code>segment_*</code> metric, diagnostics artifact</td>
+              <td><code>diagnostics/*_by_*.csv</code>, user diagnostics artifact</td>
             </tr>
           </tbody>
         </table>
@@ -1011,7 +1028,7 @@ uv run python scripts/week6_neural_rankers.py \
         <h3>Run detail 보기</h3>
         <p>
           특정 run을 클릭하면 params, metrics, artifacts가 따로 보인다. 여기서 artifact를 열어
-          summary JSON, metrics CSV, segment summary CSV를 확인한다.
+          summary JSON, metrics CSV, diagnostics CSV를 확인한다.
         </p>
       </section>
 
@@ -1040,7 +1057,7 @@ uv run python scripts/week6_neural_rankers.py \
         <p>
           이 실험의 질문은 “같은 유저가 함께 본 repo를 related source로 추가하면 candidate 회수와
           상단 품질이 좋아지는가?”다. 따라서 MLflow에서는 related cap과 Recall@100, NDCG@10,
-          segment metric을 함께 본다.
+          segment summary artifact를 함께 본다.
         </p>
 
         <h3>예시 2. Re-rank 비교 실험</h3>
@@ -1083,7 +1100,7 @@ uv run python scripts/week6_neural_rankers.py \
             <ul>
               <li>run status가 <code>FINISHED</code>인가?</li>
               <li>NDCG, Recall, unique를 같이 봤는가?</li>
-              <li>segment metric이 나빠지지 않았는가?</li>
+              <li>segment summary artifact에서 약해진 유저군이 없는가?</li>
               <li>artifact가 남았는가?</li>
             </ul>
           </div>

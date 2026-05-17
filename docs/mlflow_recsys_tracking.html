@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MLflow 추천 운영 모니터링</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Cpath d='M12 45V19h9l7 13 7-13h9v26h-8V31l-6 11h-4l-6-11v14h-8z' fill='white'/%3E%3Cpath d='M46 45V19h8v19h7v7H46z' fill='%23a7f3d0'/%3E%3Ccircle cx='50' cy='16' r='6' fill='%23f59e0b'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --paper: #ffffff;
+      --ink: #1f2937;
+      --muted: #667085;
+      --line: #d8dee8;
+      --soft: #eef2f7;
+      --code-bg: #111827;
+      --code-ink: #e5e7eb;
+      --accent: #0f766e;
+      --blue: #2563eb;
+      --green-bg: #ecfdf5;
+      --blue-bg: #eff6ff;
+      --amber-bg: #fffbeb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+      letter-spacing: 0;
+    }
+
+    header {
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .wrap {
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .hero {
+      padding: 48px 0 32px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 900px;
+      font-size: 40px;
+      line-height: 1.15;
+      font-weight: 800;
+    }
+
+    .lead {
+      max-width: 860px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 28px;
+      padding: 28px 0 56px;
+    }
+
+    nav {
+      position: sticky;
+      top: 16px;
+      align-self: start;
+      padding: 18px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    nav strong {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    nav a {
+      display: block;
+      padding: 6px 0;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    nav a:hover {
+      color: var(--blue);
+    }
+
+    article {
+      min-width: 0;
+    }
+
+    section {
+      margin-bottom: 22px;
+      padding: 28px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 26px;
+      line-height: 1.25;
+    }
+
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 18px;
+    }
+
+    p {
+      margin: 10px 0;
+    }
+
+    ul {
+      margin: 10px 0 0 22px;
+      padding: 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      background: var(--soft);
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+      overflow-wrap: anywhere;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 14px 0;
+      padding: 16px;
+      background: var(--code-bg);
+      color: var(--code-ink);
+      border-radius: 8px;
+      line-height: 1.48;
+    }
+
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--soft);
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0;
+    }
+
+    .stat {
+      padding: 16px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .stat b {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 24px;
+      line-height: 1.15;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .callout {
+      margin: 16px 0;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--blue-bg);
+    }
+
+    .callout strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .ok {
+      background: var(--green-bg);
+    }
+
+    .warn {
+      background: var(--amber-bg);
+    }
+
+    .badge {
+      display: inline-block;
+      margin: 0 6px 6px 0;
+      padding: 4px 8px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .path {
+      word-break: break-all;
+    }
+
+    .run-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0 22px;
+    }
+
+    .run-card {
+      min-width: 0;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .run-card h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .run-card p {
+      margin: 8px 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .run-card code {
+      display: inline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        display: block;
+      }
+
+      nav {
+        position: static;
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        font-size: 32px;
+      }
+
+      section {
+        padding: 22px;
+      }
+
+      .grid,
+      .run-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero">
+      <p class="eyebrow">BDA Week 7 · Recommendation Systems · MLflow</p>
+      <h1>MLflow 추천 운영 모니터링</h1>
+      <p class="lead">
+        추천 모델 실험과 운영 후보 평가를 MLflow에 어떻게 남길지 정리한 문서다.
+        MLflow는 실험/백테스트 기록에 강하고, 운영에서는 모델 선택 근거를 남기는 장부로 쓴다.
+      </p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav aria-label="목차">
+      <strong>목차</strong>
+      <a href="#summary">1. 한 장 요약</a>
+      <a href="#scope">2. 어디까지 쓸까</a>
+      <a href="#alternatives">3. 대안 도구</a>
+      <a href="#ops-view">4. 운영 뷰</a>
+      <a href="#experiments">5. Experiment 구조</a>
+      <a href="#latest">6. 최신 run</a>
+      <a href="#columns">7. UI 컬럼</a>
+      <a href="#rerun">8. 재실행</a>
+      <a href="#backfill">9. Backfill</a>
+      <a href="#rules">10. 운영 원칙</a>
+    </nav>
+
+    <article>
+      <section id="summary">
+        <h2>1. 한 장 요약</h2>
+        <div class="grid">
+          <div class="stat">
+            <b>sqlite:///mlflow.db</b>
+            <span>repo root의 SQLite backend store</span>
+          </div>
+          <div class="stat">
+            <b>3 operational views</b>
+            <span>candidate, re-rank, time trend를 분리해서 판단</span>
+          </div>
+          <div class="stat">
+            <b>2026-05-16</b>
+            <span>최신 추천 mart/feature 기준 run 기록</span>
+          </div>
+        </div>
+
+        <p>MLflow UI 실행:</p>
+        <pre><code>uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000</code></pre>
+
+        <ul>
+          <li>UI: <code>http://localhost:5000</code></li>
+          <li>학습 스크립트는 기본적으로 MLflow에 기록한다.</li>
+          <li>기록을 끄고 싶을 때만 <code>--no-mlflow</code>를 붙인다.</li>
+        </ul>
+
+        <div class="callout ok">
+          <strong>문서의 기준</strong>
+          MLflow는 실험과 백테스트 run을 표준 형식으로 남기는 데 가장 잘 맞는다.
+          이 저장소에서는 운영 후보 모델의 선택 근거와 재현 조건을 남기는 장부로도 사용한다.
+        </div>
+      </section>
+
+      <section id="scope">
+        <h2>2. MLflow를 어디까지 쓸까</h2>
+        <p>
+          MLflow는 기본적으로 실험 추적 도구다. 다양한 모델, feature, split, hyperparameter를 바꿔가며
+          백테스트한 결과를 run 단위로 남기고 비교하는 데 가장 잘 맞는다.
+          추천시스템에서는 ALS factor, candidate 수, related 후보 cap, LGBM 설정,
+          neural ranker 구조를 바꾼 결과를 같은 테이블에서 보는 용도다.
+        </p>
+        <p>
+          운영에서도 쓸 수 있지만 역할은 제한적으로 보는 게 맞다. MLflow는 production 모델이 어떤 run에서 나왔는지,
+          offline NDCG/Recall이 얼마였는지, 어떤 feature snapshot으로 학습했는지를 남기는 기준점이다.
+          반대로 실시간 latency, CTR 하락 알림, online drift 감지는 Prometheus, Grafana, Datadog,
+          Evidently, WhyLabs 같은 모니터링 도구가 더 적합하다.
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>구분</th>
+              <th>MLflow가 잘하는 일</th>
+              <th>한계</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>리서치/백테스트</td>
+              <td>run별 parameter, metric, artifact를 남기고 비교한다</td>
+              <td>UI가 실험 분석에 항상 편한 것은 아니다</td>
+            </tr>
+            <tr>
+              <td>운영 후보 평가</td>
+              <td>production 후보 모델의 offline 성능과 재현 조건을 추적한다</td>
+              <td>실시간 모니터링/알림 시스템은 아니다</td>
+            </tr>
+            <tr>
+              <td>수업 자료</td>
+              <td>현업에서 볼 수 있는 기본 experiment tracker 예시로 설명하기 좋다</td>
+              <td>학생이 바로 읽기에는 CSV/대시보드가 더 직관적일 수 있다</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout warn">
+          <strong>이 저장소의 결론</strong>
+          MLflow는 표준적인 실험 장부로 남긴다. 상세 해석과 수업용 비교표는 CSV/summary JSON,
+          필요하면 DuckDB/Streamlit 대시보드를 source of truth로 둔다.
+        </div>
+      </section>
+
+      <section id="alternatives">
+        <h2>3. 대안 도구</h2>
+        <p>
+          MLflow가 불편하다면 대안은 충분히 있다. 특히 UI에서 실험을 훑고, 차트를 만들고,
+          리포트를 공유하는 경험은 W&amp;B, Neptune, Comet 쪽이 더 편한 경우가 많다.
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>도구</th>
+              <th>성격</th>
+              <th>이 프로젝트에서의 판단</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>W&amp;B</td>
+              <td>제품화된 experiment dashboard, chart/report/sweep/artifact/registry 제공</td>
+              <td>공유와 시각화가 중요하면 MLflow보다 편할 가능성이 높다</td>
+            </tr>
+            <tr>
+              <td>Neptune</td>
+              <td>experiment tracking에 집중한 SaaS</td>
+              <td>많은 run과 metric을 테이블/차트로 관리할 때 적합</td>
+            </tr>
+            <tr>
+              <td>Comet</td>
+              <td>W&amp;B와 비슷한 experiment management 플랫폼</td>
+              <td>팀 단위 실험 비교와 리포트가 필요할 때 후보</td>
+            </tr>
+            <tr>
+              <td>ClearML</td>
+              <td>experiment tracking + self-host + job execution에 가까운 MLOps 플랫폼</td>
+              <td>수업용으로는 다소 무겁지만 자체 서버/실행 관리까지 원하면 후보</td>
+            </tr>
+            <tr>
+              <td>CSV/JSON + DuckDB + Streamlit</td>
+              <td>가장 직접적인 custom dashboard</td>
+              <td>현재 BDA 추천 실험처럼 offline metric 해석이 핵심이면 가장 읽기 쉽다</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout ok">
+          <strong>실용적인 선택</strong>
+          MLflow를 유일한 정답으로 보지 않는다. 표준 run 기록은 MLflow에 남기고,
+          강의와 분석에 필요한 비교 화면은 artifact-first 방식으로 별도 구성하는 쪽이 더 실용적이다.
+        </div>
+      </section>
+
+      <section id="ops-view">
+        <h2>4. 운영 뷰</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>운영 질문</th>
+              <th>MLflow에서 볼 것</th>
+              <th>판단 기준</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>candidate 단계에서 어떤 방식이 정답 repo를 더 잘 끌어오나?</td>
+              <td><code>recsys-two-stage</code>, <code>recsys-retrieval</code></td>
+              <td><code>core_recall_at_100</code>, <code>core_unique_at_100</code>, 모델별 recall/unique</td>
+            </tr>
+            <tr>
+              <td>같은 candidate set에서 어떤 re-ranker가 순서를 더 잘 매기나?</td>
+              <td><code>recsys-rerank</code></td>
+              <td><code>core_ndcg_at_10</code>, <code>core_ndcg_at_100</code>, 모델별 NDCG/Recall artifact</td>
+            </tr>
+            <tr>
+              <td>시간이 지나도 성능이 유지되나?</td>
+              <td>동일 설정의 날짜별 run</td>
+              <td><code>exp_data_test_end</code> 기준으로 <code>core_*</code> 추세 비교</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout warn">
+          <strong>리서치와 운영 후보 평가를 분리한다</strong>
+          논문 모델 설명, 구조 비교, 실패 원인 분석은 리서치 문서에 둔다.
+          MLflow 화면에서는 candidate recall, re-rank NDCG, 시간별 drift만 먼저 본다.
+        </div>
+      </section>
+
+      <section id="experiments">
+        <h2>5. Experiment 구조</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>experiment</th>
+              <th>운영 역할</th>
+              <th>대표 스크립트</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>recsys-two-stage</code></td>
+              <td>candidate + 운영 대표 two-stage 성능. ALS/Fallback과 Two-Stage/Fallback을 같은 run에서 비교</td>
+              <td><code>scripts/week6_two_stage_v2.py</code></td>
+            </tr>
+            <tr>
+              <td><code>recsys-rerank</code></td>
+              <td>동일 candidate set 위에서 LGBM/FM/Deep&Wide/DeepFM/DLRM re-rank 성능 비교</td>
+              <td><code>scripts/week6_neural_rankers.py</code></td>
+            </tr>
+            <tr>
+              <td><code>recsys-retrieval</code></td>
+              <td>candidate 생성 모델 비교. ALS와 Two-Tower의 정확도/다양성 trade-off 확인</td>
+              <td><code>scripts/train_two_tower_week6_full_v2.py</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="latest">
+        <h2>6. 최신 2026-05-16 run</h2>
+        <p>
+          Airflow가 생성한 최신 mart와 ranker feature parquet 기준이다.
+          2026-05-17 데이터는 아직 제외했고, 2026-05-16까지의 데이터를 학습/평가에 사용했다.
+        </p>
+
+        <p>데이터 split:</p>
+        <table>
+          <thead>
+            <tr>
+              <th>구간</th>
+              <th>기간</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>history</td><td><code>2026-03-22</code> ~ <code>2026-05-02</code></td></tr>
+            <tr><td>rank-label</td><td><code>2026-05-03</code> ~ <code>2026-05-09</code></td></tr>
+            <tr><td>test</td><td><code>2026-05-10</code> ~ <code>2026-05-16</code></td></tr>
+          </tbody>
+        </table>
+
+        <p>공통 설정:</p>
+        <p>
+          <span class="badge">use_marts=always</span>
+          <span class="badge">max_items=100000</span>
+          <span class="badge">candidate_k=120</span>
+          <span class="badge">hybrid_extra=80</span>
+          <span class="badge">related_candidate_cap=30</span>
+          <span class="badge">factors=48</span>
+          <span class="badge">iterations=4</span>
+          <span class="badge">eval_users=3000</span>
+        </p>
+        <p class="path">
+          ranker feature cache:
+          <code>data/features/week6/ranker_features_airflow_20260516.parquet</code>
+        </p>
+
+        <div class="grid">
+          <div class="stat">
+            <b>2,377,667</b>
+            <span>history interactions</span>
+          </div>
+          <div class="stat">
+            <b>361,371</b>
+            <span>rank labels</span>
+          </div>
+          <div class="stat">
+            <b>331,702</b>
+            <span>test labels</span>
+          </div>
+        </div>
+
+        <h3>MLflow runs</h3>
+        <div class="run-grid">
+          <div class="run-card">
+            <h3>Two-stage LGBM</h3>
+            <p><strong>experiment</strong><br><code>recsys-two-stage</code></p>
+            <p><strong>suffix</strong><br><code>airflow_20260516_lgbm_eval</code></p>
+            <p><strong>run id</strong><br><code>b4e1a76a92ed46608ca747b3d7482d31</code></p>
+            <p><strong>elapsed</strong> 8.81분</p>
+            <p><strong>artifact</strong><br><code>week6_two_stage_airflow_20260516_lgbm_eval_metrics.csv</code></p>
+          </div>
+          <div class="run-card">
+            <h3>Neural re-rank</h3>
+            <p><strong>experiment</strong><br><code>recsys-rerank</code></p>
+            <p><strong>suffix</strong><br><code>airflow_20260516_neural_compare</code></p>
+            <p><strong>run id</strong><br><code>4138bb93fe0846fba689518f260ddb06</code></p>
+            <p><strong>elapsed</strong> 10.14분</p>
+            <p><strong>artifact</strong><br><code>week6_ranker_compare_airflow_20260516_neural_compare_metrics.csv</code></p>
+          </div>
+          <div class="run-card">
+            <h3>Two-Tower retrieval</h3>
+            <p><strong>experiment</strong><br><code>recsys-retrieval</code></p>
+            <p><strong>suffix</strong><br><code>airflow_20260516_two_tower</code></p>
+            <p><strong>run id</strong><br><code>646383e71b2e4ee495ecac57484a3c94</code></p>
+            <p><strong>elapsed</strong> 17.67분</p>
+            <p><strong>artifact</strong><br><code>two_tower_airflow_20260516_two_tower_metrics.csv</code></p>
+          </div>
+        </div>
+
+        <h3>최신 성능 요약</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>비교</th>
+              <th>모델</th>
+              <th>NDCG@10</th>
+              <th>NDCG@100</th>
+              <th>Recall@100</th>
+              <th>Unique@100</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>re-rank</td><td>Two-Stage/LGBM</td><td>0.010989</td><td>0.022160</td><td>0.075824</td><td>4,983</td></tr>
+            <tr><td>re-rank</td><td>ALS/Fallback</td><td>0.008321</td><td>0.018460</td><td>0.065736</td><td>6,644</td></tr>
+            <tr><td>re-rank</td><td>FM / Deep&Wide / DeepFM / DLRM</td><td>0.006771</td><td>0.015860</td><td>0.057748</td><td>6,838</td></tr>
+            <tr><td>retrieval</td><td>ALS</td><td>0.009135</td><td>0.013327</td><td>0.036928</td><td>7,136</td></tr>
+            <tr><td>retrieval</td><td>Two-Tower</td><td>0.003513</td><td>0.006745</td><td>0.022170</td><td>70,537</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout warn">
+          <strong>해석 주의</strong>
+          최신 neural ranker 4종은 같은 순위로 수렴했다. 이 run에서는 모델 우열보다 sparse positive label과 BCE 학습 budget의 한계로 해석한다.
+        </div>
+      </section>
+
+      <section id="columns">
+        <h2>7. UI에서 봐야 할 컬럼</h2>
+        <p>
+          MLflow run table에는 전체 args를 다 펼치기보다 비교에 필요한 값을
+          <code>exp_*</code>, <code>core_*</code> 중심으로 본다.
+        </p>
+
+        <h3>Param</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>prefix</th>
+              <th>의미</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>exp_data_*</code></td><td>history/rank/test 날짜, catalog 크기, rank/eval user 수</td></tr>
+            <tr><td><code>exp_candidate_*</code></td><td>candidate 수, related 후보 cap, anchor 설정</td></tr>
+            <tr><td><code>exp_ranker_*</code></td><td>ranker 종류, epoch, batch size, learning rate, hidden dims</td></tr>
+            <tr><td><code>exp_run_*</code></td><td>mart 사용 여부, feature cache 사용 여부, parquet 경로</td></tr>
+            <tr><td><code>cache_*</code></td><td>feature cache를 재사용한 경우 원본 cache의 주요 설정</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Metric: 기본 화면</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>metric</th>
+              <th>운영 의미</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>core_recall_at_100</code></td><td>candidate/retrieval이 정답을 충분히 끌어오는지 보는 1차 지표</td></tr>
+            <tr><td><code>core_ndcg_at_10</code></td><td>실제 상단 추천 품질. re-rank 의사결정의 대표 지표</td></tr>
+            <tr><td><code>core_ndcg_at_100</code></td><td>Top 100 전체 정렬 품질</td></tr>
+            <tr><td><code>core_unique_at_100</code></td><td>추천 다양성. 인기 repo 쏠림 확인</td></tr>
+            <tr><td><code>elapsed_min</code></td><td>운영 비용과 재실행 가능성</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Metric: 상세 비교</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>metric</th>
+              <th>의미</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>core_ndcg_at_10</code></td><td>primary model의 top-10 ranking 품질</td></tr>
+            <tr><td><code>core_ndcg_at_100</code></td><td>primary model의 top-100 ranking 품질</td></tr>
+            <tr><td><code>core_recall_at_100</code></td><td>primary model이 test 정답을 얼마나 포함했는지</td></tr>
+            <tr><td><code>core_unique_at_100</code></td><td>primary model의 추천 다양성</td></tr>
+            <tr><td><code>{model}_ndcg_at_100</code></td><td>개별 모델의 NDCG@100</td></tr>
+            <tr><td><code>{model}_recall_at_100</code></td><td>개별 모델의 Recall@100</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="rerun">
+        <h2>8. 최신 run 재실행</h2>
+
+        <h3>LGBM two-stage</h3>
+        <pre><code>OMP_NUM_THREADS=1 uv run python scripts/week6_two_stage_v2.py \
+  --history-start 2026-03-22 \
+  --history-end 2026-05-02 \
+  --rank-start 2026-05-03 \
+  --rank-end 2026-05-09 \
+  --test-start 2026-05-10 \
+  --test-end 2026-05-16 \
+  --use-marts always \
+  --max-items 100000 \
+  --candidate-k 120 \
+  --hybrid-extra 80 \
+  --rank-users 10000 \
+  --eval-users 3000 \
+  --factors 48 \
+  --iterations 4 \
+  --als-regularization 0.03 \
+  --related-candidate-cap 30 \
+  --related-top-per-anchor 10 \
+  --related-max-seen-anchors 10 \
+  --chunk-size 1000 \
+  --ranker-feature-parquet data/features/week6/ranker_features_airflow_20260516.parquet \
+  --ranker-feature-summary data/features/week6/ranker_features_airflow_20260516_summary.json \
+  --output-suffix airflow_20260516_lgbm_eval</code></pre>
+
+        <h3>Neural re-rank 비교</h3>
+        <pre><code>OMP_NUM_THREADS=1 uv run python scripts/week6_neural_rankers.py \
+  --history-start 2026-03-22 \
+  --history-end 2026-05-02 \
+  --rank-start 2026-05-03 \
+  --rank-end 2026-05-09 \
+  --test-start 2026-05-10 \
+  --test-end 2026-05-16 \
+  --use-marts always \
+  --max-items 100000 \
+  --candidate-k 120 \
+  --hybrid-extra 80 \
+  --rank-users 10000 \
+  --eval-users 3000 \
+  --factors 48 \
+  --iterations 4 \
+  --related-candidate-cap 30 \
+  --related-top-per-anchor 10 \
+  --related-max-seen-anchors 10 \
+  --chunk-size 1000 \
+  --ranker-feature-parquet data/features/week6/ranker_features_airflow_20260516.parquet \
+  --ranker-feature-summary data/features/week6/ranker_features_airflow_20260516_summary.json \
+  --output-suffix airflow_20260516_neural_compare \
+  --rankers lgbm,fm,deepwide,deepfm,dlrm \
+  --epochs 3 \
+  --batch-size 8192 \
+  --predict-batch-size 32768 \
+  --torch-threads 1</code></pre>
+
+        <h3>Two-Tower retrieval</h3>
+        <pre><code>OMP_NUM_THREADS=1 uv run python scripts/train_two_tower_week6_full_v2.py \
+  --suffix airflow_20260516_lgbm_eval \
+  --output-suffix airflow_20260516_two_tower \
+  --epochs 3 \
+  --batch-size 4096 \
+  --eval-users 3000 \
+  --embed-dim 64</code></pre>
+      </section>
+
+      <section id="backfill">
+        <h2>9. Backfill</h2>
+        <p>이미 생성된 Week 6/7 artifact를 MLflow로 다시 적재할 때 사용한다.</p>
+        <pre><code>uv run python scripts/backfill_mlflow_from_week6_artifacts.py</code></pre>
+        <p>
+          이 스크립트는 기존 metrics/summary/model artifact를 읽어 MLflow run으로 적재한다.
+          대형 ALS/model cache는 복사하지 않고, 비교에 필요한 핵심 CSV/JSON 중심으로 남긴다.
+        </p>
+      </section>
+
+      <section id="rules">
+        <h2>10. 운영 원칙</h2>
+        <ul>
+          <li>실험 성능표는 CSV/summary JSON을 source of truth로 둔다.</li>
+          <li>MLflow는 run 비교, 재현성 확인, artifact 탐색, 운영 후보 모델의 선택 근거 기록용으로 사용한다.</li>
+          <li>실시간 서비스 모니터링과 알림은 MLflow의 주 역할이 아니다.</li>
+          <li>대형 feature/model artifact를 MLflow에 중복 저장하지 않는다.</li>
+          <li><code>exp_*</code> param과 <code>core_*</code> metric 이름은 바꾸지 않는다. UI 비교 컬럼이 깨진다.</li>
+          <li>날짜 split, feature parquet, mart 사용 여부는 반드시 MLflow param으로 남긴다.</li>
+        </ul>
+
+        <div class="callout warn">
+          <strong>주의</strong>
+          최신 run은 운영 자동화 검증용 100k catalog / 3k eval 설정이다.
+          기존 최고 full run과 직접 절대 수치를 비교하지 않는다.
+        </div>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

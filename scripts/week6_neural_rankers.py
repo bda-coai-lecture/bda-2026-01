@@ -123,6 +123,9 @@ def log_mlflow_focus_params(args: argparse.Namespace, run_summary: dict) -> None
         "exp_data_eval_users": args.eval_users,
         "exp_candidate_k": args.candidate_k,
         "exp_candidate_hybrid_extra": args.hybrid_extra,
+        "exp_candidate_related_cap": getattr(args, "related_candidate_cap", None),
+        "exp_candidate_related_top_per_anchor": getattr(args, "related_top_per_anchor", None),
+        "exp_candidate_related_max_seen_anchors": getattr(args, "related_max_seen_anchors", None),
         "exp_ranker_family": "neural_compare",
         "exp_ranker_names": ",".join(args.rankers),
         "exp_ranker_epochs": args.epochs,
@@ -135,6 +138,10 @@ def log_mlflow_focus_params(args: argparse.Namespace, run_summary: dict) -> None
         "exp_run_feature_cache_source": run_summary.get("feature_cache_source"),
         "exp_run_reuse_feature_cache": args.reuse_feature_cache,
         "exp_run_write_feature_cache": args.write_feature_cache,
+        "exp_run_use_marts": run_summary.get("use_marts"),
+        "exp_run_ranker_feature_parquet": str(args.ranker_feature_parquet)
+        if getattr(args, "ranker_feature_parquet", None)
+        else None,
         "exp_run_merged_metrics": bool(args.merge_metrics_from),
     }
     for key, value in focus_params.items():
@@ -464,10 +471,47 @@ def build_rank_data(
 
 
 def standardize_features(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    x = np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
     mean = x.mean(axis=0, dtype=np.float64).astype(np.float32)
     std = x.std(axis=0, dtype=np.float64).astype(np.float32)
     std[std < 1e-6] = 1.0
     return ((x - mean) / std).astype(np.float32), mean, std
+
+
+def load_rank_data_from_feature_parquet(
+    parquet_path: Path,
+    summary_path: Path | None,
+    expected_feature_names: list[str],
+) -> tuple[np.ndarray, np.ndarray, list[int], list[str], dict]:
+    if summary_path is None:
+        candidate_summary = parquet_path.with_name(f"{parquet_path.stem}_summary.json")
+        if candidate_summary.exists():
+            summary_path = candidate_summary
+
+    feature_names = base.load_ranker_feature_names(parquet_path, summary_path)
+    missing = sorted(set(feature_names) - set(expected_feature_names))
+    if missing:
+        raise RuntimeError(
+            f"ranker feature parquet contains unknown feature columns: {missing[:10]}"
+        )
+
+    columns = ["group_index", "label", *feature_names]
+    frame = pd.read_parquet(parquet_path, columns=columns)
+    if frame.empty:
+        raise RuntimeError(f"ranker feature parquet is empty: {parquet_path}")
+
+    groups = frame.groupby("group_index", sort=False, observed=True).size().astype(int).tolist()
+    y_train = frame["label"].astype(np.float32).to_numpy()
+    x_train_raw = frame[feature_names].astype(np.float32).to_numpy()
+    summary = {
+        "rank_users": int(len(groups)),
+        "rank_rows": int(len(y_train)),
+        "positive_labels": int(y_train.sum()),
+        "positive_rate": float(y_train.mean()),
+        "feature_parquet": str(parquet_path),
+        "feature_summary": str(summary_path) if summary_path else None,
+    }
+    return x_train_raw, y_train, groups, feature_names, summary
 
 
 def train_lgbm_ranker(
@@ -739,7 +783,6 @@ def log_mlflow_run(
         mlflow.set_tag("merged_metrics", bool(args.merge_metrics_from))
         mlflow.set_tag("ui_metric_1", "core_ndcg_at_100")
         mlflow.set_tag("ui_metric_2", "core_recall_at_100")
-        mlflow.log_params(jsonable_args(args))
         log_mlflow_focus_params(args, run_summary)
         mlflow.log_param("suffix", suffix)
         mlflow.log_param("exp_ranker_count", len(args.rankers))
@@ -752,23 +795,26 @@ def log_mlflow_run(
         mlflow.log_metric("elapsed_min", run_summary["elapsed_min"])
         mlflow.log_metric("eval_users", run_summary["eval_users"])
         for row in results.itertuples(index=False):
+            if row.model == "Popularity":
+                continue
             if int(row.k) not in {10, 100}:
                 continue
             metric_prefix = "" if row.model in current_model_names else "merged_"
             model_key = metric_model_key(str(row.model))
-            mlflow.log_metric(f"{metric_prefix}{model_key}_recall_at_{row.k}", float(row.recall))
-            mlflow.log_metric(f"{metric_prefix}{model_key}_ndcg_at_{row.k}", float(row.ndcg))
-            mlflow.log_metric(
-                f"{metric_prefix}{model_key}_unique_recommended_at_{row.k}",
-                int(row.unique_recommended),
-            )
-            if row.model == primary_model:
-                mlflow.log_metric(f"primary_ndcg_at_{row.k}", float(row.ndcg))
-                mlflow.log_metric(f"primary_recall_at_{row.k}", float(row.recall))
+            if int(row.k) == 100:
                 mlflow.log_metric(
-                    f"primary_unique_recommended_at_{row.k}",
+                    f"{metric_prefix}{model_key}_recall_at_100",
+                    float(row.recall),
+                )
+                mlflow.log_metric(
+                    f"{metric_prefix}{model_key}_ndcg_at_100",
+                    float(row.ndcg),
+                )
+                mlflow.log_metric(
+                    f"{metric_prefix}{model_key}_unique_recommended_at_100",
                     int(row.unique_recommended),
                 )
+            if row.model == primary_model:
                 if int(row.k) == 10:
                     mlflow.log_metric("core_ndcg_at_10", float(row.ndcg))
                 if int(row.k) == 100:
@@ -792,12 +838,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rank-end", type=base.parse_date, default=date(2026, 5, 1))
     parser.add_argument("--test-start", type=base.parse_date, default=date(2026, 5, 2))
     parser.add_argument("--test-end", type=base.parse_date, default=date(2026, 5, 8))
+    parser.add_argument("--mart-dir", type=Path, default=base.MART_DIR)
+    parser.add_argument(
+        "--use-marts",
+        choices=["auto", "always", "never"],
+        default="auto",
+        help="Read feedback, related candidates, and feature context from Week 6 marts.",
+    )
     parser.add_argument("--sample-ratio", type=float, default=1.0)
     parser.add_argument("--min-item-users", type=int, default=3)
     parser.add_argument("--min-user-items", type=int, default=1)
     parser.add_argument("--max-items", type=int, default=500_000)
     parser.add_argument("--candidate-k", type=int, default=300)
     parser.add_argument("--hybrid-extra", type=int, default=200)
+    parser.add_argument("--recent-candidate-cap", type=int, default=None)
+    parser.add_argument("--popular-candidate-cap", type=int, default=None)
+    parser.add_argument("--related-candidate-cap", type=int, default=0)
+    parser.add_argument("--related-top-per-anchor", type=int, default=20)
+    parser.add_argument("--related-max-seen-anchors", type=int, default=20)
+    parser.add_argument("--related-path", type=Path, default=base.DEFAULT_RELATED_PATH)
     parser.add_argument("--rank-users", type=int, default=30_000)
     parser.add_argument("--eval-users", type=int, default=30_000)
     parser.add_argument("--factors", type=int, default=64)
@@ -809,6 +868,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--write-feature-cache", action="store_true")
     parser.add_argument("--reuse-feature-cache", action="store_true")
     parser.add_argument("--feature-cache-path", type=Path, default=None)
+    parser.add_argument(
+        "--ranker-feature-parquet",
+        type=Path,
+        default=None,
+        help="Train rankers from reusable ranker feature parquet instead of rebuilding train features.",
+    )
+    parser.add_argument(
+        "--ranker-feature-summary",
+        type=Path,
+        default=None,
+        help="Optional summary JSON produced next to --ranker-feature-parquet.",
+    )
     parser.add_argument(
         "--merge-metrics-from",
         type=Path,
@@ -840,7 +911,7 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated rankers to train/evaluate: lgbm,fm,deepwide,deepfm,dlrm.",
     )
     parser.add_argument("--mlflow-tracking-uri", type=str, default="sqlite:///mlflow.db")
-    parser.add_argument("--mlflow-experiment", type=str, default="bda-week7-recsys-re-rank")
+    parser.add_argument("--mlflow-experiment", type=str, default="recsys-rerank")
     parser.add_argument("--no-mlflow", action="store_true")
     return parser.parse_args()
 
@@ -906,27 +977,42 @@ def main() -> None:
         x_train, feature_mean, feature_std = standardize_features(x_train_raw)
     else:
         print("1. load data")
-        history_df = base.load_period(base.DATA_DIR, args.history_start, args.history_end)
-        rank_df = base.load_period(base.DATA_DIR, args.rank_start, args.rank_end)
-        test_df = base.load_period(base.DATA_DIR, args.test_start, args.test_end)
-        recent_start = max(args.history_start, args.history_end - timedelta(days=13))
-        prior_end = recent_start - timedelta(days=1)
-        recent_df = base.load_period(base.DATA_DIR, recent_start, args.history_end)
-        prior_df = (
-            base.load_period(base.DATA_DIR, args.history_start, prior_end)
-            if prior_end >= args.history_start
-            else history_df.iloc[0:0].copy()
-        )
-        event_weights = dict(base.DEFAULT_WEIGHTS)
-        history_fb = base.build_feedback(history_df, event_weights)
-        rank_fb = base.build_feedback(rank_df, event_weights)
-        test_fb = base.build_feedback(test_df, event_weights)
-        recent_fb = base.build_feedback(recent_df, event_weights)
-        prior_fb = (
-            base.build_feedback(prior_df, event_weights)
-            if len(prior_df)
-            else base.empty_feedback_frame()
-        )
+        use_marts = base.should_use_marts(args.use_marts, args.mart_dir)
+        if use_marts:
+            print(f"   using marts from {args.mart_dir}")
+            history_df = base.empty_activity_frame()
+            recent_df = base.empty_activity_frame()
+            prior_df = base.empty_activity_frame()
+            recent_fb = base.empty_feedback_frame()
+            prior_fb = base.empty_feedback_frame()
+            history_fb = base.load_mart_feedback(
+                args.mart_dir / "user_repo_interaction_mart.parquet"
+            )
+            split_mart = args.mart_dir / "experiment_split_mart.parquet"
+            rank_fb = base.load_mart_feedback(split_mart, "rank_label")
+            test_fb = base.load_mart_feedback(split_mart, "test")
+        else:
+            history_df = base.load_period(base.DATA_DIR, args.history_start, args.history_end)
+            rank_df = base.load_period(base.DATA_DIR, args.rank_start, args.rank_end)
+            test_df = base.load_period(base.DATA_DIR, args.test_start, args.test_end)
+            recent_start = max(args.history_start, args.history_end - timedelta(days=13))
+            prior_end = recent_start - timedelta(days=1)
+            recent_df = base.load_period(base.DATA_DIR, recent_start, args.history_end)
+            prior_df = (
+                base.load_period(base.DATA_DIR, args.history_start, prior_end)
+                if prior_end >= args.history_start
+                else history_df.iloc[0:0].copy()
+            )
+            event_weights = dict(base.DEFAULT_WEIGHTS)
+            history_fb = base.build_feedback(history_df, event_weights)
+            rank_fb = base.build_feedback(rank_df, event_weights)
+            test_fb = base.build_feedback(test_df, event_weights)
+            recent_fb = base.build_feedback(recent_df, event_weights)
+            prior_fb = (
+                base.build_feedback(prior_df, event_weights)
+                if len(prior_df)
+                else base.empty_feedback_frame()
+            )
 
         print("2. filter catalog/users")
         history_fb, rank_fb, test_fb = base.filter_catalog(
@@ -942,27 +1028,29 @@ def main() -> None:
         )
         keep_users = set(history_fb["actor_id"].unique())
         keep_items = set(history_fb["repo_id"].unique())
-        history_df = history_df[
-            history_df["actor_id"].isin(keep_users) & history_df["repo_id"].isin(keep_items)
-        ]
-        recent_df = recent_df[
-            recent_df["actor_id"].isin(keep_users) & recent_df["repo_id"].isin(keep_items)
-        ]
-        prior_df = prior_df[
-            prior_df["actor_id"].isin(keep_users) & prior_df["repo_id"].isin(keep_items)
-        ]
-        recent_fb = recent_fb[
-            recent_fb["actor_id"].isin(keep_users) & recent_fb["repo_id"].isin(keep_items)
-        ]
-        prior_fb = prior_fb[
-            prior_fb["actor_id"].isin(keep_users) & prior_fb["repo_id"].isin(keep_items)
-        ]
+        if not use_marts:
+            history_df = history_df[
+                history_df["actor_id"].isin(keep_users) & history_df["repo_id"].isin(keep_items)
+            ]
+            recent_df = recent_df[
+                recent_df["actor_id"].isin(keep_users) & recent_df["repo_id"].isin(keep_items)
+            ]
+            prior_df = prior_df[
+                prior_df["actor_id"].isin(keep_users) & prior_df["repo_id"].isin(keep_items)
+            ]
+            recent_fb = recent_fb[
+                recent_fb["actor_id"].isin(keep_users) & recent_fb["repo_id"].isin(keep_items)
+            ]
+            prior_fb = prior_fb[
+                prior_fb["actor_id"].isin(keep_users) & prior_fb["repo_id"].isin(keep_items)
+            ]
         data_summary = {
             "history_interactions": int(len(history_fb)),
             "history_users": int(history_fb.actor_id.nunique()),
             "history_repos": int(history_fb.repo_id.nunique()),
             "rank_label_interactions": int(len(rank_fb)),
             "test_label_interactions": int(len(test_fb)),
+            "use_marts": bool(use_marts),
         }
         print(
             f"   history={len(history_fb):,} interactions, "
@@ -972,6 +1060,11 @@ def main() -> None:
 
         print("3. train ALS")
         train_sparse, user2idx, item2idx, idx2item = base.make_matrix(history_fb)
+        feature_marts = (
+            base.load_feature_marts(args.mart_dir, set(user2idx), set(item2idx))
+            if use_marts
+            else None
+        )
         als_model = AlternatingLeastSquares(
             factors=args.factors,
             regularization=0.01,
@@ -985,6 +1078,14 @@ def main() -> None:
         rank_labels = rank_fb.groupby("actor_id")["repo_id"].apply(set).to_dict()
         test_labels = test_fb.groupby("actor_id")["repo_id"].apply(set).to_dict()
         train_seen = history_fb.groupby("actor_id")["repo_id"].apply(set).to_dict()
+        related_seed_items = (
+            history_fb.sort_values(["actor_id", "score"], ascending=[True, False])
+            .groupby("actor_id", observed=True)["repo_id"]
+            .apply(lambda s: [int(rid) for rid in s.head(args.related_max_seen_anchors)])
+            .to_dict()
+            if args.related_candidate_cap > 0 and args.related_max_seen_anchors > 0
+            else {}
+        )
         rank_users = sorted(set(rank_labels) & set(user2idx))
         eval_users_all = sorted(test_labels)
         if len(eval_users_all) > args.eval_users:
@@ -994,8 +1095,17 @@ def main() -> None:
             test_labels = {uid: test_labels[uid] for uid in eval_users_all}
         test_users = sorted(set(test_labels) & set(user2idx))
 
-        pop_scores = base.feedback_popularity(history_fb)
-        recent_scores = base.feedback_popularity(recent_fb)
+        if use_marts and feature_marts:
+            repo_feature = feature_marts.get("repo_feature", pd.DataFrame())
+            pop_scores = base.repo_score_series_from_feature_mart(
+                repo_feature, item2idx, "total_score_42d"
+            )
+            recent_scores = base.repo_score_series_from_feature_mart(
+                repo_feature, item2idx, "total_score_7d"
+            )
+        else:
+            pop_scores = base.feedback_popularity(history_fb)
+            recent_scores = base.feedback_popularity(recent_fb)
         candidate_pool_size = args.candidate_k + args.hybrid_extra + 500
         popularity_candidates = (
             pop_scores[pop_scores.index.isin(item2idx)].head(candidate_pool_size).index.tolist()
@@ -1003,6 +1113,18 @@ def main() -> None:
         recent_candidates = (
             recent_scores[recent_scores.index.isin(item2idx)].head(candidate_pool_size).index.tolist()
         )
+        if use_marts:
+            related_candidates = base.load_related_candidates_from_mart(
+                args.mart_dir / "repo_repo_related_mart.parquet",
+                item2idx,
+                args.related_top_per_anchor,
+            )
+        else:
+            related_candidates = base.load_related_candidates(
+                args.related_path,
+                item2idx,
+                args.related_top_per_anchor,
+            )
 
         rank_retrieval = base.recommend_batch(
             als_model,
@@ -1031,6 +1153,11 @@ def main() -> None:
             train_seen,
             item2idx,
             max_candidates,
+            args.recent_candidate_cap,
+            args.popular_candidate_cap,
+            related_candidates,
+            args.related_candidate_cap,
+            related_seed_items,
         )
         test_hybrid = base.hybridize_candidates(
             test_retrieval,
@@ -1040,10 +1167,15 @@ def main() -> None:
             train_seen,
             item2idx,
             max_candidates,
+            args.recent_candidate_cap,
+            args.popular_candidate_cap,
+            related_candidates,
+            args.related_candidate_cap,
+            related_seed_items,
         )
 
         print("5. build features")
-        context = build_light_feature_context(
+        context = base.build_feature_context(
             history_df,
             recent_df,
             prior_df,
@@ -1053,17 +1185,28 @@ def main() -> None:
             als_model,
             user2idx,
             item2idx,
+            feature_marts,
         )
-        feature_names = build_feature_names(context)
-        x_train_raw, y_train, groups, rank_data_summary = build_rank_data(
-            rank_hybrid,
-            rank_labels,
-            user2idx,
-            item2idx,
-            context,
-            args.rank_users,
-            args.seed,
-        )
+        canonical_feature_names = build_feature_names(context)
+        if args.ranker_feature_parquet is not None:
+            x_train_raw, y_train, groups, feature_names, rank_data_summary = (
+                load_rank_data_from_feature_parquet(
+                    args.ranker_feature_parquet,
+                    args.ranker_feature_summary,
+                    canonical_feature_names,
+                )
+            )
+        else:
+            feature_names = canonical_feature_names
+            x_train_raw, y_train, groups, rank_data_summary = build_rank_data(
+                rank_hybrid,
+                rank_labels,
+                user2idx,
+                item2idx,
+                context,
+                args.rank_users,
+                args.seed,
+            )
         validate_feature_matrix(x_train_raw, feature_names)
         x_train, feature_mean, feature_std = standardize_features(x_train_raw)
 
@@ -1190,6 +1333,7 @@ def main() -> None:
         "history_repos": data_summary["history_repos"],
         "rank_label_interactions": data_summary["rank_label_interactions"],
         "test_label_interactions": data_summary["test_label_interactions"],
+        "use_marts": data_summary.get("use_marts"),
         "eval_users": eval_user_count,
         "eval_warm_users": int(sum(1 for uid in test_labels if uid in user2idx)),
         "eval_cold_users": int(sum(1 for uid in test_labels if uid not in user2idx)),

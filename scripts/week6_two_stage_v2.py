@@ -239,22 +239,19 @@ def log_compact_mlflow_metrics(results: pd.DataFrame, primary_model: str) -> Non
     """Keep the MLflow run table readable; detailed metrics stay in CSV artifacts."""
     key_cutoffs = {10, 100}
     for row in results.itertuples(index=False):
+        if row.model == "Popularity":
+            continue
         if int(row.k) not in key_cutoffs:
             continue
         model_key = metric_model_key(str(row.model))
-        mlflow.log_metric(f"{model_key}_ndcg_at_{row.k}", float(row.ndcg))
-        mlflow.log_metric(f"{model_key}_recall_at_{row.k}", float(row.recall))
-        mlflow.log_metric(
-            f"{model_key}_unique_recommended_at_{row.k}",
-            int(row.unique_recommended),
-        )
-        if row.model == primary_model:
-            mlflow.log_metric(f"primary_ndcg_at_{row.k}", float(row.ndcg))
-            mlflow.log_metric(f"primary_recall_at_{row.k}", float(row.recall))
+        if int(row.k) == 100:
+            mlflow.log_metric(f"{model_key}_ndcg_at_100", float(row.ndcg))
+            mlflow.log_metric(f"{model_key}_recall_at_100", float(row.recall))
             mlflow.log_metric(
-                f"primary_unique_recommended_at_{row.k}",
+                f"{model_key}_unique_recommended_at_100",
                 int(row.unique_recommended),
             )
+        if row.model == primary_model:
             if int(row.k) == 10:
                 mlflow.log_metric("core_ndcg_at_10", float(row.ndcg))
             if int(row.k) == 100:
@@ -286,7 +283,6 @@ def log_mlflow_run(
         mlflow.set_tag("primary_model", "Two-Stage/Fallback")
         mlflow.set_tag("ui_metric_1", "core_recall_at_100")
         mlflow.set_tag("ui_metric_2", "core_ndcg_at_10")
-        mlflow.log_params(jsonable_args(args))
         log_mlflow_focus_params(args, run_summary)
         mlflow.log_param("suffix", suffix)
         mlflow.log_param("feature_count", len(run_summary["feature_names"]))
@@ -1769,7 +1765,7 @@ def main():
     )
     parser.add_argument("--output-suffix", type=str, default=None)
     parser.add_argument("--mlflow-tracking-uri", type=str, default="sqlite:///mlflow.db")
-    parser.add_argument("--mlflow-experiment", type=str, default="bda-week6-two-stage")
+    parser.add_argument("--mlflow-experiment", type=str, default="recsys-two-stage")
     parser.add_argument("--no-mlflow", action="store_true")
     parser.add_argument("--save-user-diagnostics", action="store_true")
     parser.add_argument(
