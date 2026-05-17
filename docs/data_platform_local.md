@@ -30,8 +30,8 @@ uv run python scripts/sync_bq_metrics.py \
   --project bda-coai \
   --dataset mart \
   --parquet-dir data/daily_agg \
-  --start 2026-04-04 \
-  --end 2026-05-08 \
+  --start 2026-04-12 \
+  --end 2026-05-16 \
   --max-days 35 \
   --mode replace-all \
   --skip-fact \
@@ -52,7 +52,7 @@ uv run python scripts/sync_bq_metrics.py \
 | `mart.metrics_agent_trendy_repos` | OpenClaw/oh-my-openagent seed 기반 AI agent 트렌디 repo |
 | `mart.metrics_agent_trend_validation` | trend score와 baseline들의 다음 주 예측력 비교 |
 
-현재 로컬 parquet 기준 기간은 `2026-02-15`부터 `2026-05-08`까지다.
+현재 로컬 parquet 기준 기간은 `2026-01-01`부터 `2026-05-16`까지이며, 총 136일치다. 2026-05-17에 `2026-01-01`~`2026-02-14` 구간을 BigQuery public GitHub Archive에서 백필했다.
 
 ## dbt + Semantic Layer
 
@@ -119,7 +119,7 @@ uv run python scripts/week6_build_recsys_marts.py --smoke
 
 `repo_feature_mart`의 `stars`, `forks`는 로컬 metadata cache의 현재값이다. 그래서 강의/실험 해석에서는 temporal leakage 가능성을 명시해야 한다. 실서비스형 point-in-time mart가 필요하면 GitHub metadata도 `snapshot_date`별로 별도 수집해야 한다.
 
-비용 관리를 위해 기본 Airflow DAG는 전체 83일이 아니라 최근 35일(`2026-04-04` ~ `2026-05-08`)만 처리한다. 또한 기본 DAG는 `--skip-fact`로 raw fact를 BigQuery에 올리지 않고, Metabase가 볼 지표 테이블만 업로드한다. 전체 이력 또는 fact를 올리려면 의도적으로 옵션을 바꿔야 한다.
+비용 관리를 위해 기본 Airflow DAG는 전체 136일이 아니라 최근 35일(`2026-04-12` ~ `2026-05-16`)만 처리한다. 또한 기본 DAG는 `--skip-fact`로 raw fact를 BigQuery에 올리지 않고, Metabase가 볼 지표 테이블만 업로드한다. 전체 이력 또는 fact를 올리려면 의도적으로 옵션을 바꿔야 한다.
 
 현재 `bda-coai` 프로젝트는 BigQuery sandbox 제약이 있어서 billing이 켜져 있지 않으면 dataset/table expiration이 필요하다. 그래서 스크립트는 `mart` dataset의 기본 table/partition expiration을 58일로 맞추고, 과거 날짜 데이터를 보존하기 위해 fact table은 날짜 파티션 없이 생성한다. `activity_date` 컬럼은 그대로 있으므로 Metabase 시계열 필터링은 동일하게 가능하다.
 
@@ -156,13 +156,13 @@ metadata DAG는 하루 6회, 4시간 간격으로 실행된다. 각 실행은 Gi
 Airflow `BashOperator`는 `append_env=True`를 사용한다. 따라서 Airflow 컨테이너 환경에 `GITHUB_TOKEN`을 넣으면 metadata refresh가 자동으로 토큰 인증을 사용한다. 토큰이 없으면 `gh auth token` fallback을 시도하고, 컨테이너에 `gh` 인증도 없으면 무토큰 GitHub API 한도 안에서 동작한다.
 
 ```bash
-uv run --no-project --with pandas --with requests --with duckdb python scripts/refresh_repo_metadata.py --parquet-dir data/daily_agg --start 2026-04-04 --end 2026-05-08 --top-n 1000 --systematic-sample --sample-seed bda-repo-metadata-v1 --cache-tier warm --max-fetch 4500 --rate-limit-pause 0.2
+uv run --no-project --with pandas --with requests --with duckdb python scripts/refresh_repo_metadata.py --parquet-dir data/daily_agg --start 2026-04-12 --end 2026-05-16 --top-n 1000 --systematic-sample --sample-seed bda-repo-metadata-v1 --cache-tier warm --max-fetch 4500 --rate-limit-pause 0.2
 ```
 
 metric DAG는 매일 06:00 KST에 실행된다. 첫 태스크 `plan_metric_sync`는 `--plan-only`로 날짜 범위와 `--max-days` 방어선을 먼저 확인한다. 통과하면 `sync_metrics`가 fact 업로드 없이 aggregate metric table만 BigQuery에 갱신한다.
 
 ```bash
-uv run --no-project --with pandas --with pyarrow --with duckdb --with google-cloud-bigquery --with db-dtypes python scripts/sync_bq_metrics.py --project bda-coai --dataset mart --parquet-dir data/daily_agg --start 2026-04-04 --end 2026-05-08 --max-days 35 --mode replace-all --skip-fact --build-metrics
+uv run --no-project --with pandas --with pyarrow --with duckdb --with google-cloud-bigquery --with db-dtypes python scripts/sync_bq_metrics.py --project bda-coai --dataset mart --parquet-dir data/daily_agg --start 2026-04-12 --end 2026-05-16 --max-days 35 --mode replace-all --skip-fact --build-metrics
 ```
 
 Airflow 태스크 안정화 설정:
@@ -316,8 +316,8 @@ Repo metadata는 GitHub REST API 결과를 로컬 SQLite 캐시에 저장해서 
 
 ```bash
 uv run python scripts/refresh_repo_metadata.py \
-  --start 2026-04-04 \
-  --end 2026-05-08 \
+  --start 2026-04-12 \
+  --end 2026-05-16 \
   --top-n 1000 \
   --systematic-sample \
   --max-fetch 4500 \
@@ -344,8 +344,8 @@ uv run python scripts/refresh_repo_metadata.py \
 
 ```bash
 uv run python scripts/refresh_repo_metadata.py \
-  --start 2026-04-04 \
-  --end 2026-05-08 \
+  --start 2026-04-12 \
+  --end 2026-05-16 \
   --top-n 1000 \
   --systematic-sample \
   --max-fetch 4500 \

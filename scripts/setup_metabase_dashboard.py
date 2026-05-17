@@ -197,9 +197,31 @@ def find_dashboard(mb: Metabase, name: str) -> dict[str, Any] | None:
     return None
 
 
-def ensure_dashboard(mb: Metabase, name: str, collection_id: int) -> int:
-    existing = find_dashboard(mb, name)
+def find_dashboard_by_names(mb: Metabase, names: list[str]) -> dict[str, Any] | None:
+    dashboards = mb.get_json("/api/dashboard")
+    for name in names:
+        for dashboard in dashboards:
+            if dashboard.get("name") == name and not dashboard.get("archived"):
+                return dashboard
+    return None
+
+
+def ensure_dashboard(
+    mb: Metabase,
+    name: str,
+    collection_id: int,
+    aliases: list[str] | None = None,
+) -> int:
+    existing = find_dashboard_by_names(mb, [*(aliases or []), name])
     if existing:
+        mb.put_json(
+            f"/api/dashboard/{existing['id']}",
+            {
+                "name": name,
+                "description": "GitHub Archive 기초 지표: DAU, 이벤트, WAU, 유저 세그먼트",
+                "collection_id": collection_id,
+            },
+        )
         return int(existing["id"])
     dashboard = mb.post_json(
         "/api/dashboard",
@@ -269,31 +291,7 @@ def build_cards(database_id: int, collection_id: int, project: str, dataset: str
     table = lambda name: f"`{project}.{dataset}.{name}`"
     return [
         card_payload(
-            "KPI - 최근 일자 DAU",
-            database_id,
-            f"""
-            SELECT active_users
-            FROM {table("metrics_daily")}
-            ORDER BY activity_date DESC
-            LIMIT 1
-            """,
-            "scalar",
-            collection_id,
-        ),
-        card_payload(
-            "KPI - 최근 일자 이벤트 수",
-            database_id,
-            f"""
-            SELECT total_events
-            FROM {table("metrics_daily")}
-            ORDER BY activity_date DESC
-            LIMIT 1
-            """,
-            "scalar",
-            collection_id,
-        ),
-        card_payload(
-            "DAU 추이",
+            "일별 DAU",
             database_id,
             f"""
             SELECT activity_date, active_users
@@ -302,9 +300,15 @@ def build_cards(database_id: int, collection_id: int, project: str, dataset: str
             """,
             "line",
             collection_id,
+            {
+                "graph.y_axis.auto_range": False,
+                "graph.y_axis.min": 500000,
+                "graph.y_axis.max": 800000,
+                "graph.y_axis.title_text": "Active users",
+            },
         ),
         card_payload(
-            "총 이벤트 추이",
+            "일별 이벤트 수",
             database_id,
             f"""
             SELECT activity_date, total_events
@@ -313,9 +317,15 @@ def build_cards(database_id: int, collection_id: int, project: str, dataset: str
             """,
             "line",
             collection_id,
+            {
+                "graph.y_axis.auto_range": False,
+                "graph.y_axis.min": 2000000,
+                "graph.y_axis.max": 4000000,
+                "graph.y_axis.title_text": "Events",
+            },
         ),
         card_payload(
-            "이벤트 타입별 일별 이벤트",
+            "이벤트 타입별 일별 이벤트 수",
             database_id,
             f"""
             SELECT activity_date, action, total_events
@@ -323,166 +333,99 @@ def build_cards(database_id: int, collection_id: int, project: str, dataset: str
             WHERE action IN ('PushEvent', 'WatchEvent', 'ForkEvent', 'PullRequestEvent', 'IssuesEvent', 'IssueCommentEvent')
             ORDER BY activity_date, action
             """,
-            "area",
-            collection_id,
-        ),
-        card_payload(
-            "WAU 추이",
-            database_id,
-            f"""
-            SELECT week_start, weekly_active_users
-            FROM {table("metrics_weekly")}
-            ORDER BY week_start
-            """,
             "line",
-            collection_id,
-        ),
-        card_payload(
-            "유저 세그먼트 분포",
-            database_id,
-            f"""
-            SELECT user_segment, users
-            FROM {table("metrics_user_segments")}
-            ORDER BY users DESC
-            """,
-            "bar",
-            collection_id,
-        ),
-        card_payload(
-            "최근 7일 기초 지표",
-            database_id,
-            f"""
-            SELECT activity_date, active_users, active_repos, total_events, events_per_active_user
-            FROM {table("metrics_daily")}
-            ORDER BY activity_date DESC
-            LIMIT 7
-            """,
-            "table",
-            collection_id,
-        ),
-        card_payload(
-            "KPI - 최근 완성 코호트 W1 Retention",
-            database_id,
-            f"""
-            SELECT w1_retention
-            FROM {table("metrics_retention_summary")}
-            WHERE w1_retention > 0
-            ORDER BY cohort_week DESC
-            LIMIT 1
-            """,
-            "scalar",
-            collection_id,
-        ),
-        card_payload(
-            "Weekly Cohort Retention",
-            database_id,
-            f"""
-            SELECT cohort_week, weeks_since, retention_rate
-            FROM {table("metrics_retention_weekly")}
-            WHERE weeks_since BETWEEN 0 AND 4
-            ORDER BY cohort_week, weeks_since
-            """,
-            "table",
-            collection_id,
-        ),
-        card_payload(
-            "W1 Retention 추이",
-            database_id,
-            f"""
-            SELECT cohort_week, w1_retention
-            FROM {table("metrics_retention_summary")}
-            WHERE w1_retention > 0
-            ORDER BY cohort_week
-            """,
-            "line",
-            collection_id,
-        ),
-        card_payload(
-            "Retention Summary",
-            database_id,
-            f"""
-            SELECT cohort_week, cohort_users, w0_retention, w1_retention, w2_retention, w3_retention
-            FROM {table("metrics_retention_summary")}
-            ORDER BY cohort_week DESC
-            """,
-            "table",
-            collection_id,
-        ),
-        card_payload(
-            "AI Agent 트렌디 repo Top 20",
-            database_id,
-            f"""
-            SELECT
-              repo_name,
-              trend_score,
-              growth_ratio,
-              seed_affinity,
-              recent_active_users,
-              recent_score,
-              recent_top_action,
-              why_trendy
-            FROM {table("metrics_agent_trendy_repos")}
-            ORDER BY trend_score DESC
-            LIMIT 20
-            """,
-            "table",
-            collection_id,
-        ),
-        card_payload(
-            "Agent Trend Score Top 20",
-            database_id,
-            f"""
-            SELECT repo_name, trend_score
-            FROM {table("metrics_agent_trendy_repos")}
-            ORDER BY trend_score DESC
-            LIMIT 20
-            """,
-            "bar",
-            collection_id,
-        ),
-        card_payload(
-            "Growth vs Seed Affinity",
-            database_id,
-            f"""
-            SELECT growth_ratio, seed_affinity, recent_active_users, trend_score, repo_name
-            FROM {table("metrics_agent_trendy_repos")}
-            ORDER BY trend_score DESC
-            LIMIT 100
-            """,
-            "scatter",
             collection_id,
             {
-                "graph.dimensions": ["growth_ratio"],
-                "graph.metrics": ["seed_affinity"],
-                "graph.x_axis.title_text": "Growth ratio",
-                "graph.y_axis.title_text": "Seed affinity",
-                "graph.x_axis.scale": "linear",
-                "graph.y_axis.scale": "linear",
-                "graph.show_values": False,
+                "graph.y_axis.auto_range": False,
+                "graph.y_axis.min": 1000,
+                "graph.y_axis.max": 4000000,
+                "graph.y_axis.scale": "log",
+                "graph.y_axis.title_text": "Events, log scale",
             },
         ),
         card_payload(
-            "Agent Trend 예측력 비교",
+            "이벤트 타입별 일별 활성 유저 수",
             database_id,
             f"""
-            SELECT model, spearman_next_score, precision_at_20_next_top100, ndcg_at_20, avg_next_score_at_20
-            FROM {table("metrics_agent_trend_validation")}
-            ORDER BY ndcg_at_20 DESC
+            SELECT activity_date, action, COUNT(DISTINCT user_id) AS active_users
+            FROM {table("fact_user_repo_activity")}
+            WHERE action IN ('PushEvent', 'WatchEvent', 'ForkEvent', 'PullRequestEvent', 'IssuesEvent', 'IssueCommentEvent')
+            GROUP BY activity_date, action
+            ORDER BY activity_date, action
+            """,
+            "line",
+            collection_id,
+            {
+                "graph.y_axis.auto_range": False,
+                "graph.y_axis.min": 0,
+                "graph.y_axis.max": 700000,
+                "graph.y_axis.title_text": "Active users",
+            },
+        ),
+        card_payload(
+            "First seen 기준 유저 lifecycle",
+            database_id,
+            f"""
+            SELECT
+              activity_date,
+              new_users,
+              existing_users,
+              returning_users,
+              churned_users
+            FROM {table("metrics_user_lifecycle_sample_daily")}
+            WHERE is_complete_28d_window
+            ORDER BY activity_date
+            """,
+            "line",
+            collection_id,
+            {
+                "graph.y_axis.auto_range": False,
+                "graph.y_axis.min": 0,
+                "graph.y_axis.max": 1100,
+                "graph.y_axis.title_text": "Users",
+            },
+        ),
+        card_payload(
+            "Cohort retention heatmap",
+            database_id,
+            f"""
+            SELECT
+              cohort_week,
+              cohort_users,
+              MAX(CASE WHEN weeks_since = 0 THEN retention_rate END) AS w0,
+              MAX(CASE WHEN weeks_since = 1 THEN retention_rate END) AS w1,
+              MAX(CASE WHEN weeks_since = 2 THEN retention_rate END) AS w2,
+              MAX(CASE WHEN weeks_since = 3 THEN retention_rate END) AS w3,
+              MAX(CASE WHEN weeks_since = 4 THEN retention_rate END) AS w4
+            FROM {table("metrics_retention_weekly")}
+            WHERE weeks_since BETWEEN 0 AND 4
+            GROUP BY cohort_week, cohort_users
+            ORDER BY cohort_week
             """,
             "table",
             collection_id,
-        ),
-        card_payload(
-            "Agent Trend 주요 신호",
-            database_id,
-            f"""
-            SELECT recent_top_action, COUNT(*) AS repos, AVG(trend_score) AS avg_trend_score
-            FROM {table("metrics_agent_trendy_repos")}
-            GROUP BY recent_top_action
-            ORDER BY repos DESC
-            """,
-            "bar",
-            collection_id,
+            {
+                "table.columns": [
+                    {"name": "cohort_week", "enabled": True},
+                    {"name": "cohort_users", "enabled": True},
+                    {"name": "w0", "enabled": True, "number_style": "percent", "decimals": 1},
+                    {"name": "w1", "enabled": True, "number_style": "percent", "decimals": 1},
+                    {"name": "w2", "enabled": True, "number_style": "percent", "decimals": 1},
+                    {"name": "w3", "enabled": True, "number_style": "percent", "decimals": 1},
+                    {"name": "w4", "enabled": True, "number_style": "percent", "decimals": 1},
+                ],
+                "table.column_formatting": [
+                    {
+                        "columns": ["w0", "w1", "w2", "w3", "w4"],
+                        "type": "range",
+                        "colors": ["#fee2e2", "#fef3c7", "#dcfce7"],
+                        "min_type": "custom",
+                        "min_value": 0,
+                        "max_type": "custom",
+                        "max_value": 1,
+                    },
+                ],
+            },
         ),
     ]
 
@@ -839,7 +782,12 @@ def main() -> None:
         key_path=args.key_path,
     )
     collection_id = ensure_collection(mb, "BDA 데이터 플랫폼")
-    dashboard_id = ensure_dashboard(mb, "GitHub Archive 기초 지표", collection_id)
+    dashboard_id = ensure_dashboard(
+        mb,
+        "GitHub Archive 기초 지표",
+        collection_id,
+        aliases=["GitHub Archive Core Metrics"],
+    )
     trendy_dashboard_id = ensure_dashboard_with_description(
         mb,
         "AI Agent 트렌디 레포",
@@ -867,23 +815,12 @@ def main() -> None:
 
     card_ids = [create_card(mb, card) for card in cards]
     layout = [
-        (0, 0, 6, 4),
-        (0, 6, 6, 4),
-        (0, 12, 12, 4),
-        (4, 0, 12, 7),
-        (4, 12, 12, 7),
-        (11, 0, 12, 6),
-        (11, 12, 12, 6),
-        (17, 0, 24, 6),
-        (23, 0, 6, 4),
-        (23, 6, 18, 6),
-        (29, 0, 12, 6),
-        (29, 12, 12, 6),
-        (35, 0, 24, 8),
-        (43, 0, 12, 7),
-        (43, 12, 12, 7),
-        (50, 0, 16, 6),
-        (50, 16, 8, 6),
+        (0, 0, 12, 8),
+        (0, 12, 12, 8),
+        (8, 0, 12, 8),
+        (8, 12, 12, 8),
+        (16, 0, 24, 8),
+        (24, 0, 24, 8),
     ]
     replace_dashboard_cards(mb, dashboard_id, card_ids, layout)
 

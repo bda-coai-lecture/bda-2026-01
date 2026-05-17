@@ -977,7 +977,7 @@ def build_local_metrics_duckdb(files: list[Path]) -> dict[str, pd.DataFrame]:
     source = duckdb_parquet_source(files)
     Path("/tmp/duckdb-spill").mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(database=":memory:")
-    con.execute("SET memory_limit = '3GB'")
+    con.execute("SET memory_limit = '8GB'")
     con.execute("SET temp_directory = '/tmp/duckdb-spill'")
     con.execute("SET threads = 1")
     con.execute("SET preserve_insertion_order = false")

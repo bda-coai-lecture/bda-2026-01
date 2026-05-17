@@ -1,0 +1,1543 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Week 7 데이터 플랫폼 아키텍처</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23172033'/%3E%3Cpath d='M16 18h32M16 32h32M16 46h32' stroke='%23e5e7eb' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='22' cy='18' r='5' fill='%230f766e'/%3E%3Ccircle cx='42' cy='32' r='5' fill='%232563eb'/%3E%3Ccircle cx='28' cy='46' r='5' fill='%23b45309'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --paper: #ffffff;
+      --ink: #172033;
+      --muted: #64748b;
+      --line: #cbd5e1;
+      --soft: #eef2f7;
+      --source: #475569;
+      --airflow: #0f766e;
+      --bq: #2563eb;
+      --dbt: #b45309;
+      --metabase: #15803d;
+      --ml: #6d28d9;
+      --warn: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    * {
+      min-width: 0;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+      letter-spacing: 0;
+    }
+
+    .page {
+      width: min(1420px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+
+    .slide {
+      min-height: calc(100vh - 56px);
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 18px 45px rgb(15 23 42 / 0.08);
+    }
+
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-start;
+      margin-bottom: 22px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--airflow);
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1.08;
+      font-weight: 900;
+    }
+
+    .subtitle {
+      max-width: 820px;
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(120px, 1fr));
+      gap: 10px;
+      min-width: 340px;
+    }
+
+    .stat {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .stat b {
+      display: block;
+      font-size: 20px;
+      line-height: 1.15;
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .architecture {
+      position: relative;
+      display: grid;
+      grid-template-columns:
+        minmax(230px, 1fr) 46px
+        minmax(230px, 1fr) 46px
+        minmax(260px, 1.1fr) 46px
+        minmax(230px, 1fr);
+      grid-template-rows: auto auto auto;
+      gap: 16px 12px;
+      align-items: stretch;
+      min-height: 0;
+      padding: 12px 4px 4px;
+    }
+
+    .zone {
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fbfcfe;
+    }
+
+    .zone-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      text-transform: uppercase;
+      overflow-wrap: anywhere;
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .node {
+      position: relative;
+      min-height: 126px;
+      padding: 15px;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      z-index: 2;
+    }
+
+    .node.source { border-color: var(--source); }
+    .node.airflow { border-color: var(--airflow); }
+    .node.bq { border-color: var(--bq); }
+    .node.dbt { border-color: var(--dbt); }
+    .node.metabase { border-color: var(--metabase); }
+    .node.ml { border-color: var(--ml); }
+
+    .node-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .icon {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: var(--soft);
+      color: currentColor;
+      flex: 0 0 auto;
+    }
+
+    .icon svg {
+      width: 24px;
+      height: 24px;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .node h2 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+
+    .node p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 11px;
+    }
+
+    .chip {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: var(--soft);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+      max-width: 100%;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .local { grid-column: 1; grid-row: 1 / span 2; }
+    .orchestration { grid-column: 3; grid-row: 1 / span 2; display: grid; align-content: stretch; }
+    .warehouse { grid-column: 5; grid-row: 1; }
+    .serving { grid-column: 7; grid-row: 1; }
+    .ml-zone { grid-column: 5 / span 3; grid-row: 2; align-self: start; }
+
+    .flow-arrow {
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      min-height: 96px;
+      align-self: center;
+    }
+
+    .flow-arrow::before {
+      content: "→";
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: currentColor;
+      font-size: 22px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .flow-arrow.airflow-to-bq { color: var(--bq); }
+    .flow-arrow.bq-to-serving { color: var(--metabase); }
+    .flow-arrow.local-to-airflow { color: var(--airflow); }
+
+    .flow-arrow.local-to-airflow { grid-column: 2; grid-row: 1 / span 2; }
+    .flow-arrow.airflow-to-bq { grid-column: 4; grid-row: 1; }
+    .flow-arrow.bq-to-serving { grid-column: 6; grid-row: 1; }
+
+    .branch-arrow {
+      grid-column: 4;
+      grid-row: 2;
+      display: grid;
+      place-items: center;
+      color: var(--ml);
+      min-height: 46px;
+    }
+
+    .branch-arrow::before {
+      content: "→";
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid #ddd6fe;
+      background: #f5f3ff;
+      font-size: 22px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .airflow-node {
+      min-height: 100%;
+      display: grid;
+      align-content: center;
+    }
+
+    .airflow-node .node-head {
+      justify-content: center;
+      text-align: center;
+      flex-direction: column;
+    }
+
+    .airflow-node h2 {
+      font-size: 26px;
+    }
+
+    .dag-list {
+      display: grid;
+      gap: 7px;
+      margin-top: 14px;
+    }
+
+    .dag {
+      padding: 8px 9px;
+      border-radius: 8px;
+      background: #ecfdf5;
+      color: #134e4a;
+      font-size: 12px;
+      font-weight: 800;
+      overflow-wrap: normal;
+      word-break: keep-all;
+    }
+
+    .ml-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .ml-grid .node {
+      min-height: 140px;
+    }
+
+    .ml-grid .node-head {
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+
+    .ml-grid .node h2 {
+      font-size: 18px;
+    }
+
+    .arrow {
+      position: absolute;
+      z-index: 1;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      text-align: center;
+      display: none;
+    }
+
+    .arrow::before {
+      content: "";
+      position: absolute;
+      background: currentColor;
+    }
+
+    .arrow::after {
+      content: "";
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-top: 2px solid currentColor;
+      border-right: 2px solid currentColor;
+    }
+
+    .arrow-right::before {
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 2px;
+      transform: translateY(-50%);
+    }
+
+    .arrow-right::after {
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    .arrow-down::before {
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      transform: translateX(-50%);
+    }
+
+    .arrow-down::after {
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%) rotate(135deg);
+    }
+
+    .a-local-airflow {
+      left: 25.3%;
+      top: 37%;
+      width: 7.2%;
+      height: 24px;
+      color: var(--airflow);
+    }
+
+    .a-airflow-bq {
+      left: 48.8%;
+      top: 25%;
+      width: 6.4%;
+      height: 24px;
+      color: var(--bq);
+    }
+
+    .a-bq-dbt {
+      left: 67.7%;
+      top: 27.8%;
+      height: 13%;
+      width: 42px;
+      color: var(--dbt);
+    }
+
+    .a-dbt-metabase {
+      left: 75.4%;
+      top: 29%;
+      width: 6.8%;
+      height: 24px;
+      color: var(--metabase);
+    }
+
+    .a-airflow-ml {
+      display: none;
+      left: 48.8%;
+      top: 71%;
+      width: 6.4%;
+      height: 24px;
+      color: var(--ml);
+    }
+
+    .a-local-ml {
+      display: none;
+      left: 24.6%;
+      top: 78%;
+      width: 31.5%;
+      height: 24px;
+      color: var(--ml);
+      opacity: 0.72;
+    }
+
+    .arrow-label {
+      position: absolute;
+      left: 50%;
+      bottom: 12px;
+      transform: translateX(-50%);
+      padding: 2px 6px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .note-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 28px;
+    }
+
+    .note {
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      min-height: 88px;
+    }
+
+    .note strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .note span {
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .details {
+      margin-top: 34px;
+      display: grid;
+      gap: 24px;
+    }
+
+    .visual-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 26px;
+    }
+
+    .visual-panel {
+      min-height: 210px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .visual-panel svg {
+      width: 100%;
+      height: 118px;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .visual-panel strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 15px;
+    }
+
+    .visual-panel p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-section {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      padding: 22px;
+    }
+
+    .detail-section h2 {
+      margin: 0 0 14px;
+      font-size: 24px;
+      line-height: 1.2;
+    }
+
+    .section-lead {
+      max-width: 980px;
+      margin: -4px 0 18px;
+      color: var(--muted);
+      font-size: 15px;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 1fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .detail-grid + .detail-grid {
+      margin-top: 16px;
+    }
+
+    .detail-card {
+      min-height: 150px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+    }
+
+    .detail-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .detail-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-card ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-card li {
+      margin: 5px 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--soft);
+      color: var(--ink);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .mini-flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .concept-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .concept {
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+    }
+
+    .concept b {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .concept span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .mini-step {
+      min-height: 76px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      position: relative;
+    }
+
+    .mini-step:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      right: -8px;
+      width: 8px;
+      height: 2px;
+      background: var(--line);
+      transform: translateY(-50%);
+    }
+
+    .mini-step b {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--airflow);
+      font-size: 12px;
+    }
+
+    .mini-step span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .tool-brief {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 18px 0;
+    }
+
+    .brief {
+      min-height: 122px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+    }
+
+    .brief b {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .brief span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .component-diagram {
+      margin: 16px 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      overflow: hidden;
+    }
+
+    .component-diagram svg {
+      width: 100%;
+      height: 240px;
+      display: block;
+    }
+
+    .component-diagram .caption {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 1100px) {
+      .title-row, .architecture, .note-row, .ml-grid, .detail-grid, .mini-flow, .concept-row, .tool-brief, .visual-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .stats { min-width: 0; }
+      .local, .orchestration, .warehouse, .serving, .ml-zone {
+        grid-column: auto;
+        grid-row: auto;
+      }
+
+      .arrow, .flow-arrow, .branch-arrow { display: none; }
+      .mini-step:not(:last-child)::after { display: none; }
+      .slide { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="slide" aria-label="BDA Week 7 data platform architecture">
+      <div class="title-row">
+        <div>
+          <p class="eyebrow">BDA 2기 Week 7 · Data Handling</p>
+          <h1>현재 데이터 플랫폼 아키텍처</h1>
+          <p class="subtitle">
+            로컬 머신의 GitHub Archive parquet를 Airflow가 조율하고, BigQuery와 dbt가 지표 계층을 만들며,
+            Metabase와 추천 파이프라인이 각각 BI와 ML 결과물을 소비한다.
+          </p>
+        </div>
+        <div class="stats">
+          <div class="stat"><b>136일</b><span>local parquet<br>2026-01-01 ~ 2026-05-16</span></div>
+          <div class="stat"><b>35일</b><span>운영 갱신 window<br>2026-04-12 ~ 2026-05-16</span></div>
+          <div class="stat"><b>8 tables</b><span>BigQuery metric marts</span></div>
+          <div class="stat"><b>75 features</b><span>recsys ranker cache</span></div>
+        </div>
+      </div>
+
+      <div class="architecture">
+        <div class="zone local">
+          <div class="zone-title">Local Machine <span>Mac / Docker volume</span></div>
+          <div class="stack">
+            <div class="node source">
+              <div class="node-head">
+                <div class="icon">
+                  <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="2"></rect><path d="M2 19h20"></path></svg>
+                </div>
+                <h2>Local Data Lake</h2>
+              </div>
+              <p>일별 user-repo-action 집계 parquet가 분석, BI, 추천 파이프라인의 공통 원천이다.</p>
+              <div class="chips">
+                <span class="chip">data/daily_agg</span>
+                <span class="chip">136 days</span>
+                <span class="chip">parquet</span>
+              </div>
+            </div>
+
+            <div class="node source">
+              <div class="node-head">
+                <div class="icon">
+                  <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v10c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path><path d="M4 10c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg>
+                </div>
+                <h2>Metadata Cache</h2>
+              </div>
+              <p>GitHub API에서 가져온 repo 이름, stars, forks, language, topics를 SQLite에 보관한다.</p>
+              <div class="chips">
+                <span class="chip">repo_metadata.db</span>
+                <span class="chip">13,782 repos</span>
+              </div>
+            </div>
+
+            <div class="node source">
+              <div class="node-head">
+                <div class="icon">
+                  <svg viewBox="0 0 24 24"><path d="M4 19V5"></path><path d="M4 19h16"></path><path d="M8 16l3-4 3 2 5-7"></path></svg>
+                </div>
+                <h2>Model Artifacts</h2>
+              </div>
+              <p>추천 실험 산출물, 모델 summary, related repo 결과가 로컬 파일로 남는다.</p>
+              <div class="chips">
+                <span class="chip">data/models/week6</span>
+                <span class="chip">ALS / LGBM</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-arrow local-to-airflow" aria-label="Local data flows to Airflow"></div>
+
+        <div class="zone orchestration">
+          <div class="zone-title">Orchestration <span>Airflow 3</span></div>
+          <div class="node airflow airflow-node">
+            <div class="node-head">
+              <div class="icon">
+                <svg viewBox="0 0 24 24"><path d="M12 3v4"></path><path d="M12 17v4"></path><path d="M3 12h4"></path><path d="M17 12h4"></path><path d="M6.3 6.3l2.8 2.8"></path><path d="M14.9 14.9l2.8 2.8"></path><path d="M17.7 6.3l-2.8 2.8"></path><path d="M9.1 14.9l-2.8 2.8"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </div>
+              <h2>Airflow</h2>
+              <p>스케줄, 재시도, 실행 순서, 날짜 window 방어선을 담당한다.</p>
+            </div>
+            <div class="dag-list">
+              <div class="dag">Metadata refresh · 4시간 간격</div>
+              <div class="dag">Platform metrics · 06:00 KST</div>
+              <div class="dag">dbt metrics · 07:00 KST</div>
+              <div class="dag">Recsys features · 09:00 KST</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-arrow airflow-to-bq" aria-label="Airflow loads and builds BigQuery tables"></div>
+
+        <div class="zone warehouse">
+          <div class="zone-title">Warehouse & Transform <span>BigQuery + dbt</span></div>
+          <div class="stack">
+            <div class="node bq">
+              <div class="node-head">
+                <div class="icon">
+                  <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M8 16V9"></path><path d="M12 16v-5"></path><path d="M16 16V7"></path></svg>
+                </div>
+                <h2>BigQuery Mart</h2>
+              </div>
+              <p>공유 warehouse. fact table과 작은 metric mart가 Metabase와 dbt의 기준 데이터가 된다.</p>
+              <div class="chips">
+                <span class="chip">bda-coai.mart</span>
+                <span class="chip">46,097,702 fact rows</span>
+              </div>
+            </div>
+
+            <div class="node dbt">
+              <div class="node-head">
+                <div class="icon">
+                  <svg viewBox="0 0 24 24"><path d="M8 4H5a2 2 0 0 0-2 2v3"></path><path d="M16 4h3a2 2 0 0 1 2 2v3"></path><path d="M8 20H5a2 2 0 0 1-2-2v-3"></path><path d="M16 20h3a2 2 0 0 0 2-2v-3"></path><path d="M8 12h8"></path><path d="M12 8v8"></path></svg>
+                </div>
+                <h2>dbt Semantic Layer</h2>
+              </div>
+              <p>DAU, 이벤트, retention 같은 지표 정의를 SQL model과 metric YAML로 고정한다.</p>
+              <div class="chips">
+                <span class="chip">metrics_daily</span>
+                <span class="chip">retention</span>
+                <span class="chip">active_users</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-arrow bq-to-serving" aria-label="Metric marts are queried by Metabase"></div>
+
+        <div class="zone serving">
+          <div class="zone-title">Serving <span>BI / Product View</span></div>
+          <div class="stack">
+            <div class="node metabase">
+              <div class="node-head">
+                <div class="icon">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M7 15v-3"></path><path d="M12 15V8"></path><path d="M17 15v-5"></path><path d="M3 8h18"></path></svg>
+                </div>
+                <h2>Metabase</h2>
+              </div>
+              <p>metric mart를 읽어 강의와 운영 화면에서 볼 수 있는 대시보드를 제공한다.</p>
+              <div class="chips">
+                <span class="chip">기초 지표</span>
+                <span class="chip">AI Agent Trend</span>
+                <span class="chip">OSS Signal</span>
+              </div>
+            </div>
+
+            <div class="node metabase">
+              <div class="node-head">
+                <div class="icon">
+                  <svg viewBox="0 0 24 24"><path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h16"></path><circle cx="8" cy="5" r="1"></circle><circle cx="14" cy="12" r="1"></circle><circle cx="10" cy="19" r="1"></circle></svg>
+                </div>
+                <h2>Metric Consumers</h2>
+              </div>
+              <p>수업 자료, SQL 질문 카드, dashboard card가 같은 지표 테이블을 조회한다.</p>
+              <div class="chips">
+                <span class="chip">DAU</span>
+                <span class="chip">WAU</span>
+                <span class="chip">W1 retention</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="branch-arrow" aria-label="Airflow also schedules recommendation feature pipeline"></div>
+
+        <div class="zone ml-zone">
+          <div class="zone-title">Recommendation Path <span>Batch ML Feature Pipeline</span></div>
+          <div class="ml-grid">
+            <div class="node ml">
+              <div class="node-head">
+                <div class="icon">
+                  <svg viewBox="0 0 24 24"><path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h16"></path><path d="M8 6v12"></path><path d="M16 6v12"></path></svg>
+                </div>
+                <h2>Recsys Marts</h2>
+              </div>
+              <p>interaction, user profile, repo feature, repo-related, split mart를 고정한다.</p>
+              <div class="chips"><span class="chip">5 parquet marts</span></div>
+            </div>
+
+            <div class="node ml">
+              <div class="node-head">
+                <div class="icon">
+                  <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"></circle><circle cx="18" cy="6" r="2"></circle><circle cx="12" cy="18" r="2"></circle><path d="M8 7l3 8"></path><path d="M16 7l-3 8"></path><path d="M8 6h8"></path></svg>
+                </div>
+                <h2>Candidate Retrieval</h2>
+              </div>
+              <p>ALS, recent, popular, related source를 섞어 ranker가 볼 후보군을 만든다.</p>
+              <div class="chips"><span class="chip">ALS</span><span class="chip">related</span><span class="chip">popular</span></div>
+            </div>
+
+            <div class="node ml">
+              <div class="node-head">
+                <div class="icon">
+                  <svg viewBox="0 0 24 24"><path d="M4 18V6"></path><path d="M4 18h16"></path><path d="M7 14l3-3 3 2 5-6"></path><path d="M17 7h2v2"></path></svg>
+                </div>
+                <h2>Ranker Feature Cache</h2>
+              </div>
+              <p>75개 feature와 rank-label window를 결합해 LGBM ranker 학습 데이터를 만든다.</p>
+              <div class="chips"><span class="chip">airflow_20260516</span><span class="chip">163,400 rows</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="arrow arrow-right a-local-airflow"><span class="arrow-label">mount / read</span></div>
+        <div class="arrow arrow-right a-airflow-bq"><span class="arrow-label">load</span></div>
+        <div class="arrow arrow-down a-bq-dbt"><span class="arrow-label">build</span></div>
+        <div class="arrow arrow-right a-dbt-metabase"><span class="arrow-label">query</span></div>
+        <div class="arrow arrow-right a-airflow-ml"><span class="arrow-label">schedule</span></div>
+        <div class="arrow arrow-right a-local-ml"><span class="arrow-label">feature source</span></div>
+      </div>
+
+      <div class="note-row">
+        <div class="note">
+          <strong>로컬 머신</strong>
+          <span>원천 parquet와 metadata cache가 있고, Docker volume으로 Airflow/Metabase가 접근한다.</span>
+        </div>
+        <div class="note">
+          <strong>Airflow</strong>
+          <span>사람이 수동으로 실행하던 데이터 갱신 순서를 DAG와 schedule로 고정한다.</span>
+        </div>
+        <div class="note">
+          <strong>BigQuery + dbt</strong>
+          <span>공유 warehouse와 지표 계약 계층. BI에서 볼 숫자의 기준을 만든다.</span>
+        </div>
+        <div class="note">
+          <strong>Metabase + 추천</strong>
+          <span>하나는 운영/강의용 dashboard, 다른 하나는 추천 모델을 위한 feature 소비면이다.</span>
+        </div>
+      </div>
+
+      <div class="visual-strip">
+        <div class="visual-panel">
+          <svg viewBox="0 0 360 120" aria-label="manual work to workflow">
+            <rect x="16" y="20" width="76" height="58" rx="8" fill="#eef2f7" stroke="#94a3b8"></rect>
+            <path d="M36 43h36M36 56h26" stroke="#475569" stroke-width="3" stroke-linecap="round"></path>
+            <path d="M108 49h54" stroke="#0f766e" stroke-width="3" stroke-linecap="round"></path>
+            <path d="M154 42l10 8-10 8" fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+            <circle cx="205" cy="49" r="30" fill="#ecfdf5" stroke="#0f766e" stroke-width="2"></circle>
+            <path d="M205 24v14M205 60v14M180 49h14M216 49h14M188 32l10 10M222 32l-10 10M188 66l10-10M222 66l-10-10" stroke="#0f766e" stroke-width="3" stroke-linecap="round"></path>
+            <path d="M247 49h52" stroke="#2563eb" stroke-width="3" stroke-linecap="round"></path>
+            <path d="M291 42l10 8-10 8" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+            <rect x="306" y="22" width="38" height="54" rx="6" fill="#eff6ff" stroke="#2563eb"></rect>
+          </svg>
+          <strong>수동 실행에서 workflow로</strong>
+          <p>노트북과 터미널에서 사람이 순서대로 하던 일을 Airflow DAG로 옮긴다. 핵심은 자동화보다도 실행 순서와 실패 지점을 명확히 하는 것이다.</p>
+        </div>
+
+        <div class="visual-panel">
+          <svg viewBox="0 0 360 120" aria-label="warehouse and metric contract">
+            <ellipse cx="76" cy="30" rx="50" ry="14" fill="#eff6ff" stroke="#2563eb"></ellipse>
+            <path d="M26 30v44c0 8 22 14 50 14s50-6 50-14V30" fill="#eff6ff" stroke="#2563eb"></path>
+            <path d="M26 52c0 8 22 14 50 14s50-6 50-14" fill="none" stroke="#2563eb"></path>
+            <path d="M143 59h48" stroke="#b45309" stroke-width="3" stroke-linecap="round"></path>
+            <path d="M183 52l10 8-10 8" fill="none" stroke="#b45309" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+            <rect x="204" y="24" width="120" height="70" rx="8" fill="#fff7ed" stroke="#b45309"></rect>
+            <path d="M226 45h76M226 60h56M226 75h68" stroke="#b45309" stroke-width="3" stroke-linecap="round"></path>
+          </svg>
+          <strong>warehouse 위에 지표 계약</strong>
+          <p>BigQuery는 데이터를 모아두는 기준 저장소이고, dbt는 그 위에서 DAU, WAU, retention 같은 계산 규칙을 코드로 고정한다.</p>
+        </div>
+
+        <div class="visual-panel">
+          <svg viewBox="0 0 360 120" aria-label="serving and ml consumers">
+            <rect x="24" y="25" width="96" height="64" rx="8" fill="#ecfdf5" stroke="#15803d"></rect>
+            <path d="M44 70V52M72 70V42M100 70V58" stroke="#15803d" stroke-width="5" stroke-linecap="round"></path>
+            <path d="M136 58h54" stroke="#64748b" stroke-width="3" stroke-linecap="round"></path>
+            <path d="M182 51l10 8-10 8" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+            <circle cx="224" cy="44" r="13" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"></circle>
+            <circle cx="292" cy="44" r="13" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"></circle>
+            <circle cx="258" cy="82" r="13" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"></circle>
+            <path d="M237 48h42M231 55l18 18M285 55l-18 18" stroke="#6d28d9" stroke-width="3" stroke-linecap="round"></path>
+          </svg>
+          <strong>소비면은 둘로 나뉜다</strong>
+          <p>Metabase는 사람이 보는 지표 화면이고, 추천 feature cache는 모델이 읽는 입력 데이터다. 같은 원천에서 BI와 ML 결과물이 갈라진다.</p>
+        </div>
+      </div>
+
+      <div class="details">
+        <section class="detail-section">
+          <h2>1. Local Machine: 원천 데이터와 실행 환경</h2>
+          <p class="section-lead">
+            모든 데이터 플랫폼은 먼저 "어디에 원본이 있는가"에서 시작한다. 여기서는 클라우드 데이터레이크를 크게 만들기 전에,
+            로컬 머신에 있는 parquet 파일과 SQLite cache가 작은 원천 저장소 역할을 한다.
+          </p>
+          <div class="component-diagram">
+            <svg viewBox="0 0 980 240" aria-label="local machine data layout">
+              <rect x="22" y="22" width="936" height="196" rx="12" fill="#fbfcfe" stroke="#cbd5e1" stroke-width="2"></rect>
+              <text x="46" y="54" fill="#172033" font-size="18" font-weight="800">Local Machine / Repo Workspace</text>
+              <rect x="56" y="86" width="240" height="86" rx="10" fill="#eef2f7" stroke="#475569" stroke-width="2"></rect>
+              <text x="82" y="116" fill="#172033" font-size="16" font-weight="800">daily_agg parquet</text>
+              <text x="82" y="142" fill="#64748b" font-size="13">2026-01-01 ~ 2026-05-16</text>
+              <text x="82" y="162" fill="#64748b" font-size="13">date-partitioned local files</text>
+              <rect x="370" y="86" width="240" height="86" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"></rect>
+              <text x="396" y="116" fill="#172033" font-size="16" font-weight="800">repo_metadata.db</text>
+              <text x="396" y="142" fill="#64748b" font-size="13">GitHub API cache</text>
+              <text x="396" y="162" fill="#64748b" font-size="13">stars, forks, language</text>
+              <rect x="684" y="86" width="220" height="86" rx="10" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"></rect>
+              <text x="710" y="116" fill="#172033" font-size="16" font-weight="800">models / marts</text>
+              <text x="710" y="142" fill="#64748b" font-size="13">recsys artifacts</text>
+              <text x="710" y="162" fill="#64748b" font-size="13">features, summaries</text>
+              <path d="M296 129h72M610 129h72" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M360 121l12 8-12 8M674 121l12 8-12 8" fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+            <p class="caption">로컬 작업공간 안에서 원천 파일, metadata cache, 추천 산출물이 분리되어 있고 Airflow 컨테이너는 Docker volume mount로 이 파일들을 읽는다.</p>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-card">
+              <strong>무엇을 보관하나</strong>
+              <ul>
+                <li><code>data/daily_agg/*.parquet</code>: GitHub Archive 일별 집계</li>
+                <li><code>data/repo_metadata.db</code>: repo metadata cache</li>
+                <li><code>data/models/week6</code>: 추천 모델/평가 산출물</li>
+              </ul>
+            </div>
+            <div class="detail-card">
+              <strong>현재 상태</strong>
+              <p>로컬 parquet는 <code>2026-01-01</code>부터 <code>2026-05-16</code>까지 136일치가 있다. 다만 매일 전체를 다시 처리하면 느리고 비용도 커지기 때문에, 운영 DAG는 최근 35일만 처리하도록 제한한다.</p>
+            </div>
+            <div class="detail-card">
+              <strong>왜 중요한가</strong>
+              <p>원천 위치가 분명해야 같은 데이터를 여러 번 다른 방식으로 복사하지 않는다. BI 지표와 추천 실험이 같은 parquet에서 출발하기 때문에 결과를 서로 비교할 수 있다.</p>
+            </div>
+          </div>
+          <div class="tool-brief">
+            <div class="brief"><b>왜 이 방식을 쓰나</b><span>처음부터 복잡한 cloud data lake를 만들기보다, 로컬 parquet로 빠르게 실험하고 같은 파일을 Airflow, dbt, 추천 코드가 공유하게 만든다.</span></div>
+            <div class="brief"><b>장점</b><span>세팅이 단순하고 재실행이 쉽다. 파일이 날짜별로 나뉘어 있어 필요한 기간만 읽을 수 있다.</span></div>
+            <div class="brief"><b>한계</b><span>로컬 머신에 의존하므로 팀 단위 공유와 권한 관리에는 약하다. 데이터가 커지면 저장공간과 처리 시간이 문제가 된다.</span></div>
+            <div class="brief"><b>다음 단계</b><span>운영 규모가 커지면 GCS 같은 object storage를 원천 저장소로 두고, BigQuery external table이나 적재 테이블로 연결한다.</span></div>
+          </div>
+          <div class="concept-row">
+            <div class="concept"><b>parquet</b><span>행과 열이 많은 분석 데이터를 빠르게 읽기 좋은 파일 포맷이다. CSV보다 크기가 작고 필요한 컬럼만 읽기 쉽다.</span></div>
+            <div class="concept"><b>metadata cache</b><span>GitHub API를 매번 호출하지 않도록 repo의 부가정보를 로컬 DB에 저장해두는 장치다.</span></div>
+            <div class="concept"><b>window</b><span>파이프라인이 처리할 날짜 범위다. 이번 구조에서는 최신 35일이 운영 처리 단위다.</span></div>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <h2>2. Airflow: 사람이 하던 실행 순서의 자동화</h2>
+          <p class="section-lead">
+            데이터 작업은 보통 "파일 확인 → 변환 실행 → 테이블 적재 → 대시보드 확인"처럼 순서가 있다.
+            Airflow는 이 순서를 코드로 고정하고, 매일 같은 시간에 실행하며, 실패했을 때 어느 단계에서 멈췄는지 보여준다.
+          </p>
+          <div class="component-diagram">
+            <svg viewBox="0 0 980 260" aria-label="airflow local executor components">
+              <rect x="24" y="20" width="932" height="220" rx="12" fill="#fbfcfe" stroke="#cbd5e1" stroke-width="2"></rect>
+              <text x="48" y="52" fill="#172033" font-size="18" font-weight="800">Airflow 3 LocalExecutor 구성</text>
+              <rect x="64" y="82" width="170" height="76" rx="10" fill="#ecfdf5" stroke="#0f766e" stroke-width="2"></rect>
+              <text x="92" y="114" fill="#172033" font-size="15" font-weight="800">API Server / UI</text>
+              <text x="92" y="138" fill="#64748b" font-size="12">localhost:8080</text>
+              <rect x="286" y="82" width="170" height="76" rx="10" fill="#ecfdf5" stroke="#0f766e" stroke-width="2"></rect>
+              <text x="323" y="114" fill="#172033" font-size="15" font-weight="800">Scheduler</text>
+              <text x="323" y="138" fill="#64748b" font-size="12">DAG 실행 시점 결정</text>
+              <rect x="508" y="82" width="170" height="76" rx="10" fill="#ecfdf5" stroke="#0f766e" stroke-width="2"></rect>
+              <text x="536" y="114" fill="#172033" font-size="15" font-weight="800">DAG Processor</text>
+              <text x="536" y="138" fill="#64748b" font-size="12">Python DAG parsing</text>
+              <rect x="730" y="82" width="170" height="76" rx="10" fill="#f8fafc" stroke="#475569" stroke-width="2"></rect>
+              <text x="780" y="114" fill="#172033" font-size="15" font-weight="800">Postgres</text>
+              <text x="773" y="138" fill="#64748b" font-size="12">metadata DB</text>
+              <path d="M234 120h52M456 120h52M678 120h52" stroke="#0f766e" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M278 112l12 8-12 8M500 112l12 8-12 8M722 112l12 8-12 8" fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="286" y="180" width="170" height="38" rx="8" fill="#fff7ed" stroke="#fed7aa" stroke-width="2"></rect>
+              <text x="310" y="205" fill="#92400e" font-size="13" font-weight="800">현재는 별도 Redis 없음</text>
+              <rect x="508" y="180" width="170" height="38" rx="8" fill="#fff7ed" stroke="#fed7aa" stroke-width="2"></rect>
+              <text x="528" y="205" fill="#92400e" font-size="13" font-weight="800">현재는 Celery worker 없음</text>
+              <path d="M371 158v22M593 158v22" stroke="#fed7aa" stroke-width="2" stroke-dasharray="5 5"></path>
+            </svg>
+            <p class="caption">현재 compose는 <code>LocalExecutor</code>라 scheduler가 metadata DB를 보고 실행 가능한 task instance를 고른 뒤 같은 Airflow 컨테이너 안의 로컬 프로세스로 실행한다. Redis와 Celery worker를 쓰지 않기 때문에 단순하지만, 동시에 오래 돌릴 수 있는 작업 수는 한 머신의 CPU와 메모리에 묶인다.</p>
+          </div>
+          <div class="component-diagram">
+            <svg viewBox="0 0 980 280" aria-label="production airflow scalable execution patterns">
+              <rect x="24" y="22" width="932" height="236" rx="12" fill="#fbfcfe" stroke="#cbd5e1" stroke-width="2"></rect>
+              <text x="48" y="56" fill="#172033" font-size="18" font-weight="800">운영 환경에서의 scalable worker 패턴</text>
+              <rect x="58" y="94" width="164" height="74" rx="10" fill="#ecfdf5" stroke="#0f766e" stroke-width="2"></rect>
+              <text x="100" y="126" fill="#172033" font-size="15" font-weight="800">Airflow</text>
+              <text x="82" y="150" fill="#64748b" font-size="12">scheduler / API / DAG</text>
+              <path d="M222 131h64" stroke="#0f766e" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M278 123l12 8-12 8" fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="310" y="64" width="178" height="74" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"></rect>
+              <text x="348" y="96" fill="#172033" font-size="15" font-weight="800">Kubernetes</text>
+              <text x="338" y="120" fill="#64748b" font-size="12">pod per task / node pool</text>
+              <rect x="310" y="164" width="178" height="74" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="2"></rect>
+              <text x="350" y="196" fill="#172033" font-size="15" font-weight="800">Celery Queue</text>
+              <text x="338" y="220" fill="#64748b" font-size="12">Redis/RabbitMQ + workers</text>
+              <path d="M488 101h62M488 201h62" stroke="#64748b" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M542 93l12 8-12 8M542 193l12 8-12 8" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="574" y="54" width="154" height="58" rx="10" fill="#f8fafc" stroke="#475569" stroke-width="2"></rect>
+              <text x="618" y="89" fill="#172033" font-size="14" font-weight="800">worker 1</text>
+              <rect x="574" y="124" width="154" height="58" rx="10" fill="#f8fafc" stroke="#475569" stroke-width="2"></rect>
+              <text x="618" y="159" fill="#172033" font-size="14" font-weight="800">worker 2</text>
+              <rect x="574" y="194" width="154" height="58" rx="10" fill="#f8fafc" stroke="#475569" stroke-width="2"></rect>
+              <text x="618" y="229" fill="#172033" font-size="14" font-weight="800">worker 3</text>
+              <path d="M728 153h56" stroke="#64748b" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M776 145l12 8-12 8" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="806" y="82" width="116" height="54" rx="10" fill="#f8fafc" stroke="#475569" stroke-width="2"></rect>
+              <text x="828" y="115" fill="#172033" font-size="14" font-weight="800">Python task</text>
+              <rect x="806" y="160" width="116" height="54" rx="10" fill="#f8fafc" stroke="#475569" stroke-width="2"></rect>
+              <text x="842" y="193" fill="#172033" font-size="14" font-weight="800">dbt run</text>
+            </svg>
+            <p class="caption">회사에서는 Airflow가 직접 무거운 계산을 오래 들고 있기보다, Kubernetes pod나 autoscaled worker pool 같은 실행 계층에 task를 넘긴다. 서버리스 job 실행기를 쓰는 경우도 있지만, 핵심은 Airflow가 “언제 무엇을 실행할지”를 조율하고 실제 compute는 별도의 worker 계층이 담당한다는 점이다.</p>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-card">
+              <strong>Scheduler가 하는 일</strong>
+              <p>scheduler는 cron처럼 단순히 시간을 맞추는 프로세스가 아니다. DAG 파일을 해석한 결과와 metadata DB의 상태를 보고, 어떤 DAG run을 만들지, 어떤 task가 dependency를 만족했는지, pool과 concurrency 제한 안에서 무엇을 queue에 넣을지를 계속 결정한다.</p>
+            </div>
+            <div class="detail-card">
+              <strong>확장할 때 어려운 이유</strong>
+              <p>task 수가 많아지면 scheduler는 수천 개 task instance의 상태를 계속 평가해야 한다. 여기서 DAG parsing, metadata DB 부하, executor queue, worker slot, retry/backfill이 모두 얽힌다. 그래서 scheduler 자체를 무겁게 만들기보다 task 실행은 worker 계층으로 넘기고, metadata DB와 queue를 안정적으로 운영해야 한다.</p>
+            </div>
+            <div class="detail-card">
+              <strong>실행 방어선</strong>
+              <p><code>plan_*_sync</code> 태스크가 날짜 범위와 <code>max_days=35</code>를 먼저 확인한다. 실수로 너무 긴 기간을 처리하거나, 이미 있는 추천 feature를 불필요하게 다시 만들지 않도록 막는다.</p>
+            </div>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-card">
+              <strong>이 프로젝트의 DAG</strong>
+              <ul>
+                <li><code>gharchive_repo_metadata_refresh</code>: repo metadata 갱신</li>
+                <li><code>gharchive_platform_metrics</code>: metric marts 직접 적재</li>
+                <li><code>gharchive_dbt_metrics</code>: fact 적재 후 dbt build</li>
+                <li><code>gharchive_recsys_features</code>: 추천 mart와 feature cache 생성</li>
+              </ul>
+            </div>
+            <div class="detail-card">
+              <strong>LocalExecutor에서 운영 확장으로</strong>
+              <p>로컬에서는 scheduler와 task 실행이 한 머신 안에 있다. 운영에서는 <code>CeleryExecutor</code>로 worker pool을 늘리거나, <code>KubernetesExecutor</code>/<code>KubernetesPodOperator</code>로 task마다 pod를 띄운다. 이때 scheduler는 “실행 명령을 내리는 두뇌”이고, 실제 CPU 작업은 worker/pod/job이 담당한다.</p>
+            </div>
+            <div class="detail-card">
+              <strong>왜 중요한가</strong>
+              <p>Airflow는 계산 엔진이 아니라 조율자다. 팀에서 누가 실행해도 같은 순서로 돌고, 로그와 retry가 남기 때문에 "내 컴퓨터에서는 됐는데" 문제를 줄인다.</p>
+            </div>
+          </div>
+          <div class="tool-brief">
+            <div class="brief"><b>왜 이 도구를 쓰나</b><span>데이터 작업은 순서와 시간이 중요하다. Airflow는 여러 작업을 DAG로 연결하고, 매일 같은 시간에 실행되도록 만든다.</span></div>
+            <div class="brief"><b>장점</b><span>UI에서 성공/실패를 확인할 수 있고, 각 task의 로그가 남는다. retry와 timeout을 설정해 운영 사고를 줄일 수 있다.</span></div>
+            <div class="brief"><b>한계</b><span>Airflow 자체가 데이터를 빠르게 처리해주는 엔진은 아니다. task 안에서 실행되는 Python, SQL, dbt, BigQuery 작업이 실제 계산을 한다.</span></div>
+            <div class="brief"><b>운영 확장</b><span>회사에서는 KubernetesExecutor, CeleryExecutor, K8sPodOperator처럼 task 실행 계층을 분리해 worker를 탄력적으로 늘린다. 서버리스 job 호출은 별도 선택지로 볼 수 있다.</span></div>
+          </div>
+          <div class="concept-row">
+            <div class="concept"><b>DAG</b><span>작업들의 순서도다. A가 끝나야 B가 실행되는 관계를 코드로 표현한다.</span></div>
+            <div class="concept"><b>task</b><span>DAG 안의 한 단계다. 예를 들어 날짜 확인, fact 적재, dbt build가 각각 task가 된다.</span></div>
+            <div class="concept"><b>retry / log</b><span>실패한 작업을 다시 시도하고, 실패 원인을 나중에 확인할 수 있게 남기는 운영 장치다.</span></div>
+          </div>
+          <div class="concept-row">
+            <div class="concept"><b>scheduler</b><span>시간표, 의존성, 과거 실행 상태, 동시성 제한을 보고 다음에 실행할 task instance를 결정하는 Airflow의 핵심 프로세스다.</span></div>
+            <div class="concept"><b>executor</b><span>scheduler가 고른 task를 실제 어디에 보낼지 정하는 실행 방식이다. Local, Celery, Kubernetes executor가 대표적이다.</span></div>
+            <div class="concept"><b>worker</b><span>task 코드를 실제로 실행하는 프로세스나 pod다. 확장성은 보통 scheduler보다 worker 계층을 얼마나 탄력적으로 늘릴 수 있느냐에서 나온다.</span></div>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <h2>3. BigQuery: 공유 Warehouse</h2>
+          <p class="section-lead">
+            로컬 파일만으로도 분석은 가능하지만, 여러 도구가 같은 데이터를 조회하려면 공용 저장소가 필요하다.
+            BigQuery는 여기서 Metabase와 dbt가 함께 바라보는 기준 테이블 저장소 역할을 한다.
+          </p>
+          <div class="component-diagram">
+            <svg viewBox="0 0 980 240" aria-label="bigquery warehouse structure">
+              <rect x="24" y="24" width="932" height="190" rx="12" fill="#fbfcfe" stroke="#cbd5e1" stroke-width="2"></rect>
+              <text x="48" y="56" fill="#172033" font-size="18" font-weight="800">BigQuery dataset: bda-coai.mart</text>
+              <ellipse cx="170" cy="94" rx="92" ry="20" fill="#eff6ff" stroke="#2563eb" stroke-width="2"></ellipse>
+              <path d="M78 94v62c0 11 41 20 92 20s92-9 92-20V94" fill="#eff6ff" stroke="#2563eb" stroke-width="2"></path>
+              <text x="126" y="125" fill="#172033" font-size="15" font-weight="800">fact table</text>
+              <text x="108" y="148" fill="#64748b" font-size="12">user-repo-action</text>
+              <path d="M282 126h70" stroke="#2563eb" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M344 118l12 8-12 8" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="374" y="74" width="206" height="104" rx="10" fill="#f8fafc" stroke="#2563eb" stroke-width="2"></rect>
+              <text x="415" y="106" fill="#172033" font-size="15" font-weight="800">metric marts</text>
+              <text x="404" y="132" fill="#64748b" font-size="12">daily, weekly, retention</text>
+              <text x="404" y="153" fill="#64748b" font-size="12">small tables for BI</text>
+              <path d="M600 126h70" stroke="#2563eb" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M662 118l12 8-12 8" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="692" y="74" width="206" height="104" rx="10" fill="#ecfdf5" stroke="#15803d" stroke-width="2"></rect>
+              <text x="744" y="106" fill="#172033" font-size="15" font-weight="800">consumers</text>
+              <text x="724" y="132" fill="#64748b" font-size="12">Metabase, dbt, Python</text>
+              <text x="724" y="153" fill="#64748b" font-size="12">same source of truth</text>
+            </svg>
+            <p class="caption">큰 fact는 상세 분석과 dbt source가 되고, 대시보드는 미리 작게 만든 metric mart를 조회해 비용과 지연을 줄인다.</p>
+          </div>
+          <div class="component-diagram">
+            <svg viewBox="0 0 980 260" aria-label="bigquery storage and pruning">
+              <rect x="24" y="24" width="932" height="208" rx="12" fill="#fbfcfe" stroke="#cbd5e1" stroke-width="2"></rect>
+              <text x="48" y="58" fill="#172033" font-size="18" font-weight="800">BigQuery 물리 구조: Colossus storage + columnar scan</text>
+              <rect x="58" y="92" width="186" height="92" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"></rect>
+              <text x="94" y="126" fill="#172033" font-size="15" font-weight="800">Colossus</text>
+              <text x="82" y="150" fill="#64748b" font-size="12">분산 파일 시스템</text>
+              <text x="82" y="170" fill="#64748b" font-size="12">storage와 compute 분리</text>
+              <path d="M244 138h58" stroke="#2563eb" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M294 130l12 8-12 8" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="326" y="74" width="202" height="128" rx="10" fill="#f8fafc" stroke="#2563eb" stroke-width="2"></rect>
+              <text x="374" y="106" fill="#172033" font-size="15" font-weight="800">partition pruning</text>
+              <rect x="354" y="126" width="36" height="44" rx="4" fill="#dbeafe" stroke="#93c5fd"></rect>
+              <rect x="398" y="126" width="36" height="44" rx="4" fill="#dbeafe" stroke="#93c5fd"></rect>
+              <rect x="442" y="126" width="36" height="44" rx="4" fill="#eff6ff" stroke="#bfdbfe"></rect>
+              <text x="360" y="188" fill="#64748b" font-size="12">activity_date</text>
+              <path d="M528 138h58" stroke="#2563eb" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M578 130l12 8-12 8" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="610" y="74" width="154" height="128" rx="10" fill="#f8fafc" stroke="#2563eb" stroke-width="2"></rect>
+              <text x="638" y="106" fill="#172033" font-size="15" font-weight="800">clustering</text>
+              <path d="M640 130h88M640 148h58M640 166h74" stroke="#2563eb" stroke-width="4" stroke-linecap="round"></path>
+              <text x="634" y="188" fill="#64748b" font-size="12">repo_id, action_type</text>
+              <path d="M764 138h58" stroke="#2563eb" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M814 130l12 8-12 8" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="846" y="92" width="80" height="92" rx="10" fill="#ecfdf5" stroke="#15803d" stroke-width="2"></rect>
+              <text x="864" y="128" fill="#172033" font-size="14" font-weight="800">slots</text>
+              <text x="858" y="152" fill="#64748b" font-size="12">SQL compute</text>
+            </svg>
+            <p class="caption">BigQuery는 데이터를 Colossus에 columnar 형태로 저장하고, SQL 실행 시 필요한 컬럼과 파티션만 읽으려 한다. 그래서 <code>WHERE activity_date BETWEEN ...</code>처럼 partition key를 조건에 넣고, repo나 event type으로 자주 필터링한다면 clustering을 맞추는 것이 비용과 속도에 직접 영향을 준다.</p>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-card">
+              <strong>저장되는 테이블</strong>
+              <ul>
+                <li><code>fact_user_repo_activity</code>: user-repo-action fact</li>
+                <li><code>metrics_daily</code>, <code>metrics_weekly</code></li>
+                <li><code>metrics_retention_summary</code></li>
+                <li><code>metrics_agent_trendy_repos</code></li>
+              </ul>
+            </div>
+            <div class="detail-card">
+              <strong>Partition / Clustering</strong>
+              <p>현재 sandbox 적재는 만료 정책 제약 때문에 fact를 단순 테이블로 두지만, 운영 fact는 보통 <code>activity_date</code>로 partition을 나눈다. 자주 함께 필터링되는 <code>repo_id</code>, <code>action_type</code>, <code>user_id</code> 같은 컬럼은 clustering 후보가 된다.</p>
+            </div>
+            <div class="detail-card">
+              <strong>현재 적재 결과</strong>
+              <p>최근 수동 갱신에서 35일치 fact <code>46,097,702</code> rows가 적재됐고, metric mart 8개가 Metabase 조회용으로 갱신됐다. 지표 테이블은 작게 만들어 대시보드 조회 비용을 줄인다.</p>
+            </div>
+          </div>
+          <div class="tool-brief">
+            <div class="brief"><b>왜 이 도구를 쓰나</b><span>로컬 파일은 개인 작업에는 충분하지만, BI와 dbt가 함께 보려면 SQL로 접근 가능한 공용 warehouse가 필요하다.</span></div>
+            <div class="brief"><b>장점</b><span>storage와 compute가 분리되어 있어 서버를 직접 관리하지 않고도 큰 데이터를 SQL로 조회할 수 있다. Metabase, dbt, Python client가 모두 같은 테이블을 바라본다.</span></div>
+            <div class="brief"><b>한계</b><span>스캔한 데이터량에 따라 비용이 발생한다. partition filter 없이 큰 fact를 조회하거나 필요한 컬럼보다 많이 읽으면 대시보드 비용이 쉽게 커진다.</span></div>
+            <div class="brief"><b>이 프로젝트에서</b><span><code>bda-coai.mart</code> dataset이 fact, metric mart, trend table의 기준 저장소다.</span></div>
+          </div>
+          <div class="concept-row">
+            <div class="concept"><b>partition</b><span>테이블을 날짜 같은 기준으로 물리적으로 나눠 읽을 범위를 줄이는 방식이다. 시간 단위 로그/이벤트 fact에서 가장 먼저 보는 최적화다.</span></div>
+            <div class="concept"><b>clustering</b><span>파티션 안에서 특정 컬럼 값이 비슷한 row를 가까이 두는 방식이다. repo별, action별, user별 필터가 많을 때 효과가 난다.</span></div>
+            <div class="concept"><b>Colossus</b><span>BigQuery 밑에서 데이터를 저장하는 Google의 분산 저장 계층이다. BigQuery는 이 저장소 위에서 필요한 컬럼과 block을 병렬로 읽는다.</span></div>
+          </div>
+          <div class="concept-row">
+            <div class="concept"><b>fact table</b><span>가장 자세한 사건 기록에 가까운 테이블이다. 여기서는 날짜, 사용자, repo, action 단위의 활동 집계다.</span></div>
+            <div class="concept"><b>mart table</b><span>대시보드나 분석 목적에 맞게 미리 요약한 테이블이다. DAU, WAU, retention 등이 여기에 해당한다.</span></div>
+            <div class="concept"><b>cost control</b><span>큰 fact를 매번 스캔하지 않고 작은 mart를 조회하면 속도와 비용을 함께 줄일 수 있다.</span></div>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <h2>4. dbt: 지표 정의를 코드로 고정</h2>
+          <p class="section-lead">
+            "DAU를 어떻게 계산할 것인가" 같은 규칙은 생각보다 쉽게 어긋난다.
+            dbt는 지표를 만드는 SQL과 테스트를 프로젝트 안에 남겨서, 지표 정의가 사람의 기억이 아니라 코드로 관리되게 한다.
+          </p>
+          <div class="component-diagram">
+            <svg viewBox="0 0 980 240" aria-label="dbt model lineage">
+              <rect x="34" y="80" width="180" height="78" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"></rect>
+              <text x="76" y="111" fill="#172033" font-size="15" font-weight="800">source</text>
+              <text x="72" y="136" fill="#64748b" font-size="12">activity fact</text>
+              <path d="M214 119h68" stroke="#b45309" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M274 111l12 8-12 8" fill="none" stroke="#b45309" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="304" y="80" width="180" height="78" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="2"></rect>
+              <text x="350" y="111" fill="#172033" font-size="15" font-weight="800">staging</text>
+              <text x="336" y="136" fill="#64748b" font-size="12">clean columns / types</text>
+              <path d="M484 119h68" stroke="#b45309" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M544 111l12 8-12 8" fill="none" stroke="#b45309" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="574" y="50" width="168" height="62" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="2"></rect>
+              <text x="614" y="84" fill="#172033" font-size="14" font-weight="800">daily / weekly</text>
+              <rect x="574" y="132" width="168" height="62" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="2"></rect>
+              <text x="617" y="166" fill="#172033" font-size="14" font-weight="800">retention</text>
+              <path d="M742 82h64M742 164h64" stroke="#b45309" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M798 74l12 8-12 8M798 156l12 8-12 8" fill="none" stroke="#b45309" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="828" y="80" width="120" height="78" rx="10" fill="#ecfdf5" stroke="#15803d" stroke-width="2"></rect>
+              <text x="856" y="111" fill="#172033" font-size="15" font-weight="800">metrics</text>
+              <text x="848" y="136" fill="#64748b" font-size="12">active_users...</text>
+            </svg>
+            <p class="caption">dbt는 source에서 staging, mart, semantic metrics로 이어지는 lineage를 만든다. 그래서 어떤 지표가 어떤 원천에서 계산됐는지 추적할 수 있다.</p>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-card">
+              <strong>모델 계층</strong>
+              <ul>
+                <li><code>stg_user_repo_activity</code>: source 정리</li>
+                <li><code>metrics_daily</code>: DAU, active repo, events</li>
+                <li><code>metrics_event_type_daily</code>: action별 지표</li>
+                <li><code>metrics_retention_weekly</code>: cohort retention</li>
+              </ul>
+            </div>
+            <div class="detail-card">
+              <strong>Semantic Metrics</strong>
+              <p><code>active_users</code>, <code>active_repos</code>, <code>total_events</code>, <code>push_events</code>, <code>watch_events</code> 같은 이름을 YAML로 고정한다.</p>
+            </div>
+            <div class="detail-card">
+              <strong>왜 중요한가</strong>
+              <p>dbt의 역할은 SQL 실행만이 아니다. 지표를 재사용 가능한 계약으로 만들고, 모델과 테스트를 코드 리뷰 대상으로 만든다.</p>
+            </div>
+          </div>
+          <div class="tool-brief">
+            <div class="brief"><b>왜 이 도구를 쓰나</b><span>SQL이 여러 파일과 노트북에 흩어지면 같은 지표도 다르게 계산된다. dbt는 변환 SQL을 프로젝트 구조 안에 묶는다.</span></div>
+            <div class="brief"><b>장점</b><span>source, staging, mart 계층을 명확히 나눌 수 있고, 테스트와 문서화를 함께 둘 수 있다.</span></div>
+            <div class="brief"><b>한계</b><span>dbt는 batch SQL transform에 강하지만, API 호출이나 복잡한 Python feature engineering은 별도 스크립트가 더 편할 수 있다.</span></div>
+            <div class="brief"><b>이 프로젝트에서</b><span>핵심 platform metric은 dbt로 옮겼고, metadata enrichment가 필요한 trend table은 아직 Python이 담당한다.</span></div>
+          </div>
+          <div class="concept-row">
+            <div class="concept"><b>staging model</b><span>원천 테이블을 바로 쓰지 않고, 컬럼명과 타입을 정리해 다음 단계가 읽기 좋게 만든다.</span></div>
+            <div class="concept"><b>metric model</b><span>비즈니스 질문에 바로 답할 수 있게 날짜별, 주차별, cohort별로 집계한 모델이다.</span></div>
+            <div class="concept"><b>semantic layer</b><span>같은 지표명을 여러 도구에서 일관되게 쓰기 위한 이름과 계산 방식의 사전이다.</span></div>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <h2>5. Metabase: 지표를 소비하는 화면</h2>
+          <p class="section-lead">
+            데이터가 테이블에만 있으면 SQL을 아는 사람만 볼 수 있다. Metabase는 만들어진 지표를 차트와 대시보드로 보여줘서,
+            데이터 파이프라인의 결과가 실제로 확인 가능한 화면이 되게 한다.
+          </p>
+          <div class="component-diagram">
+            <svg viewBox="0 0 980 240" aria-label="metabase dashboard structure">
+              <rect x="34" y="44" width="250" height="144" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"></rect>
+              <text x="82" y="80" fill="#172033" font-size="16" font-weight="800">BigQuery metric marts</text>
+              <text x="76" y="110" fill="#64748b" font-size="13">metrics_daily</text>
+              <text x="76" y="132" fill="#64748b" font-size="13">retention_summary</text>
+              <text x="76" y="154" fill="#64748b" font-size="13">agent_trendy_repos</text>
+              <path d="M284 116h78" stroke="#15803d" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M354 108l12 8-12 8" fill="none" stroke="#15803d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="386" y="44" width="220" height="144" rx="12" fill="#ecfdf5" stroke="#15803d" stroke-width="2"></rect>
+              <text x="456" y="80" fill="#172033" font-size="16" font-weight="800">Metabase</text>
+              <rect x="418" y="102" width="154" height="24" rx="6" fill="#ffffff" stroke="#bbf7d0"></rect>
+              <text x="444" y="119" fill="#15803d" font-size="11" font-weight="800">SQL questions</text>
+              <rect x="418" y="134" width="154" height="24" rx="6" fill="#ffffff" stroke="#bbf7d0"></rect>
+              <text x="452" y="151" fill="#15803d" font-size="11" font-weight="800">chart cards</text>
+              <path d="M606 116h78" stroke="#15803d" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M676 108l12 8-12 8" fill="none" stroke="#15803d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="710" y="44" width="236" height="144" rx="12" fill="#f8fafc" stroke="#475569" stroke-width="2"></rect>
+              <text x="770" y="80" fill="#172033" font-size="16" font-weight="800">Dashboards</text>
+              <text x="750" y="110" fill="#64748b" font-size="13">기초 지표</text>
+              <text x="750" y="132" fill="#64748b" font-size="13">AI Agent 트렌디 레포</text>
+              <text x="750" y="154" fill="#64748b" font-size="13">OSS Signal 운영 대시보드</text>
+            </svg>
+            <p class="caption">Metabase는 계산을 소유하기보다 결과를 보여주는 계층이다. 계산 규칙은 BigQuery/dbt에 두고, Metabase는 card와 dashboard로 소비한다.</p>
+          </div>
+          <div class="component-diagram">
+            <svg viewBox="0 0 980 260" aria-label="metabase api and mcp workflow">
+              <rect x="24" y="24" width="932" height="208" rx="12" fill="#fbfcfe" stroke="#cbd5e1" stroke-width="2"></rect>
+              <text x="48" y="58" fill="#172033" font-size="18" font-weight="800">Metabase 운영 자동화: REST API + MCP/agent workflow</text>
+              <rect x="56" y="92" width="190" height="92" rx="10" fill="#f8fafc" stroke="#475569" stroke-width="2"></rect>
+              <text x="86" y="126" fill="#172033" font-size="15" font-weight="800">dashboard spec</text>
+              <text x="82" y="150" fill="#64748b" font-size="12">SQL, chart type, layout</text>
+              <path d="M246 138h58" stroke="#15803d" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M296 130l12 8-12 8" fill="none" stroke="#15803d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="328" y="74" width="190" height="128" rx="10" fill="#ecfdf5" stroke="#15803d" stroke-width="2"></rect>
+              <text x="362" y="106" fill="#172033" font-size="15" font-weight="800">Metabase API</text>
+              <rect x="356" y="126" width="134" height="24" rx="6" fill="#ffffff" stroke="#bbf7d0"></rect>
+              <text x="378" y="143" fill="#15803d" font-size="11" font-weight="800">create cards</text>
+              <rect x="356" y="158" width="134" height="24" rx="6" fill="#ffffff" stroke="#bbf7d0"></rect>
+              <text x="370" y="175" fill="#15803d" font-size="11" font-weight="800">place dashboard</text>
+              <path d="M518 138h58" stroke="#15803d" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M568 130l12 8-12 8" fill="none" stroke="#15803d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="600" y="92" width="146" height="92" rx="10" fill="#ecfdf5" stroke="#15803d" stroke-width="2"></rect>
+              <text x="636" y="126" fill="#172033" font-size="15" font-weight="800">Metabase</text>
+              <text x="632" y="150" fill="#64748b" font-size="12">cards / dashboard</text>
+              <path d="M746 138h58" stroke="#6d28d9" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M796 130l12 8-12 8" fill="none" stroke="#6d28d9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="828" y="92" width="98" height="92" rx="10" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"></rect>
+              <text x="860" y="126" fill="#172033" font-size="15" font-weight="800">MCP</text>
+              <text x="850" y="150" fill="#64748b" font-size="12">agent context</text>
+            </svg>
+            <p class="caption"><code>scripts/setup_metabase_dashboard.py</code>는 Metabase REST API로 database 연결, collection, card, dashboard 배치를 자동 구성한다. MCP/agent는 사람이 브라우저에서 반복 클릭하던 일을 줄이기 위해 대시보드 상태와 요청을 읽고, 어떤 SQL/card/layout을 바꿀지 제안하거나 API 호출 계획으로 바꾸는 인터페이스로 설명할 수 있다.</p>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-card">
+              <strong>대시보드</strong>
+              <ul>
+                <li>GitHub Archive 기초 지표</li>
+                <li>AI Agent 트렌디 레포</li>
+                <li>OSS Signal 운영 대시보드</li>
+              </ul>
+            </div>
+            <div class="detail-card">
+              <strong>조회 방식</strong>
+              <p>Metabase는 raw parquet나 큰 fact를 직접 보지 않고, BigQuery의 작은 metric mart와 trend table을 조회한다. 그래서 대시보드는 빠르게 열리고, 계산 규칙은 dbt/BigQuery 쪽에 남는다.</p>
+            </div>
+            <div class="detail-card">
+              <strong>API 자동화</strong>
+              <p><code>setup_metabase_dashboard.py</code>는 로컬 Metabase가 뜰 때까지 기다린 뒤 admin session을 만들고, BigQuery database, collection, SQL card, dashboard layout을 API로 생성한다. 대시보드도 코드처럼 다시 만들 수 있게 하는 장치다.</p>
+            </div>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-card">
+              <strong>MCP/agent가 붙는 지점</strong>
+              <p>MCP는 BI 화면을 사람이 직접 눌러 수정하는 대신, agent가 “현재 어떤 card가 있고 어떤 SQL을 쓰는지”를 맥락으로 받아 변경안을 만들게 하는 연결 계층으로 다룰 수 있다. 핵심은 대시보드가 단순 산출물이 아니라, API로 읽고 쓸 수 있는 운영 객체가 된다는 점이다.</p>
+            </div>
+            <div class="detail-card">
+              <strong>좋은 책임 분리</strong>
+              <p>지표 계산은 dbt/BigQuery가 소유하고, Metabase는 시각화와 배치를 소유한다. agent나 MCP가 개입하더라도 지표 정의를 카드 안에 복붙해서 늘리지 않고, 검증된 mart를 조회하는 SQL과 dashboard UX를 조정하는 쪽에 집중한다.</p>
+            </div>
+            <div class="detail-card">
+              <strong>왜 중요한가</strong>
+              <p>분석 결과가 노트북 안에 있으면 공유가 어렵다. BI 화면으로 바뀌면 SQL을 직접 실행하지 않아도 같은 숫자를 볼 수 있고, API/MCP 자동화가 있으면 대시보드도 재현 가능한 운영 자산으로 관리할 수 있다.</p>
+            </div>
+          </div>
+          <div class="tool-brief">
+            <div class="brief"><b>왜 이 도구를 쓰나</b><span>분석 결과를 SQL이나 노트북에만 두면 설명은 가능하지만 반복 확인이 어렵다. Metabase는 지표를 화면으로 공유한다.</span></div>
+            <div class="brief"><b>장점</b><span>카드와 대시보드를 빠르게 만들 수 있고, SQL을 몰라도 결과를 볼 수 있다. REST API가 있어 dashboard provisioning과 반복 수정도 자동화할 수 있다.</span></div>
+            <div class="brief"><b>한계</b><span>계산 규칙을 Metabase 카드마다 직접 넣으면 지표가 다시 흩어진다. MCP/agent를 붙여도 원천 지표 계약은 dbt/BigQuery 쪽에 남겨야 한다.</span></div>
+            <div class="brief"><b>이 프로젝트에서</b><span>기초 지표, AI Agent 트렌디 레포, OSS Signal 운영 대시보드가 BigQuery mart를 조회하고, API 스크립트가 카드와 레이아웃을 구성한다.</span></div>
+          </div>
+          <div class="concept-row">
+            <div class="concept"><b>dashboard</b><span>여러 지표와 차트를 한 화면에 묶은 관측 화면이다.</span></div>
+            <div class="concept"><b>card</b><span>Metabase 안에서 하나의 SQL 질문이나 차트 단위를 뜻한다.</span></div>
+            <div class="concept"><b>serving layer</b><span>가공된 데이터를 실제 사용자가 보는 형태로 제공하는 마지막 계층이다.</span></div>
+          </div>
+          <div class="concept-row">
+            <div class="concept"><b>Metabase API</b><span>브라우저 클릭 대신 database, collection, card, dashboard를 HTTP 요청으로 만들고 수정하게 해주는 운영 인터페이스다.</span></div>
+            <div class="concept"><b>MCP</b><span>agent가 BI 도구의 상태와 사용자의 변경 의도를 도구 호출 가능한 맥락으로 다룰 수 있게 해주는 연결 방식이다.</span></div>
+            <div class="concept"><b>provisioning</b><span>대시보드를 수작업 결과물이 아니라 스크립트로 재생성 가능한 설정으로 관리하는 방식이다.</span></div>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <h2>6. Recommendation Pipeline: 추천 실험의 배치화</h2>
+          <p class="section-lead">
+            추천 모델은 단순히 모델을 학습하는 것만으로 끝나지 않는다. 어떤 기간을 과거로 볼지, 어떤 기간을 정답으로 볼지,
+            후보를 어떻게 만들지, 어떤 feature로 ranker를 학습할지를 고정해야 실험을 다시 재현할 수 있다.
+          </p>
+          <div class="component-diagram">
+            <svg viewBox="0 0 980 250" aria-label="recommendation feature pipeline">
+              <rect x="34" y="78" width="148" height="76" rx="10" fill="#eef2f7" stroke="#475569" stroke-width="2"></rect>
+              <text x="72" y="110" fill="#172033" font-size="15" font-weight="800">history</text>
+              <text x="64" y="134" fill="#64748b" font-size="12">past behavior</text>
+              <path d="M182 116h54" stroke="#6d28d9" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M228 108l12 8-12 8" fill="none" stroke="#6d28d9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="258" y="78" width="148" height="76" rx="10" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"></rect>
+              <text x="298" y="110" fill="#172033" font-size="15" font-weight="800">marts</text>
+              <text x="286" y="134" fill="#64748b" font-size="12">user / repo / split</text>
+              <path d="M406 116h54" stroke="#6d28d9" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M452 108l12 8-12 8" fill="none" stroke="#6d28d9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="482" y="48" width="148" height="58" rx="10" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"></rect>
+              <text x="520" y="82" fill="#172033" font-size="15" font-weight="800">ALS</text>
+              <rect x="482" y="128" width="148" height="58" rx="10" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"></rect>
+              <text x="510" y="162" fill="#172033" font-size="15" font-weight="800">related / popular</text>
+              <path d="M630 78h54M630 158h54" stroke="#6d28d9" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M676 70l12 8-12 8M676 150l12 8-12 8" fill="none" stroke="#6d28d9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="708" y="78" width="148" height="76" rx="10" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"></rect>
+              <text x="748" y="110" fill="#172033" font-size="15" font-weight="800">features</text>
+              <text x="742" y="134" fill="#64748b" font-size="12">75 ranker columns</text>
+              <path d="M856 116h54" stroke="#6d28d9" stroke-width="3" stroke-linecap="round"></path>
+              <path d="M902 108l12 8-12 8" fill="none" stroke="#6d28d9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="914" y="78" width="42" height="76" rx="10" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"></rect>
+              <text x="926" y="122" fill="#172033" font-size="13" font-weight="800">rank</text>
+              <text x="44" y="220" fill="#64748b" font-size="12">history: 2026-03-22~2026-05-02</text>
+              <text x="326" y="220" fill="#64748b" font-size="12">rank: 2026-05-03~2026-05-09</text>
+              <text x="646" y="220" fill="#64748b" font-size="12">test: 2026-05-10~2026-05-16</text>
+            </svg>
+            <p class="caption">추천 파이프라인은 기간을 나누고, 후보 생성과 ranking feature 생성을 분리한다. 이 구조가 있어야 실험 결과를 다시 만들고 비교할 수 있다.</p>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-card">
+              <strong>기간 계약</strong>
+              <ul>
+                <li>history: <code>2026-03-22</code> ~ <code>2026-05-02</code></li>
+                <li>rank-label: <code>2026-05-03</code> ~ <code>2026-05-09</code></li>
+                <li>test: <code>2026-05-10</code> ~ <code>2026-05-16</code></li>
+              </ul>
+            </div>
+            <div class="detail-card">
+              <strong>산출물</strong>
+              <p>추천 mart 5종과 <code>ranker_features_airflow_20260516.parquet</code>가 생성된다. 최신 feature cache는 75개 feature와 <code>163,400</code> rank rows를 가진다.</p>
+            </div>
+            <div class="detail-card">
+              <strong>왜 중요한가</strong>
+              <p>추천도 노트북 실험에서 끝나지 않는다. mart, retrieval, feature cache로 나눠야 결과를 비교하고, 다음 실험에서 같은 조건을 다시 만들 수 있다.</p>
+            </div>
+          </div>
+
+          <div class="tool-brief">
+            <div class="brief"><b>왜 이렇게 나누나</b><span>추천은 모델 하나보다 데이터 준비가 더 중요하다. history, label, test 기간을 나누고 후보 생성과 ranking을 분리해야 평가가 가능하다.</span></div>
+            <div class="brief"><b>장점</b><span>mart와 feature cache가 남아 실험을 재현할 수 있다. retrieval과 ranker를 따로 개선할 수 있다.</span></div>
+            <div class="brief"><b>한계</b><span>현재는 batch 실험 구조라 실시간 추천이나 online feature serving은 없다. repo metadata도 완전한 point-in-time snapshot은 아니다.</span></div>
+            <div class="brief"><b>이 프로젝트에서</b><span>ALS retrieval, related candidate, 75개 ranker feature를 사용해 LGBM ranker 학습 데이터로 연결한다.</span></div>
+          </div>
+
+          <div class="concept-row">
+            <div class="concept"><b>retrieval</b><span>전체 repo를 다 점수화하지 않고, 먼저 후보를 좁히는 단계다. 여기서는 ALS, popular, related 후보를 함께 쓴다.</span></div>
+            <div class="concept"><b>ranker</b><span>retrieval이 만든 후보를 여러 feature로 다시 정렬하는 모델이다.</span></div>
+            <div class="concept"><b>feature cache</b><span>모델 학습에 필요한 입력값을 파일로 고정해, 같은 실험을 다시 돌릴 수 있게 만든 결과물이다.</span></div>
+          </div>
+
+          <div class="mini-flow">
+            <div class="mini-step"><b>1</b><span>daily parquet</span></div>
+            <div class="mini-step"><b>2</b><span>batch marts</span></div>
+            <div class="mini-step"><b>3</b><span>ALS / related retrieval</span></div>
+            <div class="mini-step"><b>4</b><span>75 ranker features</span></div>
+            <div class="mini-step"><b>5</b><span>HTML / evaluation output</span></div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

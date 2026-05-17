@@ -4,6 +4,7 @@ GitHub Archive(BigQuery) 데이터를 활용한 **repo 추천 시스템** 구축
 데이터 추출 → EDA → Popularity baseline → 행렬분해(ALS) → Two-Stage(ALS+LGBM) → Two-Tower(Neural) → FAISS 서빙 → Streamlit 대시보드까지 full pipeline을 다룹니다.
 
 로컬 Airflow + Metabase + BigQuery metric mart 운영 노트는 [docs/data_platform_local.md](docs/data_platform_local.md)에 정리되어 있습니다.
+추천 실험 MLflow 기록/비교 방법은 [docs/mlflow_recsys_tracking.html](docs/mlflow_recsys_tracking.html)에 분리되어 있습니다.
 
 1~6주차 강의 경계와 다음 주차 진행안은 [docs/week6_checkpoint_and_week7_plan.md](docs/week6_checkpoint_and_week7_plan.md)에 정리되어 있습니다.
 
@@ -80,13 +81,15 @@ bda-2/
 │   └── airflow/Dockerfile          # Airflow 3.2.1 + uv image
 ├── docs/
 │   ├── data_platform_local.md      # 로컬 데이터 플랫폼 운영 문서
+│   ├── mlflow_recsys_tracking.html # 추천 실험 MLflow tracking 문서
+│   ├── mlflow_recsys_tracking.md   # 추천 실험 MLflow tracking 문서
 │   └── week6_checkpoint_and_week7_plan.md # 1~6주차 완료선 + Week 7 진행안
 ├── notebooks/
 │   ├── gharchive/                  # 데이터 파이프라인
 │   ├── ghrec/                      # 추천 모델
 │   └── platform/                   # Week 7 데이터 제품화
 └── data/                           # gitignore 대상
-    ├── daily_agg/                  # 추출된 parquet (20260215~20260508)
+    ├── daily_agg/                  # 추출된 parquet (20260101~20260516)
     ├── repo_metadata.db            # GitHub 메타데이터 SQLite 캐시
     └── models/                     # 학습된 모델 아티팩트
 ```
@@ -202,8 +205,8 @@ uv run python scripts/sync_bq_metrics.py \
   --project bda-coai \
   --dataset mart \
   --parquet-dir data/daily_agg \
-  --start 2026-04-04 \
-  --end 2026-05-08 \
+  --start 2026-04-12 \
+  --end 2026-05-16 \
   --max-days 35 \
   --mode replace-all \
   --skip-fact \
@@ -211,8 +214,8 @@ uv run python scripts/sync_bq_metrics.py \
 
 # repo metadata cache 갱신
 uv run python scripts/refresh_repo_metadata.py \
-  --start 2026-04-04 \
-  --end 2026-05-08 \
+  --start 2026-04-12 \
+  --end 2026-05-16 \
   --top-n 1000 \
   --systematic-sample \
   --cache-tier warm \
@@ -240,7 +243,7 @@ OMP_NUM_THREADS=1 uv run python scripts/train_two_tower_week6_full_v2.py
 
 | 파일 | 설명 |
 |---|---|
-| `data/daily_agg/*.parquet` | BigQuery 일별 집계 (20260215~20260508, 83일) |
+| `data/daily_agg/*.parquet` | BigQuery 일별 집계 (20260101~20260516, 136일) |
 | `data/repo_metadata.db` | GitHub 메타데이터 SQLite 캐시 |
 | `data/models/als_twostage.pkl` | ALS 모델 (64 factors) |
 | `data/models/lgbm_ranker.txt` | LGBM LambdaRank re-rank model |

@@ -18,8 +18,8 @@ DBT_PROFILES_DIR = f"{PROJECT_DIR}/dbt/profiles"
 DBT_EXECUTABLE_PATH = os.environ.get("DBT_EXECUTABLE_PATH", "/home/airflow/dbt_venv/bin/dbt")
 LOCAL_TZ = ZoneInfo("Asia/Seoul")
 
-WINDOW_START = "2026-04-04"
-WINDOW_END = "2026-05-08"
+WINDOW_START = "2026-04-12"
+WINDOW_END = "2026-05-16"
 MAX_DAYS = 35
 
 UV_BASE = (
