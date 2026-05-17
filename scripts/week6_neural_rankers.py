@@ -30,6 +30,7 @@ import numpy as np
 import pandas as pd
 import torch
 from implicit.als import AlternatingLeastSquares
+from mlflow.tracking import MlflowClient
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
@@ -88,6 +89,24 @@ def metric_model_key(model_name: str) -> str:
         .replace("-", "_")
         .replace(" ", "_")
     )
+
+
+def set_mlflow_experiment_metadata(experiment_name: str) -> None:
+    mlflow.set_experiment(experiment_name)
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    if experiment is None:
+        return
+    client = MlflowClient(tracking_uri=mlflow.get_tracking_uri())
+    tags = {
+        "experiment_role": "re-rank",
+        "experiment_stage": "shared_candidate_re-rank_comparison",
+        "mlflow.note.content": (
+            "Re-rank experiment: compare LGBM, FM, Deep&Wide, DeepFM, "
+            "and DLRM on a shared candidate cache."
+        ),
+    }
+    for key, value in tags.items():
+        client.set_experiment_tag(experiment.experiment_id, key, value)
 
 
 def log_mlflow_focus_params(args: argparse.Namespace, run_summary: dict) -> None:
@@ -693,7 +712,7 @@ def log_mlflow_run(
         return
 
     mlflow.set_tracking_uri(args.mlflow_tracking_uri)
-    mlflow.set_experiment(args.mlflow_experiment)
+    set_mlflow_experiment_metadata(args.mlflow_experiment)
     current_model_names = {"Popularity", "ALS/Fallback"}
     if "lgbm" in args.rankers:
         current_model_names.add(RANKER_DISPLAY_NAMES["lgbm"])
@@ -718,6 +737,8 @@ def log_mlflow_run(
         mlflow.set_tag("script", "scripts/week6_neural_rankers.py")
         mlflow.set_tag("primary_model", primary_model)
         mlflow.set_tag("merged_metrics", bool(args.merge_metrics_from))
+        mlflow.set_tag("ui_metric_1", "core_ndcg_at_100")
+        mlflow.set_tag("ui_metric_2", "core_recall_at_100")
         mlflow.log_params(jsonable_args(args))
         log_mlflow_focus_params(args, run_summary)
         mlflow.log_param("suffix", suffix)
@@ -731,9 +752,10 @@ def log_mlflow_run(
         mlflow.log_metric("elapsed_min", run_summary["elapsed_min"])
         mlflow.log_metric("eval_users", run_summary["eval_users"])
         for row in results.itertuples(index=False):
+            if int(row.k) not in {10, 100}:
+                continue
             metric_prefix = "" if row.model in current_model_names else "merged_"
             model_key = metric_model_key(str(row.model))
-            mlflow.log_metric(f"{metric_prefix}{model_key}_precision_at_{row.k}", float(row.precision))
             mlflow.log_metric(f"{metric_prefix}{model_key}_recall_at_{row.k}", float(row.recall))
             mlflow.log_metric(f"{metric_prefix}{model_key}_ndcg_at_{row.k}", float(row.ndcg))
             mlflow.log_metric(
@@ -743,9 +765,20 @@ def log_mlflow_run(
             if row.model == primary_model:
                 mlflow.log_metric(f"primary_ndcg_at_{row.k}", float(row.ndcg))
                 mlflow.log_metric(f"primary_recall_at_{row.k}", float(row.recall))
+                mlflow.log_metric(
+                    f"primary_unique_recommended_at_{row.k}",
+                    int(row.unique_recommended),
+                )
+                if int(row.k) == 10:
+                    mlflow.log_metric("core_ndcg_at_10", float(row.ndcg))
+                if int(row.k) == 100:
+                    mlflow.log_metric("core_ndcg_at_100", float(row.ndcg))
+                    mlflow.log_metric("core_recall_at_100", float(row.recall))
+                    mlflow.log_metric("core_unique_at_100", int(row.unique_recommended))
         for model_name, summary in run_summary["neural_rankers"].items():
-            for idx, loss in enumerate(summary.get("losses", []), start=1):
-                mlflow.log_metric(f"{model_name}_train_loss", float(loss), step=idx)
+            losses = summary.get("losses", [])
+            if losses:
+                mlflow.log_metric(f"{model_name}_final_train_loss", float(losses[-1]))
         for path in artifact_paths:
             if path.exists():
                 mlflow.log_artifact(str(path))
@@ -807,7 +840,7 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated rankers to train/evaluate: lgbm,fm,deepwide,deepfm,dlrm.",
     )
     parser.add_argument("--mlflow-tracking-uri", type=str, default="sqlite:///mlflow.db")
-    parser.add_argument("--mlflow-experiment", type=str, default="bda-week7-recsys-rankers")
+    parser.add_argument("--mlflow-experiment", type=str, default="bda-week7-recsys-re-rank")
     parser.add_argument("--no-mlflow", action="store_true")
     return parser.parse_args()
 

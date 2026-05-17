@@ -30,6 +30,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 from implicit.als import AlternatingLeastSquares
 from implicit.bpr import BayesianPersonalizedRanking
+from mlflow.tracking import MlflowClient
 from scipy import sparse
 from tqdm import tqdm
 
@@ -99,6 +100,24 @@ def metric_model_key(model_name: str) -> str:
         .replace("-", "_")
         .replace(" ", "_")
     )
+
+
+def set_mlflow_experiment_metadata(experiment_name: str) -> None:
+    mlflow.set_experiment(experiment_name)
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    if experiment is None:
+        return
+    client = MlflowClient(tracking_uri=mlflow.get_tracking_uri())
+    tags = {
+        "experiment_role": "candidate",
+        "experiment_stage": "candidate_generation_and_re-rank_baseline",
+        "mlflow.note.content": (
+            "Candidate experiment: ALS/recent/popular/related candidate sources "
+            "with LGBM re-rank baseline and segment diagnostics."
+        ),
+    }
+    for key, value in tags.items():
+        client.set_experiment_tag(experiment.experiment_id, key, value)
 
 
 def log_mlflow_focus_params(args: argparse.Namespace, run_summary: dict) -> None:
@@ -216,25 +235,32 @@ def diagnostics_segment_summary(diagnostics: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def log_mlflow_segment_metrics(segment_summary: pd.DataFrame) -> None:
-    if segment_summary.empty:
-        return
-    metric_cols = [
-        "ts_ndcg_at_10",
-        "als_ndcg_at_10",
-        "ts_recall_at_100",
-        "als_recall_at_100",
-        "ts_minus_als_ndcg_at_10",
-        "ts_minus_als_recall_at_100",
-        "top10_source_related_share",
-    ]
-    for row in segment_summary.itertuples(index=False):
-        segment = str(row.segment).lower().replace(" ", "_")
-        group = str(row.segment_group).lower().replace(" ", "_")
-        for metric in metric_cols:
-            value = getattr(row, metric)
-            if pd.notna(value):
-                mlflow.log_metric(f"segment_{group}_{segment}_{metric}", float(value))
+def log_compact_mlflow_metrics(results: pd.DataFrame, primary_model: str) -> None:
+    """Keep the MLflow run table readable; detailed metrics stay in CSV artifacts."""
+    key_cutoffs = {10, 100}
+    for row in results.itertuples(index=False):
+        if int(row.k) not in key_cutoffs:
+            continue
+        model_key = metric_model_key(str(row.model))
+        mlflow.log_metric(f"{model_key}_ndcg_at_{row.k}", float(row.ndcg))
+        mlflow.log_metric(f"{model_key}_recall_at_{row.k}", float(row.recall))
+        mlflow.log_metric(
+            f"{model_key}_unique_recommended_at_{row.k}",
+            int(row.unique_recommended),
+        )
+        if row.model == primary_model:
+            mlflow.log_metric(f"primary_ndcg_at_{row.k}", float(row.ndcg))
+            mlflow.log_metric(f"primary_recall_at_{row.k}", float(row.recall))
+            mlflow.log_metric(
+                f"primary_unique_recommended_at_{row.k}",
+                int(row.unique_recommended),
+            )
+            if int(row.k) == 10:
+                mlflow.log_metric("core_ndcg_at_10", float(row.ndcg))
+            if int(row.k) == 100:
+                mlflow.log_metric("core_ndcg_at_100", float(row.ndcg))
+                mlflow.log_metric("core_recall_at_100", float(row.recall))
+                mlflow.log_metric("core_unique_at_100", int(row.unique_recommended))
 
 
 def log_mlflow_run(
@@ -248,7 +274,7 @@ def log_mlflow_run(
         return
 
     mlflow.set_tracking_uri(args.mlflow_tracking_uri)
-    mlflow.set_experiment(args.mlflow_experiment)
+    set_mlflow_experiment_metadata(args.mlflow_experiment)
     with mlflow.start_run(run_name=suffix) as run:
         run_summary["mlflow_run_id"] = run.info.run_id
         for path in artifact_paths:
@@ -258,6 +284,8 @@ def log_mlflow_run(
         mlflow.set_tag("script", "scripts/week6_two_stage_v2.py")
         mlflow.set_tag("feature_source", run_summary["feature_source"])
         mlflow.set_tag("primary_model", "Two-Stage/Fallback")
+        mlflow.set_tag("ui_metric_1", "core_recall_at_100")
+        mlflow.set_tag("ui_metric_2", "core_ndcg_at_10")
         mlflow.log_params(jsonable_args(args))
         log_mlflow_focus_params(args, run_summary)
         mlflow.log_param("suffix", suffix)
@@ -267,21 +295,7 @@ def log_mlflow_run(
         mlflow.log_param("mlflow_run_id", run.info.run_id)
         mlflow.log_metric("elapsed_min", run_summary["elapsed_min"])
         mlflow.log_metric("eval_users", run_summary["eval_users"])
-        for row in results.itertuples(index=False):
-            model_key = metric_model_key(str(row.model))
-            mlflow.log_metric(f"{model_key}_precision_at_{row.k}", float(row.precision))
-            mlflow.log_metric(f"{model_key}_recall_at_{row.k}", float(row.recall))
-            mlflow.log_metric(f"{model_key}_ndcg_at_{row.k}", float(row.ndcg))
-            mlflow.log_metric(
-                f"{model_key}_unique_recommended_at_{row.k}",
-                int(row.unique_recommended),
-            )
-            if row.model == "Two-Stage/Fallback":
-                mlflow.log_metric(f"primary_ndcg_at_{row.k}", float(row.ndcg))
-                mlflow.log_metric(f"primary_recall_at_{row.k}", float(row.recall))
-        segment_path = run_summary["paths"].get("segment_summary")
-        if segment_path and Path(segment_path).exists():
-            log_mlflow_segment_metrics(pd.read_csv(segment_path))
+        log_compact_mlflow_metrics(results, "Two-Stage/Fallback")
         for path in artifact_paths:
             if path.exists():
                 mlflow.log_artifact(str(path))

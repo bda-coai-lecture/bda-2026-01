@@ -119,14 +119,14 @@ bda-2/
 | 04 | user_item_matrix | Sparse matrix 구축 | Dense vs Sparse 비교 |
 | 05 | als_vs_popularity | ALS 행렬분해 vs Popularity | ALS 68x 더 다양한 추천 |
 | 06 | embedding_exploration | ALS/BPR 임베딩 탐색, 케이스 스터디 | 유사 repo, t-SNE |
-| **07** | **two_stage** | **ALS retrieval + LGBM ranking** | **NDCG@10 +28% vs ALS** |
+| **07** | **two_stage** | **ALS retrieval + LGBM re-rank** | **NDCG@10 +28% vs ALS** |
 | **08** | **faiss_benchmark** | **FAISS ANN 벤치마크** | **54ms → 3ms (17x)** |
 | **09** | **two_tower** | **Two-Tower (PyTorch) vs ALS** | **NDCG@50 2.7x vs ALS** |
 
 ## Two-Stage 추천 구조
 
 ```
-유저 → [ALS Retrieval] → 후보 400개 → [LGBM Ranking] → Top-K 추천
+유저 → [ALS Retrieval] → candidate 400개 → [LGBM Re-rank] → Top-K 추천
               │                              │
         collaborative signal           + metadata features
         (행렬분해 임베딩)              (stars, forks, language,
@@ -224,7 +224,7 @@ uv run python scripts/week6_build_recsys_features.py \
   --use-marts always \
   --output-suffix airflow_light
 
-# Week 7 neural ranker 비교 smoke
+# Week 7 neural re-rank 비교 smoke
 uv run python scripts/week6_neural_rankers.py \
   --smoke \
   --rankers lgbm,fm,deepwide,deepfm,dlrm \
@@ -243,7 +243,7 @@ OMP_NUM_THREADS=1 uv run python scripts/train_two_tower_week6_full_v2.py
 | `data/daily_agg/*.parquet` | BigQuery 일별 집계 (20260215~20260508, 83일) |
 | `data/repo_metadata.db` | GitHub 메타데이터 SQLite 캐시 |
 | `data/models/als_twostage.pkl` | ALS 모델 (64 factors) |
-| `data/models/lgbm_ranker.txt` | LGBM LambdaRank ranker |
+| `data/models/lgbm_ranker.txt` | LGBM LambdaRank re-rank model |
 | `data/models/two_tower.pt` | Two-Tower PyTorch 모델 |
 | `data/models/index_mappings.pkl` | user/item index 매핑 |
 | `data/models/repo_name_map.pkl` | repo_id → repo_name (11.8M) |
@@ -255,7 +255,7 @@ OMP_NUM_THREADS=1 uv run python scripts/train_two_tower_week6_full_v2.py
 | google-cloud-bigquery | BigQuery 쿼리 |
 | pandas, pyarrow | 데이터 처리 |
 | implicit | ALS/BPR 행렬분해 |
-| lightgbm | LambdaRank ranking |
+| lightgbm | LambdaRank re-rank |
 | torch | Two-Tower 모델 |
 | faiss-cpu | ANN 검색 |
 | scikit-learn | 평가 메트릭 |
