@@ -12,6 +12,8 @@ LOCAL_TZ = ZoneInfo("Asia/Seoul")
 WINDOW_START = "2026-04-04"
 WINDOW_END = "2026-05-08"
 MAX_DAYS = 35
+METADATA_WINDOW_START = WINDOW_START
+METADATA_WINDOW_END = WINDOW_END
 
 UV_BASE = (
     "uv run --no-project "
@@ -30,11 +32,15 @@ REFRESH_METADATA_COMMAND = (
     "--with duckdb "
     "python scripts/refresh_repo_metadata.py "
     "--parquet-dir data/daily_agg "
-    f"--start {WINDOW_START} "
-    f"--end {WINDOW_END} "
-    "--top-n 500 "
+    f"--start {METADATA_WINDOW_START} "
+    f"--end {METADATA_WINDOW_END} "
+    f"--sample-date {METADATA_WINDOW_END} "
+    "--top-n 1000 "
+    "--systematic-sample "
+    "--sample-seed bda-repo-metadata-v1 "
     "--cache-tier warm "
-    "--max-fetch 50"
+    "--max-fetch 4500 "
+    "--rate-limit-pause 0.2"
 )
 
 PLAN_METRICS_COMMAND = (
@@ -71,7 +77,7 @@ metadata_task_defaults = {
     "cwd": PROJECT_DIR,
     "env": default_env,
     "append_env": True,
-    "execution_timeout": timedelta(minutes=20),
+    "execution_timeout": timedelta(minutes=30),
 }
 
 metrics_task_defaults = {
@@ -84,7 +90,7 @@ with DAG(
     dag_id="gharchive_repo_metadata_refresh",
     description="Refresh the local GitHub repo metadata cache for trend dashboards.",
     start_date=datetime(2026, 5, 1, tzinfo=LOCAL_TZ),
-    schedule="0 5 * * *",
+    schedule="0 0,4,8,12,16,20 * * *",
     catchup=False,
     max_active_runs=1,
     default_args=default_args,

@@ -1,0 +1,13 @@
+gharchive_metrics:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('DBT_BIGQUERY_PROJECT', 'bda-coai') }}"
+      dataset: "{{ env_var('DBT_BIGQUERY_DATASET', 'mart') }}"
+      location: "{{ env_var('DBT_BIGQUERY_LOCATION', 'US') }}"
+      keyfile: "{{ env_var('GCP_KEY_PATH') }}"
+      threads: 4
+      job_execution_timeout_seconds: 300
+      job_retries: 1

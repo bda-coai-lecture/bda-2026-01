@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: stg_user_repo_activity
+    description: Clean BigQuery source for GitHub Archive user-repo-action activity.
+    columns:
+      - name: user_id
+        tests:
+          - not_null
+      - name: repo_id
+        tests:
+          - not_null
+      - name: action
+        tests:
+          - not_null
+      - name: event_count
+        tests:
+          - not_null
+      - name: activity_date
+        tests:
+          - not_null
+      - name: week_start
+        tests:
+          - not_null

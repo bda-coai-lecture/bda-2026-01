@@ -665,6 +665,158 @@ def build_trendy_repo_cards(
     ]
 
 
+def build_oss_signal_cards(
+    database_id: int,
+    collection_id: int,
+    project: str,
+    dataset: str,
+) -> list[dict[str, Any]]:
+    table = lambda name: f"`{project}.{dataset}.{name}`"
+    return [
+        card_payload(
+            "Signal - Latest Active Users",
+            database_id,
+            f"""
+            SELECT active_users
+            FROM {table("metrics_daily")}
+            ORDER BY activity_date DESC
+            LIMIT 1
+            """,
+            "scalar",
+            collection_id,
+        ),
+        card_payload(
+            "Signal - Latest Events",
+            database_id,
+            f"""
+            SELECT total_events
+            FROM {table("metrics_daily")}
+            ORDER BY activity_date DESC
+            LIMIT 1
+            """,
+            "scalar",
+            collection_id,
+        ),
+        card_payload(
+            "Signal - Latest W1 Retention",
+            database_id,
+            f"""
+            SELECT w1_retention
+            FROM {table("metrics_retention_summary")}
+            WHERE w1_retention > 0
+            ORDER BY cohort_week DESC
+            LIMIT 1
+            """,
+            "scalar",
+            collection_id,
+        ),
+        card_payload(
+            "Signal - Top Trend Score",
+            database_id,
+            f"""
+            SELECT trend_score
+            FROM {table("metrics_agent_trendy_repos")}
+            ORDER BY trend_score DESC
+            LIMIT 1
+            """,
+            "scalar",
+            collection_id,
+        ),
+        card_payload(
+            "Signal - Activity Trend",
+            database_id,
+            f"""
+            SELECT activity_date, active_users, active_repos, total_events
+            FROM {table("metrics_daily")}
+            ORDER BY activity_date
+            """,
+            "line",
+            collection_id,
+        ),
+        card_payload(
+            "Signal - Event Mix",
+            database_id,
+            f"""
+            SELECT activity_date, action, total_events
+            FROM {table("metrics_event_type_daily")}
+            WHERE action IN ('PushEvent', 'WatchEvent', 'ForkEvent', 'PullRequestEvent', 'IssuesEvent', 'IssueCommentEvent')
+            ORDER BY activity_date, action
+            """,
+            "area",
+            collection_id,
+        ),
+        card_payload(
+            "Signal - Trend Leaderboard",
+            database_id,
+            f"""
+            SELECT
+              repo_name,
+              trend_score,
+              growth_ratio,
+              seed_affinity,
+              recent_active_users,
+              recent_score,
+              recent_top_action,
+              why_trendy
+            FROM {table("metrics_agent_trendy_repos")}
+            ORDER BY trend_score DESC
+            LIMIT 20
+            """,
+            "table",
+            collection_id,
+        ),
+        card_payload(
+            "Signal - Growth vs Affinity",
+            database_id,
+            f"""
+            SELECT growth_ratio, seed_affinity, recent_active_users, trend_score, repo_name
+            FROM {table("metrics_agent_trendy_repos")}
+            ORDER BY trend_score DESC
+            LIMIT 100
+            """,
+            "scatter",
+            collection_id,
+            {
+                "graph.dimensions": ["growth_ratio"],
+                "graph.metrics": ["seed_affinity"],
+                "graph.x_axis.title_text": "Growth ratio",
+                "graph.y_axis.title_text": "Seed affinity",
+                "graph.x_axis.scale": "linear",
+                "graph.y_axis.scale": "linear",
+                "graph.show_values": False,
+            },
+        ),
+        card_payload(
+            "Signal - Retention Health",
+            database_id,
+            f"""
+            SELECT cohort_week, cohort_users, w1_retention, w2_retention, w3_retention
+            FROM {table("metrics_retention_summary")}
+            ORDER BY cohort_week DESC
+            """,
+            "table",
+            collection_id,
+        ),
+        card_payload(
+            "Signal - Model Validation",
+            database_id,
+            f"""
+            SELECT
+              model,
+              candidates,
+              spearman_next_score,
+              precision_at_20_next_top100,
+              ndcg_at_20,
+              avg_next_score_at_20
+            FROM {table("metrics_agent_trend_validation")}
+            ORDER BY ndcg_at_20 DESC
+            """,
+            "table",
+            collection_id,
+        ),
+    ]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", default=os.environ.get("METABASE_URL", DEFAULT_URL))
@@ -694,16 +846,24 @@ def main() -> None:
         collection_id,
         "OpenClaw와 oh-my-openagent seed를 기준으로 AI agent 생태계의 트렌디 repo를 설명하고 검증한다.",
     )
+    oss_signal_dashboard_id = ensure_dashboard_with_description(
+        mb,
+        "OSS Signal 운영 대시보드",
+        collection_id,
+        "GitHub Archive 기반 OSS/AI agent 생태계 신호를 운영 KPI, retention, trend leaderboard로 요약한다.",
+    )
 
     cards = build_cards(database_id, collection_id, args.project, args.dataset)
     trendy_cards = build_trendy_repo_cards(database_id, collection_id, args.project, args.dataset)
+    oss_signal_cards = build_oss_signal_cards(database_id, collection_id, args.project, args.dataset)
     delete_existing_cards(
         mb,
         collection_id,
-        {card["name"] for card in cards + trendy_cards},
+        {card["name"] for card in cards + trendy_cards + oss_signal_cards},
     )
     clear_dashboard_cards(mb, dashboard_id)
     clear_dashboard_cards(mb, trendy_dashboard_id)
+    clear_dashboard_cards(mb, oss_signal_dashboard_id)
 
     card_ids = [create_card(mb, card) for card in cards]
     layout = [
@@ -742,6 +902,21 @@ def main() -> None:
     ]
     replace_dashboard_cards(mb, trendy_dashboard_id, trendy_card_ids, trendy_layout)
 
+    oss_signal_card_ids = [create_card(mb, card) for card in oss_signal_cards]
+    oss_signal_layout = [
+        (0, 0, 6, 4),
+        (0, 6, 6, 4),
+        (0, 12, 6, 4),
+        (0, 18, 6, 4),
+        (4, 0, 12, 7),
+        (4, 12, 12, 7),
+        (11, 0, 24, 8),
+        (19, 0, 12, 7),
+        (19, 12, 12, 7),
+        (26, 0, 24, 7),
+    ]
+    replace_dashboard_cards(mb, oss_signal_dashboard_id, oss_signal_card_ids, oss_signal_layout)
+
     print(
         json.dumps(
             {
@@ -752,8 +927,11 @@ def main() -> None:
                 "dashboard_url": f"{args.url}/dashboard/{dashboard_id}",
                 "trendy_dashboard_id": trendy_dashboard_id,
                 "trendy_dashboard_url": f"{args.url}/dashboard/{trendy_dashboard_id}",
+                "oss_signal_dashboard_id": oss_signal_dashboard_id,
+                "oss_signal_dashboard_url": f"{args.url}/dashboard/{oss_signal_dashboard_id}",
                 "cards": len(card_ids),
                 "trendy_cards": len(trendy_card_ids),
+                "oss_signal_cards": len(oss_signal_card_ids),
             },
             ensure_ascii=False,
             indent=2,

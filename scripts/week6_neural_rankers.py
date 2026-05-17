@@ -7,6 +7,7 @@ candidates, and dense candidate features, then trains BCE re-rankers:
     - FM
     - Deep&Wide
     - DeepFM
+    - DLRM-style dense interaction model
 
 Usage:
     uv run python scripts/week6_neural_rankers.py --smoke
@@ -18,11 +19,13 @@ from __future__ import annotations
 import argparse
 import json
 import pickle
+import subprocess
 import time
 from datetime import date, timedelta
 from pathlib import Path
 
 import lightgbm as lgb
+import mlflow
 import numpy as np
 import pandas as pd
 import torch
@@ -35,14 +38,112 @@ import week6_two_stage_v2 as base
 
 
 MODEL_DIR = Path("data/models/week6")
-K_VALUES = [10, 50, 100]
+K_VALUES = [10, 50, 100, 200]
+NEURAL_RANKERS = ("fm", "deepwide", "deepfm", "dlrm")
+RANKER_DISPLAY_NAMES = {
+    "lgbm": "Two-Stage/LGBM",
+    "fm": "FM",
+    "deepwide": "Deep&Wide",
+    "deepfm": "DeepFM",
+    "dlrm": "DLRM",
+}
 
 
 def jsonable_args(args: argparse.Namespace) -> dict:
     return {
-        k: str(v) if isinstance(v, (date, Path)) else v
+        k: ",".join(str(part) for part in v)
+        if isinstance(v, tuple)
+        else str(v)
+        if isinstance(v, (date, Path))
+        else v
         for k, v in vars(args).items()
     }
+
+
+def git_metadata() -> dict[str, str | bool]:
+    try:
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        dirty = bool(
+            subprocess.check_output(
+                ["git", "status", "--porcelain"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        )
+    except (OSError, subprocess.CalledProcessError):
+        sha = "unknown"
+        dirty = "unknown"
+    return {"git_sha": sha, "git_dirty": dirty}
+
+
+def metric_model_key(model_name: str) -> str:
+    return (
+        model_name.lower()
+        .replace("/", "_")
+        .replace("&", "and")
+        .replace("-", "_")
+        .replace(" ", "_")
+    )
+
+
+def log_mlflow_focus_params(args: argparse.Namespace, run_summary: dict) -> None:
+    """Expose comparable recommendation experiment knobs in MLflow tables."""
+    focus_params = {
+        "exp_data_history_start": args.history_start,
+        "exp_data_history_end": args.history_end,
+        "exp_data_rank_start": args.rank_start,
+        "exp_data_rank_end": args.rank_end,
+        "exp_data_test_start": args.test_start,
+        "exp_data_test_end": args.test_end,
+        "exp_data_max_items": args.max_items,
+        "exp_data_rank_users": args.rank_users,
+        "exp_data_eval_users": args.eval_users,
+        "exp_candidate_k": args.candidate_k,
+        "exp_candidate_hybrid_extra": args.hybrid_extra,
+        "exp_ranker_family": "neural_compare",
+        "exp_ranker_names": ",".join(args.rankers),
+        "exp_ranker_epochs": args.epochs,
+        "exp_ranker_batch_size": args.batch_size,
+        "exp_ranker_learning_rate": args.lr,
+        "exp_ranker_hidden_dims": args.hidden_dims,
+        "exp_ranker_dlrm_embedding_dim": args.dlrm_embedding_dim or args.fm_factors,
+        "exp_ranker_fm_factors": args.fm_factors,
+        "exp_ranker_device": args.device,
+        "exp_run_feature_cache_source": run_summary.get("feature_cache_source"),
+        "exp_run_reuse_feature_cache": args.reuse_feature_cache,
+        "exp_run_write_feature_cache": args.write_feature_cache,
+        "exp_run_merged_metrics": bool(args.merge_metrics_from),
+    }
+    for key, value in focus_params.items():
+        if value is not None:
+            mlflow.log_param(
+                key,
+                str(value)
+                if isinstance(value, (date, Path, tuple, list))
+                else value,
+            )
+
+    cache_args = run_summary.get("feature_cache_args") or {}
+    for key in [
+        "history_start",
+        "history_end",
+        "rank_start",
+        "rank_end",
+        "test_start",
+        "test_end",
+        "max_items",
+        "candidate_k",
+        "hybrid_extra",
+        "rank_users",
+        "eval_users",
+        "output_suffix",
+    ]:
+        if key in cache_args:
+            mlflow.log_param(f"cache_{key}", cache_args[key])
 
 
 def choose_device(value: str) -> torch.device:
@@ -105,6 +206,41 @@ class DeepFM(nn.Module):
         return self.fm(x) + self.out(self.deep(x)).squeeze(-1)
 
 
+class DenseDLRM(nn.Module):
+    """DLRM-style ranker for the existing dense candidate feature matrix.
+
+    The original levit DLRM embeds each sparse/dense feature field and feeds
+    pairwise dot products to a DNN. Our Week 6 ranker data is already a dense
+    matrix, so each scalar feature is treated as one field and projected into a
+    shared embedding space before interaction.
+    """
+
+    def __init__(
+        self,
+        n_features: int,
+        embedding_dim: int,
+        hidden_dims: tuple[int, ...],
+        dropout: float,
+    ) -> None:
+        super().__init__()
+        self.field_weight = nn.Parameter(torch.empty(n_features, embedding_dim))
+        self.field_bias = nn.Parameter(torch.zeros(n_features, embedding_dim))
+        nn.init.xavier_uniform_(self.field_weight)
+        self.register_buffer(
+            "triu_indices",
+            torch.triu_indices(n_features, n_features, offset=1),
+        )
+        interaction_dim = n_features * (n_features - 1) // 2
+        self.deep = make_mlp(n_features + interaction_dim, hidden_dims, dropout)
+        self.out = nn.Linear(hidden_dims[-1], 1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        field_embeddings = x.unsqueeze(-1) * self.field_weight + self.field_bias
+        dot_products = torch.bmm(field_embeddings, field_embeddings.transpose(1, 2))
+        interactions = dot_products[:, self.triu_indices[0], self.triu_indices[1]]
+        return self.out(self.deep(torch.cat([x, interactions], dim=1))).squeeze(-1)
+
+
 def make_mlp(n_features: int, hidden_dims: tuple[int, ...], dropout: float) -> nn.Sequential:
     layers: list[nn.Module] = []
     in_dim = n_features
@@ -128,26 +264,43 @@ def parse_hidden_dims(value: str) -> tuple[int, ...]:
     return dims
 
 
+def parse_rankers(value: str) -> tuple[str, ...]:
+    rankers = tuple(part.strip().lower() for part in value.split(",") if part.strip())
+    valid = {"lgbm", *NEURAL_RANKERS}
+    unknown = sorted(set(rankers) - valid)
+    if unknown:
+        raise argparse.ArgumentTypeError(f"unknown rankers: {', '.join(unknown)}")
+    if not rankers:
+        raise argparse.ArgumentTypeError("rankers must contain at least one model")
+    return rankers
+
+
+def merge_metrics(existing_path: Path, current: pd.DataFrame) -> pd.DataFrame:
+    existing = pd.read_csv(existing_path)
+    current_models = set(current["model"])
+    merged = pd.concat(
+        [existing[~existing["model"].isin(current_models)], current],
+        ignore_index=True,
+    )
+    order = {
+        "Popularity": 0,
+        "ALS/Fallback": 1,
+        "Two-Stage/LGBM": 2,
+        "FM": 3,
+        "Deep&Wide": 4,
+        "DeepFM": 5,
+        "DLRM": 6,
+    }
+    merged["_model_order"] = merged["model"].map(order).fillna(99)
+    return (
+        merged.sort_values(["_model_order", "k"])
+        .drop(columns=["_model_order"])
+        .reset_index(drop=True)
+    )
+
+
 def build_feature_names(context: dict) -> list[str]:
-    return [
-        "als_score",
-        "factor_cosine",
-        *context["item_feature_names"],
-        "log_user_total_score",
-        "log_user_unique_repos",
-        "log_user_events",
-        "user_watch_share",
-        "user_pr_share",
-        "user_fork_share",
-        "user_push_share",
-        "event_match_dot",
-        "event_l1_distance",
-        "seen_max_cosine",
-        "seen_mean_cosine",
-        "source_is_als",
-        "source_is_recent",
-        "source_is_popular",
-    ]
+    return base.feature_names_for_context(context)
 
 
 def build_light_feature_context(
@@ -161,82 +314,18 @@ def build_light_feature_context(
     user2idx: dict[int, int],
     item2idx: dict[int, int],
 ) -> dict:
-    """Build the compact feature context without heavy per-user profile objects."""
-    pop = base.feedback_popularity(history_fb).to_dict()
-    recent_pop = base.feedback_popularity(recent_fb).to_dict() if len(recent_fb) else {}
-    prior_pop = base.feedback_popularity(prior_fb).to_dict() if len(prior_fb) else {}
-    user_activity = base.aggregate_user_activity(history_fb)
-    item_user_counts = history_fb.groupby("repo_id", observed=True)["actor_id"].nunique().to_dict()
-    recent_item_users = recent_fb.groupby("repo_id", observed=True)["actor_id"].nunique().to_dict()
-    item_event, user_event = base.event_stats(history_df)
-    recent_item_event, _ = base.event_stats(recent_df) if len(recent_df) else ({}, {})
-    meta, lang2idx = base.load_metadata(base.DB_PATH)
-
-    user_factors = model.user_factors.astype(np.float32)
-    item_factors = model.item_factors.astype(np.float32)
-    user_norms = np.linalg.norm(user_factors, axis=1, keepdims=True)
-    item_norms = np.linalg.norm(item_factors, axis=1, keepdims=True)
-    user_norms[user_norms == 0] = 1.0
-    item_norms[item_norms == 0] = 1.0
-
-    item_feature_names = [
-        "log_popularity",
-        "log_item_user_count",
-        "log_recent_popularity",
-        "log_recent_item_user_count",
-        "pop_growth",
-        "log_item_events",
-        "item_watch_share",
-        "item_pr_share",
-        "item_fork_share",
-        "item_push_share",
-        "recent_item_watch_share",
-        "recent_item_pr_share",
-        "log_stars",
-        "log_forks",
-        "language_idx",
-        "archived",
-    ]
-    item_static = np.zeros((len(item2idx), len(item_feature_names)), dtype=np.float32)
-    for repo_id, iidx in item2idx.items():
-        i_event = item_event.get(repo_id, {})
-        r_event = recent_item_event.get(repo_id, {})
-        i_meta = meta.get(repo_id, {})
-        log_recent = np.log1p(recent_pop.get(repo_id, 0.0))
-        log_prior = np.log1p(prior_pop.get(repo_id, 0.0))
-        item_static[iidx] = np.array(
-            [
-                np.log1p(pop.get(repo_id, 0.0)),
-                np.log1p(item_user_counts.get(repo_id, 0)),
-                log_recent,
-                np.log1p(recent_item_users.get(repo_id, 0)),
-                log_recent - log_prior,
-                i_event.get("log_item_events", 0.0),
-                i_event.get("item_watch_share", 0.0),
-                i_event.get("item_pr_share", 0.0),
-                i_event.get("item_fork_share", 0.0),
-                i_event.get("item_push_share", 0.0),
-                r_event.get("item_watch_share", 0.0),
-                r_event.get("item_pr_share", 0.0),
-                i_meta.get("log_stars", 0.0),
-                i_meta.get("log_forks", 0.0),
-                i_meta.get("language_idx", 0.0),
-                i_meta.get("archived", 0.0),
-            ],
-            dtype=np.float32,
-        )
-
-    return {
-        "pop": pop,
-        "recent_pop": recent_pop,
-        "user_activity": user_activity,
-        "user_event": user_event,
-        "user_normed": user_factors / user_norms,
-        "item_normed": item_factors / item_norms,
-        "item_static": item_static,
-        "item_feature_names": item_feature_names,
-        "lang2idx": lang2idx,
-    }
+    """Build feature context using the canonical two-stage implementation."""
+    return base.build_feature_context(
+        history_df,
+        recent_df,
+        prior_df,
+        history_fb,
+        recent_fb,
+        prior_fb,
+        model,
+        user2idx,
+        item2idx,
+    )
 
 
 def features_for_candidates(
@@ -246,87 +335,68 @@ def features_for_candidates(
     item2idx: dict[int, int],
     context: dict,
 ) -> tuple[np.ndarray, list[int]]:
-    uidx = user2idx.get(uid)
-    if uidx is None or not candidates:
-        return np.empty((0, 0), dtype=np.float32), []
+    return base.features_for_candidates(uid, candidates, user2idx, item2idx, context)
 
-    repo_ids, iidxs, als_scores, sources = [], [], [], []
-    for cand in candidates:
-        if len(cand) == 2:
-            rid, score = cand
-            source = 1
-        else:
-            rid, score, source = cand
-        iidx = item2idx.get(rid)
-        if iidx is None:
-            continue
-        repo_ids.append(rid)
-        iidxs.append(iidx)
-        als_scores.append(score)
-        sources.append(source)
-    if not repo_ids:
-        return np.empty((0, 0), dtype=np.float32), []
 
-    n = len(repo_ids)
-    iidxs_arr = np.array(iidxs)
-    user_activity = context["user_activity"].get(
-        uid, {"user_total_score": 0.0, "user_unique_repos": 0.0}
-    )
-    user_event = context["user_event"].get(uid, {})
-    cos = context["user_normed"][uidx] @ context["item_normed"][iidxs_arr].T
-    item_features = context["item_static"][iidxs_arr]
-    feature_idx = {name: i for i, name in enumerate(context["item_feature_names"])}
+def validate_feature_matrix(
+    x: np.ndarray,
+    feature_names: list[str],
+    cache_path: Path | None = None,
+) -> None:
+    expected_cols = len(feature_names)
+    actual_cols = x.shape[1] if x.ndim == 2 else None
+    if actual_cols != expected_cols:
+        location = f" in {cache_path}" if cache_path is not None else ""
+        raise RuntimeError(
+            f"Feature matrix{location} has {actual_cols} columns, "
+            f"but feature_names has {expected_cols}. Rebuild the feature cache "
+            "without --reuse-feature-cache or choose a new --feature-cache-path."
+        )
 
-    item_watch = item_features[:, feature_idx["item_watch_share"]]
-    item_pr = item_features[:, feature_idx["item_pr_share"]]
-    item_fork = item_features[:, feature_idx["item_fork_share"]]
-    item_push = item_features[:, feature_idx["item_push_share"]]
-    user_watch = float(user_event.get("user_watch_share", 0.0))
-    user_pr = float(user_event.get("user_pr_share", 0.0))
-    user_fork = float(user_event.get("user_fork_share", 0.0))
-    user_push = float(user_event.get("user_push_share", 0.0))
-    event_match_dot = (
-        item_watch * user_watch
-        + item_pr * user_pr
-        + item_fork * user_fork
-        + item_push * user_push
-    )
-    event_l1_distance = (
-        np.abs(item_watch - user_watch)
-        + np.abs(item_pr - user_pr)
-        + np.abs(item_fork - user_fork)
-        + np.abs(item_push - user_push)
-    )
 
-    source_arr = np.array(sources, dtype=np.int8)
-    source_is_als = (source_arr == 1).astype(np.float32)
-    source_is_recent = (source_arr == 2).astype(np.float32)
-    source_is_popular = (source_arr == 3).astype(np.float32)
-    seen_max_cos = np.zeros(n, dtype=np.float32)
-    seen_mean_cos = np.zeros(n, dtype=np.float32)
+def validate_feature_cache(
+    cache_path: Path,
+    context: dict,
+    feature_names: list[str],
+    x_train_raw: np.ndarray,
+) -> None:
+    required_context_keys = {
+        "recent_user_activity",
+        "prior_user_activity",
+        "user_seen_iidxs",
+        "user_profile_normed",
+        "item_feature_names",
+    }
+    missing = sorted(required_context_keys - set(context))
+    if missing:
+        raise RuntimeError(
+            f"Feature cache {cache_path} is incompatible with the current neural feature set; "
+            f"missing context keys: {', '.join(missing)}. Rebuild without "
+            "--reuse-feature-cache or choose a new --feature-cache-path."
+        )
 
-    x = np.column_stack(
-        [
-            np.array(als_scores, dtype=np.float32),
-            cos.astype(np.float32),
-            item_features,
-            np.full(n, np.log1p(user_activity["user_total_score"]), dtype=np.float32),
-            np.full(n, np.log1p(user_activity["user_unique_repos"]), dtype=np.float32),
-            np.full(n, user_event.get("log_user_events", 0.0), dtype=np.float32),
-            np.full(n, user_event.get("user_watch_share", 0.0), dtype=np.float32),
-            np.full(n, user_event.get("user_pr_share", 0.0), dtype=np.float32),
-            np.full(n, user_event.get("user_fork_share", 0.0), dtype=np.float32),
-            np.full(n, user_event.get("user_push_share", 0.0), dtype=np.float32),
-            event_match_dot.astype(np.float32),
-            event_l1_distance.astype(np.float32),
-            seen_max_cos,
-            seen_mean_cos,
-            source_is_als,
-            source_is_recent,
-            source_is_popular,
-        ]
-    )
-    return x.astype(np.float32), repo_ids
+    expected_names = build_feature_names(context)
+    if feature_names != expected_names:
+        mismatch = next(
+            (
+                i
+                for i, (cached_name, expected_name) in enumerate(
+                    zip(feature_names, expected_names, strict=False)
+                )
+                if cached_name != expected_name
+            ),
+            min(len(feature_names), len(expected_names)),
+        )
+        cached_name = feature_names[mismatch] if mismatch < len(feature_names) else "<missing>"
+        expected_name = expected_names[mismatch] if mismatch < len(expected_names) else "<missing>"
+        raise RuntimeError(
+            f"Feature cache {cache_path} uses stale feature_names "
+            f"(cached={len(feature_names)}, expected={len(expected_names)}, "
+            f"first mismatch at {mismatch}: {cached_name!r} != {expected_name!r}). "
+            "Rebuild without --reuse-feature-cache or choose a new --feature-cache-path."
+        )
+
+    validate_feature_matrix(x_train_raw, feature_names, cache_path)
 
 
 def build_rank_data(
@@ -415,6 +485,8 @@ def make_neural_model(
         return DeepWide(n_features, hidden_dims, dropout)
     if model_name == "deepfm":
         return DeepFM(n_features, factor_dim, hidden_dims, dropout)
+    if model_name == "dlrm":
+        return DenseDLRM(n_features, factor_dim, hidden_dims, dropout)
     raise ValueError(f"unknown neural model: {model_name}")
 
 
@@ -493,7 +565,7 @@ def evaluate_rankers(
     als_retrieval: dict[int, list[tuple[int, float]]],
     hybrid_retrieval: dict[int, list[tuple[int, float, int]]],
     test_labels: dict[int, set[int]],
-    lgbm_ranker: lgb.LGBMRanker,
+    lgbm_ranker: lgb.LGBMRanker | None,
     neural_rankers: dict[str, nn.Module],
     neural_mean: np.ndarray,
     neural_std: np.ndarray,
@@ -506,14 +578,10 @@ def evaluate_rankers(
     fallback_candidates: list[int],
     train_seen: dict[int, set[int]],
 ) -> tuple[pd.DataFrame, int]:
-    model_names = [
-        "Popularity",
-        "ALS/Fallback",
-        "Two-Stage/LGBM",
-        "FM",
-        "Deep&Wide",
-        "DeepFM",
-    ]
+    model_names = ["Popularity", "ALS/Fallback"]
+    if lgbm_ranker is not None:
+        model_names.append(RANKER_DISPLAY_NAMES["lgbm"])
+    model_names.extend(RANKER_DISPLAY_NAMES[name] for name in neural_rankers)
     metrics = {
         name: {k: {"precision": [], "recall": [], "ndcg": []} for k in K_VALUES}
         for name in model_names
@@ -537,29 +605,28 @@ def evaluate_rankers(
 
         x, repo_ids = features_for_candidates(uid, hybrid_pairs, user2idx, item2idx, context)
         if len(repo_ids):
-            lgbm_scores = lgbm_ranker.booster_.predict(x)
-            recs_by_model["Two-Stage/LGBM"] = [
-                repo_ids[i] for i in np.argsort(-lgbm_scores)
-            ]
-            for display_name, ranker_key in [
-                ("FM", "fm"),
-                ("Deep&Wide", "deepwide"),
-                ("DeepFM", "deepfm"),
-            ]:
+            if lgbm_ranker is not None:
+                lgbm_scores = lgbm_ranker.booster_.predict(x)
+                recs_by_model[RANKER_DISPLAY_NAMES["lgbm"]] = [
+                    repo_ids[i] for i in np.argsort(-lgbm_scores)
+                ]
+            for ranker_key, ranker in neural_rankers.items():
                 scores = predict_neural(
-                    neural_rankers[ranker_key],
+                    ranker,
                     x,
                     neural_mean,
                     neural_std,
                     device,
                     args.predict_batch_size,
                 )
-                recs_by_model[display_name] = [repo_ids[i] for i in np.argsort(-scores)]
+                recs_by_model[RANKER_DISPLAY_NAMES[ranker_key]] = [
+                    repo_ids[i] for i in np.argsort(-scores)
+                ]
         else:
-            recs_by_model["Two-Stage/LGBM"] = als_recs
-            recs_by_model["FM"] = als_recs
-            recs_by_model["Deep&Wide"] = als_recs
-            recs_by_model["DeepFM"] = als_recs
+            if lgbm_ranker is not None:
+                recs_by_model[RANKER_DISPLAY_NAMES["lgbm"]] = als_recs
+            for ranker_key in neural_rankers:
+                recs_by_model[RANKER_DISPLAY_NAMES[ranker_key]] = als_recs
 
         for model_name, recs in recs_by_model.items():
             for k in K_VALUES:
@@ -594,6 +661,11 @@ def save_torch_model(
     feature_names: list[str],
     args: argparse.Namespace,
 ) -> None:
+    factor_dim = (
+        args.dlrm_embedding_dim or args.fm_factors
+        if model_name == "dlrm"
+        else args.fm_factors
+    )
     torch.save(
         {
             "model_name": model_name,
@@ -602,12 +674,81 @@ def save_torch_model(
             "feature_std": std,
             "feature_names": feature_names,
             "n_features": len(feature_names),
-            "fm_factors": args.fm_factors,
+            "fm_factors": factor_dim,
             "hidden_dims": args.hidden_dims,
             "dropout": args.dropout,
         },
         path,
     )
+
+
+def log_mlflow_run(
+    args: argparse.Namespace,
+    suffix: str,
+    run_summary: dict,
+    results: pd.DataFrame,
+    artifact_paths: list[Path],
+) -> None:
+    if args.no_mlflow:
+        return
+
+    mlflow.set_tracking_uri(args.mlflow_tracking_uri)
+    mlflow.set_experiment(args.mlflow_experiment)
+    current_model_names = {"Popularity", "ALS/Fallback"}
+    if "lgbm" in args.rankers:
+        current_model_names.add(RANKER_DISPLAY_NAMES["lgbm"])
+    current_model_names.update(RANKER_DISPLAY_NAMES[name] for name in run_summary["neural_rankers"])
+    first_neural = next(iter(run_summary["neural_rankers"]), None)
+    primary_model = (
+        RANKER_DISPLAY_NAMES["dlrm"]
+        if "dlrm" in run_summary["neural_rankers"]
+        else RANKER_DISPLAY_NAMES["lgbm"]
+        if "lgbm" in args.rankers
+        else RANKER_DISPLAY_NAMES[first_neural]
+        if first_neural is not None
+        else "ALS/Fallback"
+    )
+
+    with mlflow.start_run(run_name=suffix) as run:
+        run_summary["mlflow_run_id"] = run.info.run_id
+        for path in artifact_paths:
+            if path.name.endswith("_summary.json"):
+                path.write_text(json.dumps(run_summary, indent=2), encoding="utf-8")
+        mlflow.set_tags(git_metadata())
+        mlflow.set_tag("script", "scripts/week6_neural_rankers.py")
+        mlflow.set_tag("primary_model", primary_model)
+        mlflow.set_tag("merged_metrics", bool(args.merge_metrics_from))
+        mlflow.log_params(jsonable_args(args))
+        log_mlflow_focus_params(args, run_summary)
+        mlflow.log_param("suffix", suffix)
+        mlflow.log_param("exp_ranker_count", len(args.rankers))
+        mlflow.log_param("rankers", ",".join(args.rankers))
+        mlflow.log_param("feature_count", len(run_summary["feature_names"]))
+        mlflow.log_param("feature_cache_source", run_summary["feature_cache_source"])
+        mlflow.log_param("actual_rank_rows", run_summary["rank_data"]["rank_rows"])
+        mlflow.log_param("actual_rank_users", run_summary["rank_data"]["rank_users"])
+        mlflow.log_param("mlflow_run_id", run.info.run_id)
+        mlflow.log_metric("elapsed_min", run_summary["elapsed_min"])
+        mlflow.log_metric("eval_users", run_summary["eval_users"])
+        for row in results.itertuples(index=False):
+            metric_prefix = "" if row.model in current_model_names else "merged_"
+            model_key = metric_model_key(str(row.model))
+            mlflow.log_metric(f"{metric_prefix}{model_key}_precision_at_{row.k}", float(row.precision))
+            mlflow.log_metric(f"{metric_prefix}{model_key}_recall_at_{row.k}", float(row.recall))
+            mlflow.log_metric(f"{metric_prefix}{model_key}_ndcg_at_{row.k}", float(row.ndcg))
+            mlflow.log_metric(
+                f"{metric_prefix}{model_key}_unique_recommended_at_{row.k}",
+                int(row.unique_recommended),
+            )
+            if row.model == primary_model:
+                mlflow.log_metric(f"primary_ndcg_at_{row.k}", float(row.ndcg))
+                mlflow.log_metric(f"primary_recall_at_{row.k}", float(row.recall))
+        for model_name, summary in run_summary["neural_rankers"].items():
+            for idx, loss in enumerate(summary.get("losses", []), start=1):
+                mlflow.log_metric(f"{model_name}_train_loss", float(loss), step=idx)
+        for path in artifact_paths:
+            if path.exists():
+                mlflow.log_artifact(str(path))
 
 
 def parse_args() -> argparse.Namespace:
@@ -635,6 +776,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--write-feature-cache", action="store_true")
     parser.add_argument("--reuse-feature-cache", action="store_true")
     parser.add_argument("--feature-cache-path", type=Path, default=None)
+    parser.add_argument(
+        "--merge-metrics-from",
+        type=Path,
+        default=None,
+        help="Existing metrics CSV to merge with newly evaluated models.",
+    )
 
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=8192)
@@ -645,8 +792,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--hidden-dims", type=parse_hidden_dims, default=(128, 64))
     parser.add_argument("--fm-factors", type=int, default=16)
+    parser.add_argument(
+        "--dlrm-embedding-dim",
+        type=int,
+        default=None,
+        help="DLRM field embedding dim. Defaults to --fm-factors for comparable size.",
+    )
     parser.add_argument("--lgbm-estimators", type=int, default=120)
     parser.add_argument("--torch-threads", type=int, default=1)
+    parser.add_argument(
+        "--rankers",
+        type=parse_rankers,
+        default=("lgbm", "fm", "deepwide", "deepfm", "dlrm"),
+        help="Comma-separated rankers to train/evaluate: lgbm,fm,deepwide,deepfm,dlrm.",
+    )
+    parser.add_argument("--mlflow-tracking-uri", type=str, default="sqlite:///mlflow.db")
+    parser.add_argument("--mlflow-experiment", type=str, default="bda-week7-recsys-rankers")
+    parser.add_argument("--no-mlflow", action="store_true")
     return parser.parse_args()
 
 
@@ -664,6 +826,8 @@ def apply_smoke_defaults(args: argparse.Namespace) -> None:
     args.epochs = min(args.epochs, 1)
     args.batch_size = min(args.batch_size, 4096)
     args.lgbm_estimators = min(args.lgbm_estimators, 40)
+    if args.dlrm_embedding_dim is not None:
+        args.dlrm_embedding_dim = min(args.dlrm_embedding_dim, 16)
 
 
 def main() -> None:
@@ -705,6 +869,7 @@ def main() -> None:
         groups = cached["groups"]
         rank_data_summary = cached["rank_data_summary"]
         data_summary = cached["data_summary"]
+        validate_feature_cache(feature_cache_path, context, feature_names, x_train_raw)
         x_train, feature_mean, feature_std = standardize_features(x_train_raw)
     else:
         print("1. load data")
@@ -719,9 +884,16 @@ def main() -> None:
             if prior_end >= args.history_start
             else history_df.iloc[0:0].copy()
         )
-        history_fb, rank_fb, test_fb = map(base.build_feedback, [history_df, rank_df, test_df])
-        recent_fb = base.build_feedback(recent_df)
-        prior_fb = base.build_feedback(prior_df) if len(prior_df) else history_fb.iloc[0:0].copy()
+        event_weights = dict(base.DEFAULT_WEIGHTS)
+        history_fb = base.build_feedback(history_df, event_weights)
+        rank_fb = base.build_feedback(rank_df, event_weights)
+        test_fb = base.build_feedback(test_df, event_weights)
+        recent_fb = base.build_feedback(recent_df, event_weights)
+        prior_fb = (
+            base.build_feedback(prior_df, event_weights)
+            if len(prior_df)
+            else base.empty_feedback_frame()
+        )
 
         print("2. filter catalog/users")
         history_fb, rank_fb, test_fb = base.filter_catalog(
@@ -859,6 +1031,7 @@ def main() -> None:
             args.rank_users,
             args.seed,
         )
+        validate_feature_matrix(x_train_raw, feature_names)
         x_train, feature_mean, feature_std = standardize_features(x_train_raw)
 
         if args.write_feature_cache:
@@ -892,17 +1065,26 @@ def main() -> None:
     print("6. train rankers")
     neural_rankers: dict[str, nn.Module] = {}
     neural_summaries: dict[str, dict] = {}
-    for model_name in ["fm", "deepwide", "deepfm"]:
+    dlrm_embedding_dim = args.dlrm_embedding_dim or args.fm_factors
+    for model_name in [name for name in NEURAL_RANKERS if name in args.rankers]:
+        if model_name == "dlrm":
+            original_factor_dim = args.fm_factors
+            args.fm_factors = dlrm_embedding_dim
         ranker, summary = train_neural_ranker(model_name, x_train, y_train, args, device)
+        if model_name == "dlrm":
+            args.fm_factors = original_factor_dim
+            summary["embedding_dim"] = dlrm_embedding_dim
         neural_rankers[model_name] = ranker
         neural_summaries[model_name] = summary
-    lgbm_ranker = train_lgbm_ranker(
-        x_train_raw,
-        y_train,
-        groups,
-        args.seed,
-        args.lgbm_estimators,
-    )
+    lgbm_ranker = None
+    if "lgbm" in args.rankers:
+        lgbm_ranker = train_lgbm_ranker(
+            x_train_raw,
+            y_train,
+            groups,
+            args.seed,
+            args.lgbm_estimators,
+        )
 
     print("7. evaluate")
     results, eval_user_count = evaluate_rankers(
@@ -930,13 +1112,15 @@ def main() -> None:
     mappings_path = MODEL_DIR / f"week6_ranker_compare_{suffix}_mappings.pkl"
     als_path = MODEL_DIR / f"als_ranker_compare_{suffix}.pkl"
     pt_paths = {
-        "fm": MODEL_DIR / f"fm_ranker_{suffix}.pt",
-        "deepwide": MODEL_DIR / f"deepwide_ranker_{suffix}.pt",
-        "deepfm": MODEL_DIR / f"deepfm_ranker_{suffix}.pt",
+        name: MODEL_DIR / f"{name}_ranker_{suffix}.pt"
+        for name in neural_rankers
     }
 
+    if args.merge_metrics_from is not None:
+        results = merge_metrics(args.merge_metrics_from, results)
     results.to_csv(metrics_path, index=False)
-    lgbm_ranker.booster_.save_model(str(lgbm_path))
+    if lgbm_ranker is not None:
+        lgbm_ranker.booster_.save_model(str(lgbm_path))
     als_path.write_bytes(pickle.dumps(als_model))
     mappings_path.write_bytes(
         pickle.dumps(
@@ -944,7 +1128,7 @@ def main() -> None:
                 "user2idx": user2idx,
                 "item2idx": item2idx,
                 "idx2item": idx2item,
-                "weights": base.WEIGHTS,
+                "weights": base.DEFAULT_WEIGHTS,
                 "feature_names": feature_names,
                 "feature_mean": feature_mean,
                 "feature_std": feature_std,
@@ -964,7 +1148,9 @@ def main() -> None:
 
     run_summary = {
         "args": jsonable_args(args),
+        "git": git_metadata(),
         "feature_cache_args": cached_args,
+        "feature_cache_source": "reused" if args.reuse_feature_cache else "built",
         "device": str(device),
         "history_interactions": data_summary["history_interactions"],
         "history_users": data_summary["history_users"],
@@ -976,12 +1162,13 @@ def main() -> None:
         "eval_cold_users": int(sum(1 for uid in test_labels if uid not in user2idx)),
         "rank_data": rank_data_summary,
         "neural_rankers": neural_summaries,
+        "merged_metrics_from": str(args.merge_metrics_from) if args.merge_metrics_from else None,
         "feature_names": feature_names,
         "metadata_language_count": len(context["lang2idx"]),
         "paths": {
             "metrics": str(metrics_path),
             "summary": str(summary_path),
-            "lgbm": str(lgbm_path),
+            "lgbm": str(lgbm_path) if lgbm_ranker is not None else None,
             "als": str(als_path),
             "mappings": str(mappings_path),
             "pt": {name: str(path) for name, path in pt_paths.items()},
@@ -990,6 +1177,11 @@ def main() -> None:
         "elapsed_min": round((time.time() - started) / 60, 2),
     }
     summary_path.write_text(json.dumps(run_summary, indent=2), encoding="utf-8")
+
+    artifact_paths = [metrics_path, summary_path, *pt_paths.values()]
+    if lgbm_ranker is not None:
+        artifact_paths.append(lgbm_path)
+    log_mlflow_run(args, suffix, run_summary, results, artifact_paths)
 
     print("\nresults")
     print(results.to_string(index=False))

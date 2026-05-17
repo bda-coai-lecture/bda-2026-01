@@ -1271,6 +1271,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--build-metrics", action="store_true")
     parser.add_argument("--skip-fact", action="store_true")
     parser.add_argument("--summary", action="store_true", default=True)
+    parser.add_argument("--no-summary", action="store_false", dest="summary")
     parser.add_argument("--plan-only", action="store_true")
     parser.add_argument("--max-days", type=int, default=DEFAULT_MAX_DAYS)
     parser.add_argument("--allow-full-history", action="store_true")

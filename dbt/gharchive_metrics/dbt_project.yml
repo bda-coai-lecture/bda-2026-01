@@ -1,0 +1,27 @@
+name: gharchive_metrics
+version: "1.0.0"
+config-version: 2
+
+profile: gharchive_metrics
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+vars:
+  source_dataset: mart
+
+models:
+  gharchive_metrics:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

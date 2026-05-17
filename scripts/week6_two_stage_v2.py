@@ -17,14 +17,17 @@ import json
 import math
 import pickle
 import sqlite3
+import subprocess
 import time
 from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
 import lightgbm as lgb
+import mlflow
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 from implicit.als import AlternatingLeastSquares
 from implicit.bpr import BayesianPersonalizedRanking
 from scipy import sparse
@@ -37,6 +40,15 @@ MODEL_DIR = Path("data/models/week6")
 DB_PATH = Path("data/repo_metadata.db")
 DEFAULT_RELATED_PATH = MODEL_DIR / "item2item_related_latest.parquet"
 BEST_FULL_SUFFIX = "related80_anchor20_full_als96_i12_lgbm63"
+RANKER_FEATURE_META_COLUMNS = {
+    "group_index",
+    "actor_id",
+    "repo_id",
+    "label",
+    "raw_candidate_rank",
+    "raw_candidate_score",
+    "raw_candidate_source",
+}
 
 DEFAULT_WEIGHTS = {
     "WatchEvent": 1.0,
@@ -46,6 +58,240 @@ DEFAULT_WEIGHTS = {
     "IssueCommentEvent": 0.3,
     "PushEvent": 0.2,
 }
+
+
+def jsonable_args(args: argparse.Namespace) -> dict:
+    return {
+        k: ",".join(str(part) for part in v)
+        if isinstance(v, list)
+        else str(v)
+        if isinstance(v, (date, Path))
+        else v
+        for k, v in vars(args).items()
+    }
+
+
+def git_metadata() -> dict[str, str | bool]:
+    try:
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        dirty = bool(
+            subprocess.check_output(
+                ["git", "status", "--porcelain"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        )
+    except (OSError, subprocess.CalledProcessError):
+        sha = "unknown"
+        dirty = "unknown"
+    return {"git_sha": sha, "git_dirty": dirty}
+
+
+def metric_model_key(model_name: str) -> str:
+    return (
+        model_name.lower()
+        .replace("/", "_")
+        .replace("&", "and")
+        .replace("-", "_")
+        .replace(" ", "_")
+    )
+
+
+def log_mlflow_focus_params(args: argparse.Namespace, run_summary: dict) -> None:
+    """Expose the recommendation experiment knobs that matter in MLflow tables."""
+    focus_params = {
+        "exp_data_history_start": args.history_start,
+        "exp_data_history_end": args.history_end,
+        "exp_data_rank_start": args.rank_start,
+        "exp_data_rank_end": args.rank_end,
+        "exp_data_test_start": args.test_start,
+        "exp_data_test_end": args.test_end,
+        "exp_data_max_items": args.max_items,
+        "exp_data_rank_users": args.rank_users,
+        "exp_data_eval_users": args.eval_users,
+        "exp_candidate_k": args.candidate_k,
+        "exp_candidate_hybrid_extra": args.hybrid_extra,
+        "exp_candidate_recent_cap": args.recent_candidate_cap,
+        "exp_candidate_popular_cap": args.popular_candidate_cap,
+        "exp_candidate_related_cap": args.related_candidate_cap,
+        "exp_candidate_related_top_per_anchor": args.related_top_per_anchor,
+        "exp_candidate_related_max_seen_anchors": args.related_max_seen_anchors,
+        "exp_candidate_related_anchor_count": run_summary.get("related_anchor_count"),
+        "exp_ranker_retrieval_model": args.retrieval_model,
+        "exp_ranker_factors": args.factors,
+        "exp_ranker_iterations": args.iterations,
+        "exp_ranker_lgbm_num_leaves": args.lgbm_num_leaves,
+        "exp_ranker_lgbm_learning_rate": args.lgbm_learning_rate,
+        "exp_ranker_lgbm_min_child_samples": args.lgbm_min_child_samples,
+        "exp_ranker_lgbm_n_estimators": args.lgbm_estimators,
+        "exp_ranker_lgbm_colsample": args.lgbm_colsample,
+        "exp_run_use_marts": run_summary.get("use_marts"),
+        "exp_run_feature_source": run_summary.get("feature_source"),
+        "exp_run_save_user_diagnostics": args.save_user_diagnostics,
+    }
+    for key, value in focus_params.items():
+        if value is not None:
+            mlflow.log_param(
+                key,
+                str(value)
+                if isinstance(value, (date, Path, tuple, list))
+                else value,
+            )
+
+
+def dominant_event(df: pd.DataFrame) -> pd.Series:
+    event_cols = [
+        "user_watch_share",
+        "user_pr_share",
+        "user_fork_share",
+        "user_push_share",
+        "user_issue_share",
+        "user_comment_share",
+    ]
+    labels = {col: col.replace("user_", "").replace("_share", "") for col in event_cols}
+    values = df[event_cols].fillna(0)
+    out = values.idxmax(axis=1).map(labels)
+    out.loc[values.sum(axis=1) == 0] = "none"
+    return out
+
+
+def quartile_segment(series: pd.Series) -> pd.Series:
+    if len(series) < 4:
+        return pd.Series(["all"] * len(series), index=series.index, dtype="object")
+    try:
+        return pd.qcut(
+            series.rank(method="first"),
+            4,
+            labels=["low", "mid_low", "mid_high", "high"],
+        )
+    except ValueError:
+        return pd.Series(["all"] * len(series), index=series.index, dtype="object")
+
+
+def diagnostics_segment_summary(diagnostics: pd.DataFrame) -> pd.DataFrame:
+    if diagnostics.empty:
+        return pd.DataFrame()
+
+    df = diagnostics.copy()
+    df["dominant_event"] = dominant_event(df)
+    df["activity_bin"] = quartile_segment(df["log_user_total_score"])
+    df["recent_bin"] = quartile_segment(df["user_recent_score_share"])
+
+    rows = []
+    for group_col in ["dominant_event", "activity_bin", "recent_bin"]:
+        grouped = df.groupby(group_col, observed=True)
+        for segment, part in grouped:
+            rows.append(
+                {
+                    "segment_group": group_col,
+                    "segment": str(segment),
+                    "users": int(len(part)),
+                    "ts_hit_at_10": float(part["ts_hit@10"].mean()),
+                    "als_hit_at_10": float(part["als_hit@10"].mean()),
+                    "ts_ndcg_at_10": float(part["ts_ndcg@10"].mean()),
+                    "als_ndcg_at_10": float(part["als_ndcg@10"].mean()),
+                    "ts_recall_at_100": float(part["ts_recall@100"].mean()),
+                    "als_recall_at_100": float(part["als_recall@100"].mean()),
+                    "ts_minus_als_ndcg_at_10": float(
+                        part["ts_minus_als_ndcg@10"].mean()
+                    ),
+                    "ts_minus_als_recall_at_100": float(
+                        part["ts_minus_als_recall@100"].mean()
+                    ),
+                    "top10_source_als_share": float(
+                        part.get("top10_source_als_share", pd.Series(dtype=float)).mean()
+                    ),
+                    "top10_source_recent_share": float(
+                        part.get("top10_source_recent_share", pd.Series(dtype=float)).mean()
+                    ),
+                    "top10_source_related_share": float(
+                        part.get("top10_source_related_share", pd.Series(dtype=float)).mean()
+                    ),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def log_mlflow_segment_metrics(segment_summary: pd.DataFrame) -> None:
+    if segment_summary.empty:
+        return
+    metric_cols = [
+        "ts_ndcg_at_10",
+        "als_ndcg_at_10",
+        "ts_recall_at_100",
+        "als_recall_at_100",
+        "ts_minus_als_ndcg_at_10",
+        "ts_minus_als_recall_at_100",
+        "top10_source_related_share",
+    ]
+    for row in segment_summary.itertuples(index=False):
+        segment = str(row.segment).lower().replace(" ", "_")
+        group = str(row.segment_group).lower().replace(" ", "_")
+        for metric in metric_cols:
+            value = getattr(row, metric)
+            if pd.notna(value):
+                mlflow.log_metric(f"segment_{group}_{segment}_{metric}", float(value))
+
+
+def log_mlflow_run(
+    args: argparse.Namespace,
+    suffix: str,
+    run_summary: dict,
+    results: pd.DataFrame,
+    artifact_paths: list[Path],
+) -> None:
+    if args.no_mlflow:
+        return
+
+    mlflow.set_tracking_uri(args.mlflow_tracking_uri)
+    mlflow.set_experiment(args.mlflow_experiment)
+    with mlflow.start_run(run_name=suffix) as run:
+        run_summary["mlflow_run_id"] = run.info.run_id
+        for path in artifact_paths:
+            if path.name.endswith("_summary.json"):
+                path.write_text(json.dumps(run_summary, indent=2), encoding="utf-8")
+        mlflow.set_tags(git_metadata())
+        mlflow.set_tag("script", "scripts/week6_two_stage_v2.py")
+        mlflow.set_tag("feature_source", run_summary["feature_source"])
+        mlflow.set_tag("primary_model", "Two-Stage/Fallback")
+        mlflow.log_params(jsonable_args(args))
+        log_mlflow_focus_params(args, run_summary)
+        mlflow.log_param("suffix", suffix)
+        mlflow.log_param("feature_count", len(run_summary["feature_names"]))
+        mlflow.log_param("actual_rank_rows", run_summary["ranker"]["rank_rows"])
+        mlflow.log_param("actual_rank_users", run_summary["ranker"]["rank_users"])
+        mlflow.log_param("mlflow_run_id", run.info.run_id)
+        mlflow.log_metric("elapsed_min", run_summary["elapsed_min"])
+        mlflow.log_metric("eval_users", run_summary["eval_users"])
+        for row in results.itertuples(index=False):
+            model_key = metric_model_key(str(row.model))
+            mlflow.log_metric(f"{model_key}_precision_at_{row.k}", float(row.precision))
+            mlflow.log_metric(f"{model_key}_recall_at_{row.k}", float(row.recall))
+            mlflow.log_metric(f"{model_key}_ndcg_at_{row.k}", float(row.ndcg))
+            mlflow.log_metric(
+                f"{model_key}_unique_recommended_at_{row.k}",
+                int(row.unique_recommended),
+            )
+            if row.model == "Two-Stage/Fallback":
+                mlflow.log_metric(f"primary_ndcg_at_{row.k}", float(row.ndcg))
+                mlflow.log_metric(f"primary_recall_at_{row.k}", float(row.recall))
+        segment_path = run_summary["paths"].get("segment_summary")
+        if segment_path and Path(segment_path).exists():
+            log_mlflow_segment_metrics(pd.read_csv(segment_path))
+        for path in artifact_paths:
+            if path.exists():
+                mlflow.log_artifact(str(path))
+
+
+def parse_k_values(value: str) -> list[int]:
+    k_values = sorted({int(part.strip()) for part in value.split(",") if part.strip()})
+    if not k_values or any(k <= 0 for k in k_values):
+        raise argparse.ArgumentTypeError("k values must be positive integers")
+    return k_values
 
 
 def apply_best_full_preset(args: argparse.Namespace) -> None:
@@ -65,6 +311,7 @@ def apply_best_full_preset(args: argparse.Namespace) -> None:
     args.lgbm_num_leaves = 63
     args.lgbm_min_child_samples = 50
     args.lgbm_colsample = 0.85
+    args.lgbm_lambdarank_truncation = 200
     args.save_user_diagnostics = True
     if args.output_suffix is None:
         args.output_suffix = BEST_FULL_SUFFIX
@@ -1018,9 +1265,70 @@ def features_for_candidates(
             source_is_recent,
             source_is_popular,
             source_is_related,
+            source_is_recent * user_push,
+            source_is_recent * user_issue,
+            source_is_recent * user_pr,
+            source_is_recent * np.log1p(user_activity["user_unique_repos"]),
+            source_is_recent * event_l1_distance,
+            source_is_related * np.log1p(user_activity["user_unique_repos"]),
+            source_is_related * seen_max_cos,
+            source_is_als * user_watch,
+            source_is_als * user_fork,
+            source_is_als * profile_cos,
+            source_is_popular * user_push,
+            source_is_popular * candidate_rank_pct,
         ]
     )
     return x.astype(np.float32), repo_ids
+
+
+def feature_names_for_context(context: dict) -> list[str]:
+    return [
+        "als_score",
+        "factor_cosine",
+        "profile_cosine",
+        *context["item_feature_names"],
+        "log_user_total_score",
+        "log_user_unique_repos",
+        "log_recent_user_total_score",
+        "log_recent_user_unique_repos",
+        "log_prior_user_total_score",
+        "log_prior_user_unique_repos",
+        "user_recent_score_share",
+        "user_score_growth_ratio",
+        "user_unique_repo_growth_ratio",
+        "log_user_events",
+        "user_watch_share",
+        "user_pr_share",
+        "user_fork_share",
+        "user_push_share",
+        "user_issue_share",
+        "user_comment_share",
+        "user_event_entropy",
+        "event_match_dot",
+        "event_l1_distance",
+        "seen_max_cosine",
+        "seen_mean_cosine",
+        "candidate_rank",
+        "candidate_rank_pct",
+        "reciprocal_candidate_rank",
+        "source_is_als",
+        "source_is_recent",
+        "source_is_popular",
+        "source_is_related",
+        "source_recent_x_user_push",
+        "source_recent_x_user_issue",
+        "source_recent_x_user_pr",
+        "source_recent_x_log_user_unique_repos",
+        "source_recent_x_event_l1_distance",
+        "source_related_x_log_user_unique_repos",
+        "source_related_x_seen_max_cosine",
+        "source_als_x_user_watch",
+        "source_als_x_user_fork",
+        "source_als_x_profile_cosine",
+        "source_popular_x_user_push",
+        "source_popular_x_candidate_rank_pct",
+    ]
 
 
 def train_ranker(
@@ -1067,6 +1375,7 @@ def train_ranker(
         subsample=lgbm_params["subsample"],
         colsample_bytree=lgbm_params["colsample_bytree"],
         reg_lambda=lgbm_params["reg_lambda"],
+        lambdarank_truncation_level=lgbm_params["lambdarank_truncation_level"],
         random_state=seed,
         verbose=-1,
     )
@@ -1077,6 +1386,72 @@ def train_ranker(
         "positive_labels": positive_labels,
         "positive_rate": float(y_train.mean()),
     }
+
+
+def load_ranker_feature_names(parquet_path: Path, summary_path: Path | None) -> list[str]:
+    if summary_path is not None:
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        names = summary.get("features", {}).get("feature_names")
+        if names:
+            return list(names)
+
+    return [
+        name
+        for name in pq.ParquetFile(parquet_path).schema_arrow.names
+        if name not in RANKER_FEATURE_META_COLUMNS
+    ]
+
+
+def train_ranker_from_feature_parquet(
+    parquet_path: Path,
+    summary_path: Path | None,
+    expected_feature_names: list[str],
+    lgbm_params: dict,
+    seed: int,
+):
+    if summary_path is None:
+        candidate_summary = parquet_path.with_name(f"{parquet_path.stem}_summary.json")
+        if candidate_summary.exists():
+            summary_path = candidate_summary
+    feature_names = load_ranker_feature_names(parquet_path, summary_path)
+    missing = sorted(set(feature_names) - set(expected_feature_names))
+    if missing:
+        raise RuntimeError(
+            f"ranker feature parquet contains unknown feature columns: {missing[:10]}"
+        )
+
+    columns = ["group_index", "label", *feature_names]
+    frame = pd.read_parquet(parquet_path, columns=columns)
+    if frame.empty:
+        raise RuntimeError(f"ranker feature parquet is empty: {parquet_path}")
+
+    groups = frame.groupby("group_index", sort=False, observed=True).size().astype(int).tolist()
+    y_train = frame["label"].astype(np.int32).to_numpy()
+    x_train = frame[feature_names].astype(np.float32).to_numpy()
+
+    ranker = lgb.LGBMRanker(
+        objective="lambdarank",
+        metric="ndcg",
+        n_estimators=lgbm_params["n_estimators"],
+        learning_rate=lgbm_params["learning_rate"],
+        num_leaves=lgbm_params["num_leaves"],
+        min_child_samples=lgbm_params["min_child_samples"],
+        subsample=lgbm_params["subsample"],
+        colsample_bytree=lgbm_params["colsample_bytree"],
+        reg_lambda=lgbm_params["reg_lambda"],
+        lambdarank_truncation_level=lgbm_params["lambdarank_truncation_level"],
+        random_state=seed,
+        verbose=-1,
+    )
+    ranker.fit(x_train, y_train, group=groups)
+    return ranker, {
+        "rank_users": int(len(groups)),
+        "rank_rows": int(len(y_train)),
+        "positive_labels": int(y_train.sum()),
+        "positive_rate": float(y_train.mean()),
+        "feature_parquet": str(parquet_path),
+        "feature_summary": str(summary_path) if summary_path else None,
+    }, feature_names
 
 
 def evaluate(
@@ -1092,6 +1467,7 @@ def evaluate(
     train_seen: dict[int, set[int]],
     k_values: list[int],
     feature_names: list[str],
+    feature_indices: list[int],
     qual_top_k: int,
     qual_users: int,
     seed: int,
@@ -1127,7 +1503,8 @@ def evaluate(
             for cand in ts_pairs
         }
 
-        x, repo_ids = features_for_candidates(uid, ts_pairs, user2idx, item2idx, context)
+        x_all, repo_ids = features_for_candidates(uid, ts_pairs, user2idx, item2idx, context)
+        x = x_all[:, feature_indices] if len(repo_ids) else x_all
         if len(repo_ids):
             scores = ranker.booster_.predict(x)
             ranked_idx = np.argsort(-scores)
@@ -1356,6 +1733,18 @@ def main():
     parser.add_argument("--lgbm-subsample", type=float, default=1.0)
     parser.add_argument("--lgbm-colsample", type=float, default=1.0)
     parser.add_argument("--lgbm-reg-l2", type=float, default=0.0)
+    parser.add_argument(
+        "--lgbm-lambdarank-truncation",
+        type=int,
+        default=200,
+        help="LambdaRank truncation level. Keep near the target NDCG cutoff.",
+    )
+    parser.add_argument(
+        "--k-values",
+        type=parse_k_values,
+        default=[10, 50, 100, 200],
+        help="Comma-separated cutoffs for precision/recall/nDCG evaluation.",
+    )
     parser.add_argument("--chunk-size", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--smoke", action="store_true")
@@ -1365,7 +1754,22 @@ def main():
         help=f"Use the current canonical full-run preset ({BEST_FULL_SUFFIX}).",
     )
     parser.add_argument("--output-suffix", type=str, default=None)
+    parser.add_argument("--mlflow-tracking-uri", type=str, default="sqlite:///mlflow.db")
+    parser.add_argument("--mlflow-experiment", type=str, default="bda-week6-two-stage")
+    parser.add_argument("--no-mlflow", action="store_true")
     parser.add_argument("--save-user-diagnostics", action="store_true")
+    parser.add_argument(
+        "--ranker-feature-parquet",
+        type=Path,
+        default=None,
+        help="Train the LGBM ranker from a reusable ranker feature parquet instead of rebuilding rank features.",
+    )
+    parser.add_argument(
+        "--ranker-feature-summary",
+        type=Path,
+        default=None,
+        help="Optional summary JSON produced next to --ranker-feature-parquet.",
+    )
     parser.add_argument(
         "--event-weight",
         action="append",
@@ -1578,58 +1982,38 @@ def main():
         item2idx,
         feature_marts,
     )
-    feature_names = [
-        "als_score",
-        "factor_cosine",
-        "profile_cosine",
-        *context["item_feature_names"],
-        "log_user_total_score",
-        "log_user_unique_repos",
-        "log_recent_user_total_score",
-        "log_recent_user_unique_repos",
-        "log_prior_user_total_score",
-        "log_prior_user_unique_repos",
-        "user_recent_score_share",
-        "user_score_growth_ratio",
-        "user_unique_repo_growth_ratio",
-        "log_user_events",
-        "user_watch_share",
-        "user_pr_share",
-        "user_fork_share",
-        "user_push_share",
-        "user_issue_share",
-        "user_comment_share",
-        "user_event_entropy",
-        "event_match_dot",
-        "event_l1_distance",
-        "seen_max_cosine",
-        "seen_mean_cosine",
-        "candidate_rank",
-        "candidate_rank_pct",
-        "reciprocal_candidate_rank",
-        "source_is_als",
-        "source_is_recent",
-        "source_is_popular",
-        "source_is_related",
-    ]
-    ranker, rank_summary = train_ranker(
-        rank_hybrid,
-        rank_labels,
-        user2idx,
-        item2idx,
-        context,
-        args.rank_users,
-        args.seed,
-        {
-            "n_estimators": args.lgbm_estimators,
-            "learning_rate": args.lgbm_learning_rate,
-            "num_leaves": args.lgbm_num_leaves,
-            "min_child_samples": args.lgbm_min_child_samples,
-            "subsample": args.lgbm_subsample,
-            "colsample_bytree": args.lgbm_colsample,
-            "reg_lambda": args.lgbm_reg_l2,
-        },
-    )
+    canonical_feature_names = feature_names_for_context(context)
+    lgbm_params = {
+        "n_estimators": args.lgbm_estimators,
+        "learning_rate": args.lgbm_learning_rate,
+        "num_leaves": args.lgbm_num_leaves,
+        "min_child_samples": args.lgbm_min_child_samples,
+        "subsample": args.lgbm_subsample,
+        "colsample_bytree": args.lgbm_colsample,
+        "reg_lambda": args.lgbm_reg_l2,
+        "lambdarank_truncation_level": args.lgbm_lambdarank_truncation,
+    }
+    if args.ranker_feature_parquet is not None:
+        ranker, rank_summary, feature_names = train_ranker_from_feature_parquet(
+            args.ranker_feature_parquet,
+            args.ranker_feature_summary,
+            canonical_feature_names,
+            lgbm_params,
+            args.seed,
+        )
+    else:
+        ranker, rank_summary = train_ranker(
+            rank_hybrid,
+            rank_labels,
+            user2idx,
+            item2idx,
+            context,
+            args.rank_users,
+            args.seed,
+            lgbm_params,
+        )
+        feature_names = canonical_feature_names
+    feature_indices = [canonical_feature_names.index(name) for name in feature_names]
 
     print("6. evaluate")
     results, eval_user_count, qual_cases, user_diagnostics = evaluate(
@@ -1643,8 +2027,9 @@ def main():
         popularity_candidates,
         recent_candidates,
         train_seen,
-        [10, 50, 100],
+        args.k_values,
         feature_names,
+        feature_indices,
         args.qual_top_k,
         args.qual_users,
         args.seed,
@@ -1652,11 +2037,19 @@ def main():
         args.save_user_diagnostics,
     )
 
+    suffix = args.output_suffix or "latest"
+    results_path = MODEL_DIR / f"week6_two_stage_{suffix}_metrics.csv"
+    summary_path = MODEL_DIR / f"week6_two_stage_{suffix}_summary.json"
+    als_path = MODEL_DIR / f"als_{suffix}.pkl"
+    ranker_path = MODEL_DIR / f"lgbm_ranker_{suffix}.txt"
+    mappings_path = MODEL_DIR / f"mappings_{suffix}.pkl"
+    qual_path = MODEL_DIR / f"week6_qual_cases_{suffix}.parquet"
+    diagnostics_path = MODEL_DIR / f"week6_user_diagnostics_{suffix}.parquet"
+    segment_summary_path = MODEL_DIR / f"week6_segment_summary_{suffix}.csv"
+
     run_summary = {
-        "args": {
-            k: str(v) if isinstance(v, (date, Path)) else v
-            for k, v in vars(args).items()
-        },
+        "args": jsonable_args(args),
+        "git": git_metadata(),
         "history_interactions": int(len(history_fb)),
         "history_users": int(history_fb.actor_id.nunique()),
         "history_repos": int(history_fb.repo_id.nunique()),
@@ -1673,22 +2066,28 @@ def main():
         "feature_source": context["feature_source"],
         "feature_names": feature_names,
         "metadata_language_count": len(context["lang2idx"]),
+        "paths": {
+            "metrics": str(results_path),
+            "summary": str(summary_path),
+            "lgbm": str(ranker_path),
+            "als": str(als_path),
+            "mappings": str(mappings_path),
+            "qual_cases": str(qual_path),
+            "user_diagnostics": str(diagnostics_path)
+            if args.save_user_diagnostics
+            else None,
+            "segment_summary": str(segment_summary_path)
+            if args.save_user_diagnostics
+            else None,
+        },
         "elapsed_min": round((time.time() - started) / 60, 2),
     }
-
-    suffix = args.output_suffix or "latest"
-    results_path = MODEL_DIR / f"week6_two_stage_{suffix}_metrics.csv"
-    summary_path = MODEL_DIR / f"week6_two_stage_{suffix}_summary.json"
-    als_path = MODEL_DIR / f"als_{suffix}.pkl"
-    ranker_path = MODEL_DIR / f"lgbm_ranker_{suffix}.txt"
-    mappings_path = MODEL_DIR / f"mappings_{suffix}.pkl"
-    qual_path = MODEL_DIR / f"week6_qual_cases_{suffix}.parquet"
-    diagnostics_path = MODEL_DIR / f"week6_user_diagnostics_{suffix}.parquet"
 
     results.to_csv(results_path, index=False)
     qual_cases.to_parquet(qual_path, index=False)
     if args.save_user_diagnostics:
         user_diagnostics.to_parquet(diagnostics_path, index=False)
+        diagnostics_segment_summary(user_diagnostics).to_csv(segment_summary_path, index=False)
     summary_path.write_text(json.dumps(run_summary, indent=2), encoding="utf-8")
     als_path.write_bytes(pickle.dumps(model))
     ranker.booster_.save_model(str(ranker_path))
@@ -1703,6 +2102,11 @@ def main():
             }
         )
     )
+    artifact_paths = [results_path, summary_path, ranker_path, qual_path]
+    if args.save_user_diagnostics:
+        artifact_paths.append(diagnostics_path)
+        artifact_paths.append(segment_summary_path)
+    log_mlflow_run(args, suffix, run_summary, results, artifact_paths)
 
     print("\nresults")
     print(results.to_string(index=False))

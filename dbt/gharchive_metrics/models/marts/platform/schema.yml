@@ -1,0 +1,63 @@
+version: 2
+
+models:
+  - name: metrics_daily
+    description: Daily GitHub Archive activity metrics for dashboarding.
+    columns:
+      - name: activity_date
+        tests:
+          - not_null
+          - unique
+      - name: active_users
+        tests:
+          - not_null
+      - name: total_events
+        tests:
+          - not_null
+
+  - name: metrics_event_type_daily
+    description: Daily metrics split by GitHub event type.
+    columns:
+      - name: activity_date
+        tests:
+          - not_null
+      - name: action
+        tests:
+          - not_null
+
+  - name: metrics_weekly
+    description: Weekly active user/repo and event metrics.
+    columns:
+      - name: week_start
+        tests:
+          - not_null
+          - unique
+
+  - name: metrics_user_segments
+    description: User activity segment summary over the selected fact window.
+    columns:
+      - name: user_segment
+        tests:
+          - not_null
+          - unique
+
+  - name: metrics_retention_weekly
+    description: Weekly cohort retention long table.
+    columns:
+      - name: cohort_week
+        tests:
+          - not_null
+      - name: week_start
+        tests:
+          - not_null
+      - name: weeks_since
+        tests:
+          - not_null
+
+  - name: metrics_retention_summary
+    description: Cohort retention summary with W0-W3 retention columns.
+    columns:
+      - name: cohort_week
+        tests:
+          - not_null
+          - unique

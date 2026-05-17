@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Week 7 MLflow 온보딩: 추천시스템 실험을 재현 가능하게 만들기</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fa;
+      --paper: #ffffff;
+      --ink: #1d2433;
+      --muted: #5f6b7a;
+      --line: #d8dde6;
+      --soft: #eef2f6;
+      --accent: #0f766e;
+      --accent-2: #2563eb;
+      --warn: #92400e;
+      --warn-bg: #fff7ed;
+      --code-bg: #111827;
+      --code-ink: #e5e7eb;
+      --ok-bg: #ecfdf5;
+      --info-bg: #eff6ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.65;
+      letter-spacing: 0;
+    }
+
+    header {
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .wrap {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .hero {
+      padding: 56px 0 36px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 920px;
+      font-size: 42px;
+      line-height: 1.15;
+      font-weight: 800;
+    }
+
+    .lead {
+      max-width: 860px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 19px;
+    }
+
+    main {
+      padding: 28px 0 56px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 28px;
+      align-items: start;
+    }
+
+    nav {
+      position: sticky;
+      top: 16px;
+      padding: 18px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    nav strong {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    nav a {
+      display: block;
+      padding: 6px 0;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    nav a:hover {
+      color: var(--accent-2);
+    }
+
+    article {
+      min-width: 0;
+    }
+
+    section {
+      margin-bottom: 22px;
+      padding: 28px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 27px;
+      line-height: 1.25;
+    }
+
+    h3 {
+      margin: 26px 0 10px;
+      font-size: 19px;
+    }
+
+    p {
+      margin: 10px 0;
+    }
+
+    ul, ol {
+      margin: 10px 0 0 22px;
+      padding: 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      background: var(--soft);
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 14px 0;
+      padding: 16px;
+      background: var(--code-bg);
+      color: var(--code-ink);
+      border-radius: 8px;
+      line-height: 1.5;
+    }
+
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: var(--soft);
+      font-weight: 700;
+    }
+
+    .callout {
+      margin: 16px 0;
+      padding: 14px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--info-bg);
+    }
+
+    .callout strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .warn {
+      background: var(--warn-bg);
+      color: var(--warn);
+      border-color: #fed7aa;
+    }
+
+    .ok {
+      background: var(--ok-bg);
+      border-color: #bbf7d0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .mini {
+      padding: 16px;
+      background: #fbfcfd;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .mini h3 {
+      margin-top: 0;
+    }
+
+    .tag {
+      display: inline-block;
+      margin: 2px 4px 2px 0;
+      padding: 3px 8px;
+      background: var(--soft);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .step {
+      min-height: 86px;
+      padding: 12px;
+      background: #fbfcfd;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--accent);
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        display: block;
+      }
+
+      nav {
+        position: static;
+        margin-bottom: 20px;
+      }
+
+      .grid, .flow {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 32px;
+      }
+
+      section {
+        padding: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero">
+      <p class="eyebrow">BDA Week 7 · Recommendation Systems · MLflow</p>
+      <h1>MLflow 온보딩: 추천시스템 실험을 기록하고, 비교하고, 다시 실행하는 법</h1>
+      <p class="lead">
+        이 문서는 MLflow를 처음 보는 사람도 추천시스템 실험 관리의 필요성을 이해하고,
+        이 저장소의 실험 코드를 MLflow UI에서 읽을 수 있게 만드는 온보딩 가이드다.
+      </p>
+    </div>
+  </header>
+
+  <main class="wrap layout">
+    <nav aria-label="목차">
+      <strong>목차</strong>
+      <a href="#why">1. 왜 필요한가</a>
+      <a href="#what">2. MLflow란 무엇인가</a>
+      <a href="#concepts">3. 기본 개념</a>
+      <a href="#harness">4. Harness 관점</a>
+      <a href="#recsys">5. 추천시스템 실험</a>
+      <a href="#repo">6. 이 repo에서 보기</a>
+      <a href="#ui">7. UI 읽는 법</a>
+      <a href="#workflow">8. 실험 흐름</a>
+      <a href="#checklist">9. 체크리스트</a>
+      <a href="#faq">10. FAQ</a>
+    </nav>
+
+    <article>
+      <section id="why">
+        <h2>1. 왜 MLflow가 필요한가</h2>
+        <p>
+          머신러닝 수업에서 처음에는 보통 노트북 하나로 시작한다. 데이터를 읽고, 전처리하고,
+          모델을 학습하고, 마지막 셀에서 점수를 확인한다. 작은 실습에서는 이 방식이 빠르다.
+          하지만 실험이 늘어나면 바로 문제가 생긴다.
+        </p>
+        <ul>
+          <li>어제 나온 점수가 어떤 데이터 기간으로 만든 결과였는지 기억나지 않는다.</li>
+          <li>후보 생성 설정을 바꾼 것인지, 랭커 설정을 바꾼 것인지 헷갈린다.</li>
+          <li>노트북 셀을 순서대로 실행하지 않아 결과가 재현되지 않는다.</li>
+          <li>최고 성능이라고 생각한 run의 모델 파일, feature importance, 평가 CSV가 흩어진다.</li>
+          <li>평균 점수는 올랐는데 어떤 유저군에서 나빠졌는지 확인하기 어렵다.</li>
+        </ul>
+        <div class="callout">
+          <strong>핵심 문제</strong>
+          모델을 잘 만드는 것만으로는 부족하다. 어떤 조건에서 어떤 결과가 나왔는지 남기지 않으면,
+          개선인지 우연인지 판단할 수 없다.
+        </div>
+        <p>
+          MLflow는 이 문제를 풀기 위한 도구다. 모델 자체를 대신 만들어주는 도구라기보다,
+          실험을 기록하고 비교하고 재현할 수 있게 해주는 실험 관리 도구로 이해하면 된다.
+        </p>
+      </section>
+
+      <section id="what">
+        <h2>2. MLflow란 무엇인가</h2>
+        <p>
+          MLflow는 머신러닝 실험의 실행 기록을 남기는 시스템이다. 한 번 모델을 학습할 때마다
+          사용한 설정값, 나온 점수, 생성된 파일을 한 곳에 저장한다. 나중에는 웹 UI에서 여러 실행을
+          나란히 비교할 수 있다.
+        </p>
+
+        <div class="grid">
+          <div class="mini">
+            <h3>비전공자식 설명</h3>
+            <p>
+              MLflow는 머신러닝 실험의 실험노트다. 요리로 치면 레시피, 재료, 조리 시간,
+              완성 사진, 맛 평가를 한 장에 붙여두는 기록장에 가깝다.
+            </p>
+          </div>
+          <div class="mini">
+            <h3>취준생식 설명</h3>
+            <p>
+              MLflow는 포트폴리오에서 “모델을 돌려봤다”를 “어떤 가설을 어떤 설정으로 검증했고,
+              어떤 metric과 artifact로 판단했다”로 바꿔주는 도구다.
+            </p>
+          </div>
+        </div>
+
+        <h3>MLflow가 해주는 일</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>기록 대상</th>
+              <th>예시</th>
+              <th>왜 중요한가</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Parameter</td>
+              <td><code>candidate_k=300</code>, <code>lgbm_num_leaves=63</code></td>
+              <td>사람이 정한 실험 조건이다. 같은 조건으로 다시 실행하려면 필요하다.</td>
+            </tr>
+            <tr>
+              <td>Metric</td>
+              <td><code>NDCG@10</code>, <code>Recall@100</code>, <code>elapsed_min</code></td>
+              <td>실행 결과다. 모델이 좋아졌는지 판단하는 기준이다.</td>
+            </tr>
+            <tr>
+              <td>Artifact</td>
+              <td>metrics CSV, summary JSON, 모델 파일, diagnostics parquet</td>
+              <td>점수만으로 부족할 때 결과 파일을 열어 원인을 분석한다.</td>
+            </tr>
+            <tr>
+              <td>Tag</td>
+              <td><code>script</code>, <code>git_sha</code>, <code>primary_model</code></td>
+              <td>run을 분류하고, 어떤 코드 버전에서 나온 결과인지 추적한다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="concepts">
+        <h2>3. MLflow 기본 개념</h2>
+        <p>
+          MLflow를 처음 볼 때는 용어가 낯설 수 있다. 하지만 핵심은 단순하다.
+          <strong>Experiment 안에 여러 Run이 있고, 각 Run에는 Params, Metrics, Artifacts가 붙는다.</strong>
+        </p>
+
+        <div class="flow" aria-label="MLflow 기본 구조">
+          <div class="step">
+            <strong>Experiment</strong>
+            같은 목적의 실험 묶음
+          </div>
+          <div class="step">
+            <strong>Run</strong>
+            한 번의 실행 기록
+          </div>
+          <div class="step">
+            <strong>Params</strong>
+            실행 전 정한 설정
+          </div>
+          <div class="step">
+            <strong>Metrics</strong>
+            실행 후 나온 점수
+          </div>
+          <div class="step">
+            <strong>Artifacts</strong>
+            실행 결과 파일
+          </div>
+        </div>
+
+        <h3>Experiment</h3>
+        <p>
+          Experiment는 실험을 담는 폴더 같은 개념이다. 예를 들어 이 저장소에서는
+          two-stage 추천 실험과 neural ranker 비교 실험을 서로 다른 experiment로 나눈다.
+        </p>
+        <ul>
+          <li><code>bda-week6-two-stage</code>: ALS 후보 생성과 LGBM 랭커 중심 실험</li>
+          <li><code>bda-week7-recsys-rankers</code>: LGBM, FM, Deep&Wide, DeepFM, DLRM 비교 실험</li>
+        </ul>
+
+        <h3>Run</h3>
+        <p>
+          Run은 한 번의 실행이다. 같은 스크립트를 실행하더라도 데이터 기간, 후보 개수, 모델 파라미터가
+          다르면 다른 run으로 남긴다.
+        </p>
+
+        <h3>Parameter와 Metric의 차이</h3>
+        <p>
+          Parameter는 실행 전에 사람이 정한 값이고, Metric은 실행 후 계산된 값이다.
+          이 둘을 구분하는 습관이 중요하다.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>구분</th>
+              <th>질문</th>
+              <th>추천 실험 예시</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Parameter</td>
+              <td>내가 무엇을 바꿨나?</td>
+              <td><code>related_candidate_cap=80</code>, <code>factors=96</code></td>
+            </tr>
+            <tr>
+              <td>Metric</td>
+              <td>그 결과 무엇이 달라졌나?</td>
+              <td><code>primary_ndcg_at_10=0.016</code>, <code>primary_recall_at_100=0.074</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Artifact</h3>
+        <p>
+          Artifact는 실험의 증거 파일이다. 성능 숫자만 보면 “좋아졌다”까지는 알 수 있지만,
+          왜 좋아졌는지는 알기 어렵다. 추천시스템에서는 artifact가 특히 중요하다.
+        </p>
+        <ul>
+          <li><code>metrics.csv</code>: 모델별 NDCG, Recall, Precision, coverage</li>
+          <li><code>summary.json</code>: 데이터 규모, split, feature, 경로 정보</li>
+          <li><code>week6_user_diagnostics_*.parquet</code>: 유저별 hit, NDCG, source mix</li>
+          <li><code>week6_segment_summary_*.csv</code>: segment별 평균 성능</li>
+          <li><code>lgbm_ranker_*.txt</code>, <code>*.pt</code>: 저장된 모델</li>
+        </ul>
+      </section>
+
+      <section id="harness">
+        <h2>4. Harness 관점으로 보는 MLflow</h2>
+        <p>
+          MLflow를 “실험 결과판”으로만 보면 반쪽짜리 이해다. 더 중요한 관점은
+          <strong>MLflow가 머신러닝 실험 harness의 관측 장치</strong>라는 점이다.
+        </p>
+
+        <h3>Harness란 무엇인가</h3>
+        <p>
+          소프트웨어 테스트에서 test harness는 테스트 대상 코드를 감싸고, 입력을 넣고,
+          실행하고, 결과를 검증하는 장치다. 머신러닝에서도 비슷한 구조가 필요하다.
+          모델 함수 하나만 있다고 실험이 되는 것이 아니다. 데이터 split, feature 생성,
+          후보 생성, 학습, 평가, 결과 저장이 모두 한 흐름으로 묶여야 한다.
+        </p>
+
+        <div class="callout ok">
+          <strong>ML 실험 harness</strong>
+          데이터와 모델을 같은 규칙으로 실행하고, 결과를 같은 형식으로 남기는 반복 실행 장치다.
+        </div>
+
+        <h3>MLflow는 harness 자체인가?</h3>
+        <p>
+          정확히 말하면 MLflow는 harness 전체가 아니다. Harness는 우리가 작성한 실험 스크립트와
+          파이프라인이다. MLflow는 그 harness 안에서 실행 기록을 수집하고 보여주는 역할을 한다.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>역할</th>
+              <th>이 저장소의 예시</th>
+              <th>MLflow와의 관계</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Harness 실행기</td>
+              <td><code>scripts/week6_two_stage_v2.py</code></td>
+              <td>실험을 실제로 실행한다.</td>
+            </tr>
+            <tr>
+              <td>데이터 기준</td>
+              <td>history / rank-label / test split</td>
+              <td><code>exp_data_*</code> param으로 기록한다.</td>
+            </tr>
+            <tr>
+              <td>실험 스위치</td>
+              <td>candidate cap, related source, ranker params</td>
+              <td><code>exp_candidate_*</code>, <code>exp_ranker_*</code> param으로 기록한다.</td>
+            </tr>
+            <tr>
+              <td>검증 기준</td>
+              <td>NDCG@K, Recall@K, unique@K</td>
+              <td>metric으로 기록한다.</td>
+            </tr>
+            <tr>
+              <td>진단 자료</td>
+              <td>user diagnostics, segment summary</td>
+              <td>artifact와 segment metric으로 기록한다.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Harness 관점이 중요한 이유</h3>
+        <p>
+          모델 실험은 실험 조건이 조금만 달라도 비교가 불공정해진다. 예를 들어 candidate set이
+          달라진 상태에서 LGBM과 DeepFM을 비교하면, ranker 성능 차이인지 후보 품질 차이인지
+          알 수 없다. Harness 관점은 이런 혼동을 줄인다.
+        </p>
+        <ul>
+          <li>같은 split을 쓰는가?</li>
+          <li>같은 candidate set에서 ranker만 바꿨는가?</li>
+          <li>같은 metric으로 평가했는가?</li>
+          <li>실패한 run도 남겼는가?</li>
+          <li>평균 성능뿐 아니라 segment별 손익도 봤는가?</li>
+        </ul>
+        <p>
+          MLflow는 이 질문에 답하기 위한 화면을 제공한다. 그래서 실무에서는 MLflow를 단순한
+          로깅 라이브러리가 아니라, 실험 harness를 운영 가능하게 만드는 인터페이스로 보는 편이 낫다.
+        </p>
+      </section>
+
+      <section id="recsys">
+        <h2>5. 추천시스템 실험에서 MLflow가 특히 중요한 이유</h2>
+        <p>
+          추천시스템은 일반적인 분류 모델보다 실험 조건이 복잡하다. 모델 하나만 바꾸는 일이 아니라,
+          후보 생성 방식과 랭킹 방식, 평가 기준이 모두 얽혀 있다.
+        </p>
+
+        <h3>추천 실험은 보통 두 단계다</h3>
+        <div class="flow">
+          <div class="step">
+            <strong>1. Data</strong>
+            유저 행동 로그를 시간 기준으로 나눈다.
+          </div>
+          <div class="step">
+            <strong>2. Retrieval</strong>
+            ALS, related, recent, popular로 후보를 만든다.
+          </div>
+          <div class="step">
+            <strong>3. Ranking</strong>
+            LGBM, DeepFM, DLRM으로 후보 순서를 바꾼다.
+          </div>
+          <div class="step">
+            <strong>4. Evaluation</strong>
+            NDCG, Recall, coverage를 계산한다.
+          </div>
+          <div class="step">
+            <strong>5. Diagnosis</strong>
+            유저군과 source별로 원인을 본다.
+          </div>
+        </div>
+
+        <h3>추천 실험에서 반드시 남겨야 하는 것</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>범주</th>
+              <th>기록할 값</th>
+              <th>MLflow key 예시</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>데이터 기간</td>
+              <td>history, rank-label, test 기간</td>
+              <td><code>exp_data_history_start</code>, <code>exp_data_test_end</code></td>
+            </tr>
+            <tr>
+              <td>후보 생성</td>
+              <td>candidate K, hybrid extra, related cap</td>
+              <td><code>exp_candidate_k</code>, <code>exp_candidate_related_cap</code></td>
+            </tr>
+            <tr>
+              <td>랭커 설정</td>
+              <td>모델 종류, LGBM leaf, epoch, batch size</td>
+              <td><code>exp_ranker_names</code>, <code>exp_ranker_lgbm_num_leaves</code></td>
+            </tr>
+            <tr>
+              <td>주요 성능</td>
+              <td>상단 품질과 후보 회수</td>
+              <td><code>primary_ndcg_at_10</code>, <code>primary_recall_at_100</code></td>
+            </tr>
+            <tr>
+              <td>진단 성능</td>
+              <td>push, PR, high-activity 유저군의 성능</td>
+              <td><code>segment_dominant_event_push_ts_ndcg_at_10</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout warn">
+          <strong>주의할 점</strong>
+          추천에서는 평균 NDCG 하나만 보면 위험하다. 전체 평균이 좋아져도 특정 유저군에서 나빠질 수 있고,
+          인기 repo 몇 개에만 추천이 몰리면 coverage가 나빠질 수 있다.
+        </div>
+      </section>
+
+      <section id="repo">
+        <h2>6. 이 저장소에서 MLflow 보기</h2>
+        <p>
+          이 저장소는 MLflow tracking URI로 <code>sqlite:///mlflow.db</code>를 사용한다.
+          즉 run 기록은 repo root의 <code>mlflow.db</code>에 저장된다.
+        </p>
+
+        <h3>MLflow UI 실행</h3>
+        <pre><code>cd bda-2
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000</code></pre>
+        <p>
+          실행 후 브라우저에서 <code>http://127.0.0.1:5000</code>을 열면 된다.
+        </p>
+
+        <h3>주요 experiment</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Experiment</th>
+              <th>용도</th>
+              <th>주로 볼 것</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>bda-week6-two-stage</code></td>
+              <td>ALS retrieval + LGBM ranking 실험</td>
+              <td>candidate source, related cap, segment diagnostics</td>
+            </tr>
+            <tr>
+              <td><code>bda-week7-recsys-rankers</code></td>
+              <td>LGBM/FM/Deep&Wide/DeepFM/DLRM ranker 비교</td>
+              <td>같은 후보셋에서 ranker별 NDCG/Recall 비교</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>실험 스크립트</h3>
+        <pre><code># two-stage 추천 실험
+uv run python scripts/week6_two_stage_v2.py \
+  --smoke \
+  --save-user-diagnostics \
+  --output-suffix mlflow_onboarding_smoke
+
+# ranker 비교 실험
+uv run python scripts/week6_neural_rankers.py \
+  --smoke \
+  --rankers lgbm \
+  --output-suffix mlflow_onboarding_ranker_smoke</code></pre>
+
+        <p>
+          두 스크립트 모두 기본적으로 MLflow에 기록한다. 기록을 끄고 싶을 때만
+          <code>--no-mlflow</code>를 붙인다.
+        </p>
+
+        <h3>현재 repo의 MLflow 설계</h3>
+        <p>
+          전체 args는 그대로 남기되, 수업과 실험 비교에서 자주 보는 핵심 설정은
+          <code>exp_*</code> prefix로 한 번 더 기록한다. 이렇게 하면 MLflow UI에서 열을 고르거나
+          필터를 걸 때 훨씬 읽기 쉽다.
+        </p>
+        <p>
+          추천 실험에서 대표로 볼 key는 다음과 같다.
+        </p>
+        <p>
+          <span class="tag">exp_data_*</span>
+          <span class="tag">exp_candidate_*</span>
+          <span class="tag">exp_ranker_*</span>
+          <span class="tag">primary_ndcg_at_*</span>
+          <span class="tag">primary_recall_at_*</span>
+          <span class="tag">segment_*</span>
+        </p>
+      </section>
+
+      <section id="ui">
+        <h2>7. MLflow UI 읽는 법</h2>
+        <p>
+          MLflow UI를 처음 열면 run 목록이 표로 보인다. 이 표를 “실험 비교표”로 읽으면 된다.
+        </p>
+
+        <h3>Step 1. Experiment 선택</h3>
+        <p>
+          왼쪽에서 <code>bda-week6-two-stage</code> 또는 <code>bda-week7-recsys-rankers</code>를 선택한다.
+          지금 보고 싶은 질문이 후보 생성인지, ranker 비교인지에 따라 experiment를 고른다.
+        </p>
+
+        <h3>Step 2. 필요한 column 켜기</h3>
+        <p>
+          run table에서 column을 조정해 다음 값을 보이게 한다.
+        </p>
+        <ul>
+          <li><code>params.exp_candidate_k</code></li>
+          <li><code>params.exp_candidate_related_cap</code></li>
+          <li><code>params.exp_ranker_names</code></li>
+          <li><code>metrics.primary_ndcg_at_10</code></li>
+          <li><code>metrics.primary_recall_at_100</code></li>
+          <li><code>metrics.elapsed_min</code></li>
+        </ul>
+
+        <h3>Step 3. 비교 질문을 명확히 하기</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>질문</th>
+              <th>고정할 것</th>
+              <th>바꿀 것</th>
+              <th>볼 metric</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>related source가 도움이 됐나?</td>
+              <td>split, ALS/LGBM 설정</td>
+              <td><code>exp_candidate_related_cap</code></td>
+              <td><code>primary_ndcg_at_10</code>, <code>primary_recall_at_100</code>, coverage</td>
+            </tr>
+            <tr>
+              <td>LGBM 튜닝이 도움이 됐나?</td>
+              <td>candidate set</td>
+              <td>LGBM params</td>
+              <td><code>primary_ndcg_at_10</code>, <code>primary_ndcg_at_100</code></td>
+            </tr>
+            <tr>
+              <td>neural ranker가 LGBM보다 좋은가?</td>
+              <td>candidate cache, split</td>
+              <td><code>exp_ranker_names</code></td>
+              <td>모델별 <code>ndcg_at_100</code>, <code>recall_at_100</code></td>
+            </tr>
+            <tr>
+              <td>어떤 유저군이 약한가?</td>
+              <td>best run</td>
+              <td>segment</td>
+              <td><code>segment_*</code> metric, diagnostics artifact</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Step 4. Run detail 보기</h3>
+        <p>
+          특정 run을 클릭하면 params, metrics, artifacts가 따로 보인다. 여기서 artifact를 열어
+          summary JSON, metrics CSV, segment summary CSV를 확인한다.
+        </p>
+      </section>
+
+      <section id="workflow">
+        <h2>8. 추천 실험 workflow</h2>
+        <p>
+          좋은 실험은 아무 모델이나 여러 번 돌리는 것이 아니다. 비교 질문을 정하고,
+          그 질문에 필요한 부분만 바꾸는 방식으로 진행한다.
+        </p>
+
+        <h3>권장 흐름</h3>
+        <ol>
+          <li>기준 run을 하나 정한다.</li>
+          <li>이번 실험의 질문을 한 문장으로 쓴다.</li>
+          <li>고정할 조건과 바꿀 조건을 분리한다.</li>
+          <li>스크립트를 실행해 MLflow run을 남긴다.</li>
+          <li>primary metric으로 1차 비교한다.</li>
+          <li>artifact와 segment metric으로 원인을 확인한다.</li>
+          <li>개선이 맞으면 다음 기준 run으로 승격한다.</li>
+        </ol>
+
+        <h3>예시 1. Candidate source 실험</h3>
+        <pre><code>uv run python scripts/week6_two_stage_v2.py \
+  --best-full \
+  --related-candidate-cap 80 \
+  --related-top-per-anchor 10 \
+  --related-max-seen-anchors 20 \
+  --save-user-diagnostics \
+  --output-suffix related80_anchor20_full</code></pre>
+        <p>
+          이 실험의 질문은 “같은 유저가 함께 본 repo를 related source로 추가하면 후보 회수와
+          상단 품질이 좋아지는가?”다. 따라서 MLflow에서는 related cap과 Recall@100, NDCG@10,
+          segment metric을 함께 본다.
+        </p>
+
+        <h3>예시 2. Ranker 비교 실험</h3>
+        <pre><code>uv run python scripts/week6_neural_rankers.py \
+  --reuse-feature-cache \
+  --feature-cache-path data/models/week6/week6_ranker_compare_week7_full_500k_u100k_e3_features.pkl \
+  --rankers lgbm,fm,deepwide,deepfm,dlrm \
+  --epochs 3 \
+  --batch-size 32768 \
+  --torch-threads 1 \
+  --device cpu \
+  --output-suffix week7_ranker_compare</code></pre>
+        <p>
+          이 실험의 질문은 “같은 후보셋에서 어떤 ranker가 가장 좋은가?”다.
+          후보 cache를 재사용해야 ranker 비교가 공정해진다.
+        </p>
+
+        <h3>좋은 run 이름</h3>
+        <p>
+          run 이름은 나중에 봐도 실험 의도가 보여야 한다.
+        </p>
+        <ul>
+          <li>좋음: <code>related80_anchor20_full_als96_i12_lgbm63</code></li>
+          <li>좋음: <code>week7_full_500k_u100k_e3_reuse_b32768</code></li>
+          <li>나쁨: <code>test</code>, <code>final</code>, <code>new_new_final</code></li>
+        </ul>
+      </section>
+
+      <section id="checklist">
+        <h2>9. 실험 전후 체크리스트</h2>
+        <h3>실험 전</h3>
+        <ul>
+          <li>이번 실험 질문이 한 문장으로 말해지는가?</li>
+          <li>비교할 baseline run이 정해져 있는가?</li>
+          <li>데이터 split이 이전 run과 같은가?</li>
+          <li>후보 생성 실험인지, ranker 실험인지 구분했는가?</li>
+          <li>run 이름이 나중에 봐도 이해되는가?</li>
+        </ul>
+
+        <h3>실험 후</h3>
+        <ul>
+          <li>MLflow run status가 <code>FINISHED</code>인지 확인했는가?</li>
+          <li><code>primary_ndcg_at_10</code>과 <code>primary_recall_at_100</code>을 함께 봤는가?</li>
+          <li>coverage 또는 unique recommended가 무너졌는가?</li>
+          <li>segment metric에서 특정 유저군이 나빠졌는가?</li>
+          <li>summary JSON과 metrics CSV artifact가 남았는가?</li>
+          <li>좋아진 이유를 한 문장으로 설명할 수 있는가?</li>
+        </ul>
+
+        <div class="callout">
+          <strong>취준생 포인트</strong>
+          포트폴리오에서는 “NDCG가 올랐다”보다 “후보 source를 추가했고, Recall@100과 coverage가 같이 좋아졌으며,
+          push/PR segment에서도 손실이 줄었다”가 훨씬 강한 설명이다.
+        </div>
+      </section>
+
+      <section id="faq">
+        <h2>10. FAQ</h2>
+
+        <h3>Q. MLflow가 모델 성능을 올려주나요?</h3>
+        <p>
+          직접 올려주지는 않는다. 대신 어떤 변경이 성능을 올렸는지, 어떤 변경이 실패했는지 빨리 알게 해준다.
+          이게 반복되면 결과적으로 모델 개선 속도가 빨라진다.
+        </p>
+
+        <h3>Q. 그냥 CSV로 기록하면 안 되나요?</h3>
+        <p>
+          작은 실험은 CSV로도 가능하다. 하지만 run이 늘어나면 params, metrics, artifacts, git 정보,
+          모델 파일이 흩어진다. MLflow는 이들을 run 단위로 묶어준다.
+        </p>
+
+        <h3>Q. 모든 값을 metric으로 올리면 좋나요?</h3>
+        <p>
+          아니다. UI에서 비교할 핵심 숫자는 metric으로 올리고, 큰 표나 유저별 결과는 artifact로 남기는 편이 좋다.
+          예를 들어 유저별 diagnostics 전체는 parquet artifact로 두고, 대표 segment 평균만 metric으로 올린다.
+        </p>
+
+        <h3>Q. 추천시스템에서 가장 먼저 봐야 할 metric은 무엇인가요?</h3>
+        <p>
+          상단 품질은 <code>NDCG@10</code>, 후보 회수는 <code>Recall@100</code>, 쏠림 여부는
+          <code>unique@100</code>을 함께 본다. 하나만 보면 착시가 생긴다.
+        </p>
+
+        <h3>Q. Harness 관점에서 MLflow를 한 문장으로 말하면?</h3>
+        <p>
+          MLflow는 머신러닝 실험 harness가 남기는 실행 기록을 표준화해서, 같은 질문을 같은 기준으로
+          반복 검증할 수 있게 해주는 도구다.
+        </p>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

@@ -1,0 +1,141 @@
+version: 2
+
+semantic_models:
+  - name: user_repo_activity
+    description: Semantic model over cleaned GitHub Archive user-repo activity.
+    model: ref('stg_user_repo_activity')
+    defaults:
+      agg_time_dimension: activity_date
+    entities:
+      - name: activity
+        type: primary
+        expr: "concat(cast(activity_date as string), '-', cast(user_id as string), '-', cast(repo_id as string), '-', action)"
+      - name: user
+        type: foreign
+        expr: user_id
+      - name: repo
+        type: foreign
+        expr: repo_id
+    dimensions:
+      - name: activity_date
+        type: time
+        type_params:
+          time_granularity: day
+      - name: week_start
+        type: time
+        type_params:
+          time_granularity: week
+      - name: action
+        type: categorical
+    measures:
+      - name: total_events
+        description: Sum of GitHub Archive events.
+        agg: sum
+        expr: event_count
+      - name: push_events
+        description: Sum of PushEvent activity.
+        agg: sum
+        expr: "case when action = 'PushEvent' then event_count else 0 end"
+      - name: watch_events
+        description: Sum of WatchEvent activity.
+        agg: sum
+        expr: "case when action = 'WatchEvent' then event_count else 0 end"
+      - name: fork_events
+        description: Sum of ForkEvent activity.
+        agg: sum
+        expr: "case when action = 'ForkEvent' then event_count else 0 end"
+      - name: pull_request_events
+        description: Sum of PullRequestEvent activity.
+        agg: sum
+        expr: "case when action = 'PullRequestEvent' then event_count else 0 end"
+      - name: issue_events
+        description: Sum of IssuesEvent activity.
+        agg: sum
+        expr: "case when action = 'IssuesEvent' then event_count else 0 end"
+      - name: issue_comment_events
+        description: Sum of IssueCommentEvent activity.
+        agg: sum
+        expr: "case when action = 'IssueCommentEvent' then event_count else 0 end"
+      - name: user_repo_action_rows
+        description: Count of user-repo-action aggregate rows.
+        agg: count
+        expr: user_id
+      - name: active_users
+        description: Distinct active GitHub users.
+        agg: count_distinct
+        expr: user_id
+      - name: active_repos
+        description: Distinct active GitHub repositories.
+        agg: count_distinct
+        expr: repo_id
+
+metrics:
+  - name: total_events
+    description: Total GitHub Archive event count.
+    type: simple
+    label: Total Events
+    type_params:
+      measure: total_events
+
+  - name: active_users
+    description: Distinct users with at least one event.
+    type: simple
+    label: Active Users
+    type_params:
+      measure: active_users
+
+  - name: active_repos
+    description: Distinct repositories with at least one event.
+    type: simple
+    label: Active Repos
+    type_params:
+      measure: active_repos
+
+  - name: user_repo_action_rows
+    description: Number of aggregate rows in the activity fact table.
+    type: simple
+    label: User Repo Action Rows
+    type_params:
+      measure: user_repo_action_rows
+
+  - name: push_events
+    description: Total PushEvent count.
+    type: simple
+    label: Push Events
+    type_params:
+      measure: push_events
+
+  - name: watch_events
+    description: Total WatchEvent count.
+    type: simple
+    label: Watch Events
+    type_params:
+      measure: watch_events
+
+  - name: fork_events
+    description: Total ForkEvent count.
+    type: simple
+    label: Fork Events
+    type_params:
+      measure: fork_events
+
+  - name: pull_request_events
+    description: Total PullRequestEvent count.
+    type: simple
+    label: Pull Request Events
+    type_params:
+      measure: pull_request_events
+
+  - name: issue_events
+    description: Total IssuesEvent count.
+    type: simple
+    label: Issue Events
+    type_params:
+      measure: issue_events
+
+  - name: issue_comment_events
+    description: Total IssueCommentEvent count.
+    type: simple
+    label: Issue Comment Events
+    type_params:
+      measure: issue_comment_events

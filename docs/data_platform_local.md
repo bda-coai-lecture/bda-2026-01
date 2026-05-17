@@ -1,6 +1,6 @@
 # 데이터 플랫폼 로컬 구성
 
-최종 수정: 2026-05-10
+최종 수정: 2026-05-13
 
 목표는 로컬에서 Airflow 3와 Metabase를 띄우고, 로컬 parquet 산출물을 BigQuery mart로 동기화한 뒤 과거 기초 지표를 Metabase에서 보는 것이다.
 
@@ -13,6 +13,8 @@
 | orchestration | Airflow 3.2.1 | Docker Compose, `http://localhost:8080` |
 | BI | Metabase | Docker Compose, `http://localhost:3001` |
 | Python 실행 | uv | Airflow task도 `uv run` 사용 |
+| transform / semantic layer | dbt Core + dbt-bigquery | `dbt/gharchive_metrics` |
+| Airflow-dbt integration | Astronomer Cosmos | `dags/gharchive_dbt_metrics.py` |
 
 Airflow Docker 구성은 Apache Airflow 3.2.1 공식 Docker Compose 구조를 기준으로 했다. Airflow 3에서는 UI/API 서비스 이름이 `airflow-apiserver`이고, DAG parsing은 `airflow-dag-processor`가 담당한다.
 
@@ -51,6 +53,37 @@ uv run python scripts/sync_bq_metrics.py \
 | `mart.metrics_agent_trend_validation` | trend score와 baseline들의 다음 주 예측력 비교 |
 
 현재 로컬 parquet 기준 기간은 `2026-02-15`부터 `2026-05-08`까지다.
+
+## dbt + Semantic Layer
+
+Week 7부터는 Python script가 모든 metric table을 직접 만드는 구조에서, BigQuery fact table을 source로 두고 dbt가 core metric mart를 만드는 구조로 넘어간다.
+
+```bash
+GCP_KEY_PATH=/path/to/gcp-key.json \
+DBT_BIGQUERY_PROJECT=bda-coai \
+DBT_BIGQUERY_DATASET=mart \
+uv run --with dbt-bigquery dbt build \
+  --project-dir dbt/gharchive_metrics \
+  --profiles-dir dbt/profiles
+```
+
+dbt project 구성:
+
+| 경로 | 역할 |
+|---|---|
+| `dbt/gharchive_metrics/models/staging/stg_user_repo_activity.sql` | `mart.fact_user_repo_activity` 정리 view |
+| `dbt/gharchive_metrics/models/marts/platform/metrics_daily.sql` | 일별 DAU/repo/event mart |
+| `dbt/gharchive_metrics/models/marts/platform/metrics_event_type_daily.sql` | event type별 일별 mart |
+| `dbt/gharchive_metrics/models/marts/platform/metrics_weekly.sql` | WAU/weekly repo/event mart |
+| `dbt/gharchive_metrics/models/marts/platform/metrics_user_segments.sql` | 활동일수 기반 유저 segment mart |
+| `dbt/gharchive_metrics/models/marts/platform/metrics_retention_weekly.sql` | cohort retention long mart |
+| `dbt/gharchive_metrics/models/marts/platform/metrics_retention_summary.sql` | W0~W3 retention summary |
+| `dbt/gharchive_metrics/models/semantic/platform_activity.yml` | dbt Semantic Layer semantic model/metrics |
+| `dbt/gharchive_metrics/models/semantic/time_spine_daily.sql` | MetricFlow용 day grain time spine |
+
+현재 semantic layer에는 `total_events`, `active_users`, `active_repos`, `user_repo_action_rows`와 `push_events`, `watch_events`, `fork_events`, `pull_request_events`, `issue_events`, `issue_comment_events`를 정의했다. 이 정의는 metric 이름과 집계 방식을 YAML로 고정해서 BI/LLM/분석 쪽에서 같은 지표명을 쓰게 만드는 강의 포인트로 사용한다.
+
+`metrics_agent_trendy_repos`, `metrics_agent_trend_validation`은 SQLite metadata cache와 keyword enrichment가 필요하므로 당분간 Python script가 담당한다. 이 둘까지 dbt로 옮기려면 repo metadata도 BigQuery source로 적재해야 한다.
 
 ## 추천 실험용 batch mart
 
@@ -116,13 +149,14 @@ Airflow UI:
 - DAG:
   - `gharchive_repo_metadata_refresh`: repo metadata cache 갱신
   - `gharchive_platform_metrics`: BigQuery metric mart 갱신
+  - `gharchive_dbt_metrics`: fact 적재 후 Cosmos로 dbt metric/semantic layer build
 
-metadata DAG는 매일 05:00 KST에 실행된다. 일별 주기 작업에서는 `warm` tier를 사용하고, GitHub API 호출량은 `--max-fetch 50`으로 제한한다.
+metadata DAG는 하루 6회, 4시간 간격으로 실행된다. 각 실행은 GitHub API 호출량을 `--max-fetch 4500`으로 제한한다. GitHub authenticated REST API의 primary limit은 5,000 requests/hour라서, 실행당 500개 정도를 다른 작업/헤더 확인 여유로 남긴다. 따라서 이론상 하루 최대 수집량은 `4500 * 6 = 27,000`개다. 후보는 최근 35일 이벤트 기준 상위 1000개 repo를 먼저 잡고, 전날 DAU에서 고정 seed systematic sample을 추가한다. K는 prime 후보를 시뮬레이션해서 `max_fetch * 7일 warm window` 안에서 가장 많이 새 repo를 탐색하는 값으로 고른다.
 
 Airflow `BashOperator`는 `append_env=True`를 사용한다. 따라서 Airflow 컨테이너 환경에 `GITHUB_TOKEN`을 넣으면 metadata refresh가 자동으로 토큰 인증을 사용한다. 토큰이 없으면 `gh auth token` fallback을 시도하고, 컨테이너에 `gh` 인증도 없으면 무토큰 GitHub API 한도 안에서 동작한다.
 
 ```bash
-uv run --no-project --with pandas --with requests --with duckdb python scripts/refresh_repo_metadata.py --parquet-dir data/daily_agg --start 2026-04-04 --end 2026-05-08 --top-n 500 --cache-tier warm --max-fetch 50
+uv run --no-project --with pandas --with requests --with duckdb python scripts/refresh_repo_metadata.py --parquet-dir data/daily_agg --start 2026-04-04 --end 2026-05-08 --top-n 1000 --systematic-sample --sample-seed bda-repo-metadata-v1 --cache-tier warm --max-fetch 4500 --rate-limit-pause 0.2
 ```
 
 metric DAG는 매일 06:00 KST에 실행된다. 첫 태스크 `plan_metric_sync`는 `--plan-only`로 날짜 범위와 `--max-days` 방어선을 먼저 확인한다. 통과하면 `sync_metrics`가 fact 업로드 없이 aggregate metric table만 BigQuery에 갱신한다.
@@ -135,9 +169,12 @@ Airflow 태스크 안정화 설정:
 
 | DAG | task | retry | timeout |
 |---|---|---:|---:|
-| `gharchive_repo_metadata_refresh` | `refresh_repo_metadata` | 1회, 5분 대기 | 20분 |
+| `gharchive_repo_metadata_refresh` | `refresh_repo_metadata` | 1회, 5분 대기 | 30분 |
 | `gharchive_platform_metrics` | `plan_metric_sync` | 1회, 5분 대기 | 5분 |
 | `gharchive_platform_metrics` | `sync_metrics` | 1회, 5분 대기 | 45분 |
+| `gharchive_dbt_metrics` | `plan_fact_sync` | 1회, 5분 대기 | 5분 |
+| `gharchive_dbt_metrics` | `sync_fact` | 1회, 5분 대기 | 45분 |
+| `gharchive_dbt_metrics` | `dbt_metrics` task group | 1회, 5분 대기 | dbt model별 task |
 
 컨테이너 안에서는 macOS host `.venv`를 쓰지 않도록 아래 경로를 쓴다.
 
@@ -147,6 +184,8 @@ Airflow 태스크 안정화 설정:
 | `UV_PROJECT_ENVIRONMENT` | `/opt/airflow/uv-env/bda-2` |
 
 Airflow DAG에서는 프로젝트 전체 dependency를 설치하지 않도록 `uv run --no-project --with ...`를 쓴다. 이렇게 하면 추천 실험용 `torch`, `faiss`, `lightgbm`까지 설치하지 않고 데이터 플랫폼 동기화에 필요한 최소 패키지만 쓴다.
+
+Cosmos와 dbt-bigquery는 Airflow image에 설치한다. Airflow task 실행은 Cosmos `DBT_RUNNER`를 사용하고, CLI fallback을 위해 `/home/airflow/dbt_venv/bin/dbt`도 함께 둔다.
 
 로컬 Docker에서 35일 parquet를 집계할 때는 DuckDB 메모리 제한을 `3GB`, thread를 `1`로 두고 `/tmp/duckdb-spill`을 사용한다. Airflow 태스크는 2026-05-10 기준 실제 실행 검증이 끝났고, `metrics_*` 8개 테이블을 갱신한다.
 
@@ -179,6 +218,7 @@ uv run python scripts/setup_metabase_dashboard.py
 | Password | `bda-local-2026` |
 | Dashboard | `GitHub Archive 기초 지표` |
 | Trend Dashboard | `AI Agent 트렌디 레포` |
+| Product Dashboard | `OSS Signal 운영 대시보드` |
 
 추천 질문/차트:
 
@@ -198,6 +238,11 @@ uv run python scripts/setup_metabase_dashboard.py
 
 - URL: `http://localhost:3001/dashboard/3`
 - 목적: OpenClaw/oh-my-openagent seed 기반으로 트렌디 repo 후보, 점수 근거, seed affinity, 정량 검증을 한 화면에서 설명한다.
+
+상품형 운영 대시보드:
+
+- URL: `http://localhost:3001/dashboard/4`
+- 목적: OSS/AI agent 생태계 신호를 KPI, activity trend, event mix, trend leaderboard, retention health, model validation으로 한 화면에서 설명한다.
 
 Retention 정의:
 
@@ -273,8 +318,10 @@ Repo metadata는 GitHub REST API 결과를 로컬 SQLite 캐시에 저장해서 
 uv run python scripts/refresh_repo_metadata.py \
   --start 2026-04-04 \
   --end 2026-05-08 \
-  --top-n 500 \
-  --max-fetch 200
+  --top-n 1000 \
+  --systematic-sample \
+  --max-fetch 4500 \
+  --rate-limit-pause 0.2
 ```
 
 캐시 신뢰도 정책:
@@ -299,18 +346,22 @@ uv run python scripts/refresh_repo_metadata.py \
 uv run python scripts/refresh_repo_metadata.py \
   --start 2026-04-04 \
   --end 2026-05-08 \
-  --top-n 500 \
-  --max-fetch 200 \
+  --top-n 1000 \
+  --systematic-sample \
+  --max-fetch 4500 \
+  --rate-limit-pause 0.2 \
   --dry-run
 ```
 
 동작 방식:
 
-- 로컬 parquet에서 이벤트 수 기준 Top repo를 뽑는다.
+- 로컬 parquet에서 이벤트 수 기준 Top repo를 뽑는다. 기본값은 상위 1000개다.
+- `--systematic-sample`을 켜면 최신 일자 또는 `--sample-date`의 DAU에서 `hash(seed, actor_id) % K = 0`인 유저를 고르고, 그 유저들이 전날 반응한 repo를 후보에 추가한다.
+- `--sample-k-prime`을 직접 주지 않으면 prime K 후보를 돌려보며 Top repo 갱신 후 남는 `--max-fetch * stale_days` 예산 안에서 가장 많은 sample repo를 담는 K를 선택한다.
 - `data/repo_name_lookup.db`에서 `repo_id -> owner/repo` 이름을 먼저 찾는다.
 - lookup cache에 없으면 `data/models/repo_name_map.pkl`에서 찾고, 찾은 값과 miss를 `data/repo_name_lookup.db`에 저장한다. 559MB pickle을 매번 읽지 않기 위한 로컬 보조 캐시다.
 - `data/repo_metadata.db`에 없는 repo를 먼저 fetch한다.
-- 그다음 `--refresh-stale-days`보다 오래된 기존 cache를 갱신한다.
+- 그다음 `--refresh-stale-days`보다 오래된 기존 cache를 갱신한다. `warm` 기준은 7일이라, 이미 fresh cache에 hit한 repo는 API 호출 없이 넘어가고 stale/missing repo만 0에서 1로 채워진다.
 - GitHub token은 `GITHUB_TOKEN` 환경변수를 우선 사용하고, 없으면 `gh auth token`을 사용한다. 토큰 값은 문서나 로그에 남기지 않는다.
 
 캐시 상태 확인:

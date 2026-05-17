@@ -17,4 +17,13 @@ gcp-key.json
 logs/
 plugins/
 config/
+mlruns/
+mlartifacts/
+mlflow.db
 .env
+
+# dbt artifacts
+dbt/**/target/
+dbt/**/dbt_packages/
+dbt/**/logs/
+dbt/profiles/.user.yml

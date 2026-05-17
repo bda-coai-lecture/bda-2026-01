@@ -1,0 +1,25 @@
+version: 2
+
+sources:
+  - name: gharchive
+    database: "{{ env_var('DBT_BIGQUERY_PROJECT', 'bda-coai') }}"
+    schema: "{{ var('source_dataset', 'mart') }}"
+    tables:
+      - name: fact_user_repo_activity
+        description: Daily user-repo-action aggregate loaded from local GitHub Archive parquet.
+        columns:
+          - name: user_id
+            tests:
+              - not_null
+          - name: repo_id
+            tests:
+              - not_null
+          - name: action
+            tests:
+              - not_null
+          - name: event_count
+            tests:
+              - not_null
+          - name: activity_date
+            tests:
+              - not_null
