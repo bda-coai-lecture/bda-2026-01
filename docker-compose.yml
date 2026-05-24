@@ -37,6 +37,20 @@ x-airflow-common: &airflow-common
       condition: service_healthy
 
 services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    image: bda-api:latest
+    command: uvicorn ghrec.api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      PYTHONUNBUFFERED: "1"
+    restart: unless-stopped
+
   postgres:
     image: postgres:16
     environment:

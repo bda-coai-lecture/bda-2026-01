@@ -28,6 +28,7 @@ import lightgbm as lgb
 import mlflow
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 import torch
 from implicit.als import AlternatingLeastSquares
 from mlflow.tracking import MlflowClient
@@ -495,14 +496,27 @@ def load_rank_data_from_feature_parquet(
             f"ranker feature parquet contains unknown feature columns: {missing[:10]}"
         )
 
+    parquet = pq.ParquetFile(parquet_path)
     columns = ["group_index", "label", *feature_names]
-    frame = pd.read_parquet(parquet_path, columns=columns)
-    if frame.empty:
+    x_parts: list[np.ndarray] = []
+    y_parts: list[np.ndarray] = []
+    group_parts: list[np.ndarray] = []
+    for batch in parquet.iter_batches(columns=columns, batch_size=100_000):
+        frame = batch.to_pandas()
+        if frame.empty:
+            continue
+        group_parts.append(frame["group_index"].to_numpy(np.int32, copy=True))
+        y_parts.append(frame["label"].to_numpy(np.float32, copy=True))
+        x_parts.append(frame[feature_names].to_numpy(np.float32, copy=True))
+
+    if not y_parts:
         raise RuntimeError(f"ranker feature parquet is empty: {parquet_path}")
 
-    groups = frame.groupby("group_index", sort=False, observed=True).size().astype(int).tolist()
-    y_train = frame["label"].astype(np.float32).to_numpy()
-    x_train_raw = frame[feature_names].astype(np.float32).to_numpy()
+    group_index = np.concatenate(group_parts)
+    _, counts = np.unique(group_index, return_counts=True)
+    groups = counts.astype(int).tolist()
+    y_train = np.concatenate(y_parts).astype(np.float32, copy=False)
+    x_train_raw = np.vstack(x_parts).astype(np.float32, copy=False)
     summary = {
         "rank_users": int(len(groups)),
         "rank_rows": int(len(y_train)),
@@ -989,8 +1003,10 @@ def main() -> None:
                 args.mart_dir / "user_repo_interaction_mart.parquet"
             )
             split_mart = args.mart_dir / "experiment_split_mart.parquet"
-            rank_fb = base.load_mart_feedback(split_mart, "rank_label")
-            test_fb = base.load_mart_feedback(split_mart, "test")
+            rank_fb = base.load_mart_feedback(
+                split_mart, "rank_label", args.rank_start, args.rank_end
+            )
+            test_fb = base.load_mart_feedback(split_mart, "test", args.test_start, args.test_end)
         else:
             history_df = base.load_period(base.DATA_DIR, args.history_start, args.history_end)
             rank_df = base.load_period(base.DATA_DIR, args.rank_start, args.rank_end)
@@ -1158,6 +1174,15 @@ def main() -> None:
             related_candidates,
             args.related_candidate_cap,
             related_seed_items,
+        )
+        rank_hybrid = base.add_label_only_candidates(
+            rank_hybrid,
+            rank_labels,
+            train_seen,
+            item2idx,
+        )
+        data_summary["rank_label_only_candidates"] = base.count_source_rows(
+            rank_hybrid, base.SOURCE_LABEL_ONLY
         )
         test_hybrid = base.hybridize_candidates(
             test_retrieval,
@@ -1332,6 +1357,7 @@ def main() -> None:
         "history_users": data_summary["history_users"],
         "history_repos": data_summary["history_repos"],
         "rank_label_interactions": data_summary["rank_label_interactions"],
+        "rank_label_only_candidates": data_summary.get("rank_label_only_candidates"),
         "test_label_interactions": data_summary["test_label_interactions"],
         "use_marts": data_summary.get("use_marts"),
         "eval_users": eval_user_count,

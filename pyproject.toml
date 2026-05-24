@@ -8,6 +8,7 @@ dependencies = [
     "db-dtypes>=1.4.4",
     "duckdb>=1.5.2",
     "faiss-cpu>=1.13.2",
+    "fastapi>=0.136.1",
     "google-cloud-bigquery>=3.40.1",
     "google-cloud-bigquery-storage>=2.36.2",
     "implicit>=0.7.2",
@@ -24,6 +25,7 @@ dependencies = [
     "streamlit>=1.56.0",
     "torch>=2.11.0",
     "tqdm>=4.67.3",
+    "uvicorn>=0.46.0",
 ]
 
 [build-system]

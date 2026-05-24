@@ -420,6 +420,7 @@ def build_repo_repo_related_mart(
 
 def build_experiment_split_mart(
     splits: dict[str, pd.DataFrame],
+    split_windows: dict[str, tuple[date, date]],
     experiment_id: str,
 ) -> pd.DataFrame:
     rows = []
@@ -428,11 +429,24 @@ def build_experiment_split_mart(
         if feedback.empty:
             continue
         feedback = feedback.rename(columns={"score": "weighted_score"})
+        start_date, end_date = split_windows[split]
+        feedback.insert(0, "split_start_date", pd.Timestamp(start_date))
+        feedback.insert(1, "split_end_date", pd.Timestamp(end_date))
         feedback.insert(0, "split", split)
         feedback.insert(0, "experiment_id", experiment_id)
         rows.append(feedback)
     if not rows:
-        return pd.DataFrame(columns=["experiment_id", "split", "actor_id", "repo_id", "weighted_score"])
+        return pd.DataFrame(
+            columns=[
+                "experiment_id",
+                "split",
+                "split_start_date",
+                "split_end_date",
+                "actor_id",
+                "repo_id",
+                "weighted_score",
+            ]
+        )
     return pd.concat(rows, ignore_index=True).sort_values(
         ["experiment_id", "split", "actor_id", "repo_id"]
     )
@@ -514,6 +528,11 @@ def main() -> None:
     print("6. build experiment split mart")
     split = build_experiment_split_mart(
         {"history": history_df, "rank_label": rank_df, "test": test_df},
+        {
+            "history": (args.history_start, args.history_end),
+            "rank_label": (args.rank_label_start, args.rank_label_end),
+            "test": (args.test_start, args.test_end),
+        },
         args.experiment_id,
     )
     write_parquet(split, args.output_dir / "experiment_split_mart.parquet")

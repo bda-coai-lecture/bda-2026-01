@@ -471,8 +471,10 @@ def main() -> None:
         prior_fb = base.empty_feedback_frame()
         history_fb = base.load_mart_feedback(args.mart_dir / "user_repo_interaction_mart.parquet")
         split_mart = args.mart_dir / "experiment_split_mart.parquet"
-        rank_fb = base.load_mart_feedback(split_mart, "rank_label")
-        test_fb = base.load_mart_feedback(split_mart, "test")
+        rank_fb = base.load_mart_feedback(
+            split_mart, "rank_label", args.rank_start, args.rank_end
+        )
+        test_fb = base.load_mart_feedback(split_mart, "test", args.test_start, args.test_end)
     else:
         history_df = base.load_period(args.data_dir, args.history_start, args.history_end)
         recent_start = max(args.history_start, args.history_end - timedelta(days=13))
@@ -619,6 +621,12 @@ def main() -> None:
         args.related_candidate_cap,
         related_seed_items,
     )
+    rank_hybrid = base.add_label_only_candidates(
+        rank_hybrid,
+        rank_labels,
+        train_seen,
+        item2idx,
+    )
     test_hybrid = base.hybridize_candidates(
         test_retrieval,
         test_users,
@@ -691,6 +699,9 @@ def main() -> None:
         "test_label_interactions": int(len(test_fb)),
         "rank_retrieval_users": len(rank_retrieval),
         "test_retrieval_users": len(test_retrieval),
+        "rank_label_only_candidates": base.count_source_rows(
+            rank_hybrid, base.SOURCE_LABEL_ONLY
+        ),
         "feature_source": context.get("feature_source", "raw"),
         "use_marts": use_marts,
     }

@@ -152,6 +152,7 @@ dependencies = [
     { name = "db-dtypes" },
     { name = "duckdb" },
     { name = "faiss-cpu" },
+    { name = "fastapi" },
     { name = "google-cloud-bigquery" },
     { name = "google-cloud-bigquery-storage" },
     { name = "implicit" },
@@ -168,6 +169,7 @@ dependencies = [
     { name = "streamlit" },
     { name = "torch" },
     { name = "tqdm" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -175,6 +177,7 @@ requires-dist = [
     { name = "db-dtypes", specifier = ">=1.4.4" },
     { name = "duckdb", specifier = ">=1.5.2" },
     { name = "faiss-cpu", specifier = ">=1.13.2" },
+    { name = "fastapi", specifier = ">=0.136.1" },
     { name = "google-cloud-bigquery", specifier = ">=3.40.1" },
     { name = "google-cloud-bigquery-storage", specifier = ">=2.36.2" },
     { name = "implicit", specifier = ">=0.7.2" },
@@ -191,6 +194,7 @@ requires-dist = [
     { name = "streamlit", specifier = ">=1.56.0" },
     { name = "torch", specifier = ">=2.11.0" },
     { name = "tqdm", specifier = ">=4.67.3" },
+    { name = "uvicorn", specifier = ">=0.46.0" },
 ]
 
 [[package]]

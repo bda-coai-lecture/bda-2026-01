@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>추천 데이터 스플릿 시각화</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #637083;
+      --line: #d7dde7;
+      --history: #eef3f8;
+      --history-border: #7b8794;
+      --rank: #e8f3ff;
+      --rank-border: #4b8fca;
+      --test: #e8f7ed;
+      --test-border: #3b9b62;
+      --bad: #ffe2e2;
+      --bad-border: #d85c5c;
+      --panel: #f7f9fc;
+      --white: #fff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: #eef2f7;
+      line-height: 1.45;
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 36px 24px 56px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 0 0 28px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .panel {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      margin-top: 18px;
+      box-shadow: 0 8px 24px rgba(21, 38, 64, 0.06);
+    }
+
+    .panel h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: 42fr 7fr 7fr;
+      gap: 10px;
+      min-height: 104px;
+      align-items: stretch;
+    }
+
+    .block {
+      border: 2px solid;
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 0;
+    }
+
+    .history { background: var(--history); border-color: var(--history-border); }
+    .rank { background: var(--rank); border-color: var(--rank-border); }
+    .test { background: var(--test); border-color: var(--test-border); }
+    .bad { background: var(--bad); border-color: var(--bad-border); }
+
+    .label {
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .date {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .use {
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    .cutoffs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+
+    .arrow-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .box {
+      border: 1px solid var(--line);
+      background: var(--white);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 76px;
+    }
+
+    .arrow {
+      color: var(--muted);
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    ul {
+      margin: 10px 0 0;
+      padding-left: 18px;
+    }
+
+    li + li { margin-top: 6px; }
+
+    .tag {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .tag.good { background: #dff4e7; color: #267047; }
+    .tag.warn { background: #ffe7e7; color: #a33535; }
+
+    @media (max-width: 760px) {
+      main { padding: 24px 14px 40px; }
+      .timeline, .cutoffs, .compare, .arrow-row {
+        grid-template-columns: 1fr;
+      }
+      .arrow { transform: rotate(90deg); justify-self: center; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>추천 데이터 스플릿 시각화</h1>
+    <p class="lead">목표: candidate generator와 re-ranker가 같은 train positive를 쓰게 한다.</p>
+
+    <section class="panel">
+      <h2>지난 주차 비교용 Split</h2>
+      <div class="timeline">
+        <div class="block history">
+          <div>
+            <div class="label">history</div>
+            <div class="date">2026-03-14 ~ 2026-04-24</div>
+          </div>
+          <div class="use">context, seen item, feature seed</div>
+        </div>
+        <div class="block rank">
+          <div>
+            <div class="label">rank_label</div>
+            <div class="date">2026-04-25 ~ 2026-05-01</div>
+          </div>
+          <div class="use">retrieval + rerank 공통 train positive</div>
+        </div>
+        <div class="block test">
+          <div>
+            <div class="label">test</div>
+            <div class="date">2026-05-02 ~ 2026-05-08</div>
+          </div>
+          <div class="use">최종 성능 평가</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>맞는 학습 구조</h2>
+      <div class="cutoffs">
+        <div class="card">
+          <span class="tag good">candidate generator</span>
+          <h3>같은 train positive로 retrieval 학습</h3>
+          <div class="arrow-row">
+            <div class="box">
+              <strong>rank_label positive</strong>
+              <div class="small">2026-04-25 ~ 2026-05-01 user-repo interaction</div>
+            </div>
+            <div class="arrow">→</div>
+            <div class="box">
+              <strong>ALS / BPR / Two-Tower</strong>
+              <div class="small">test user 후보를 생성하는 retrieval 모델</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <span class="tag good">re-ranker</span>
+          <h3>같은 train positive로 ranking 학습</h3>
+          <div class="arrow-row">
+            <div class="box">
+              <strong>rank_label positive</strong>
+              <div class="small">retrieval과 동일한 positive 원천</div>
+            </div>
+            <div class="arrow">→</div>
+            <div class="box">
+              <strong>mixed negatives</strong>
+              <div class="small">retrieval hard + popular/recent + related + random</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>헷갈렸던 지점</h2>
+      <div class="compare">
+        <div class="card bad">
+          <span class="tag warn">나쁜 설계</span>
+          <h3>서로 다른 positive split</h3>
+          <ul>
+            <li>retrieval은 history positive로 학습</li>
+            <li>rerank는 rank_label positive로 학습</li>
+            <li>모델 차이와 데이터 차이가 섞임</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag good">새 설계</span>
+          <h3>같은 train positive</h3>
+          <ul>
+            <li>candidate generator도 rank_label positive로 학습</li>
+            <li>re-ranker도 rank_label positive로 학습</li>
+            <li>test positive는 최종 평가에만 사용</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

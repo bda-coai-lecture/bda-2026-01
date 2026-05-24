@@ -50,6 +50,11 @@ RANKER_FEATURE_META_COLUMNS = {
     "raw_candidate_score",
     "raw_candidate_source",
 }
+SOURCE_ALS = 1
+SOURCE_RECENT = 2
+SOURCE_POPULAR = 3
+SOURCE_RELATED = 4
+SOURCE_LABEL_ONLY = 5
 
 DEFAULT_WEIGHTS = {
     "WatchEvent": 1.0,
@@ -382,15 +387,42 @@ def empty_feedback_frame() -> pd.DataFrame:
     )
 
 
-def load_mart_feedback(path: Path, split: str | None = None) -> pd.DataFrame:
+def load_mart_feedback(
+    path: Path,
+    split: str | None = None,
+    expected_start: date | None = None,
+    expected_end: date | None = None,
+) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"mart not found: {path}")
     columns = ["actor_id", "repo_id", "weighted_score"]
     if split is not None:
-        columns = ["split", *columns]
+        available = set(pq.ParquetFile(path).schema_arrow.names)
+        date_columns = [
+            col for col in ["split_start_date", "split_end_date"] if col in available
+        ]
+        columns = ["split", *date_columns, *columns]
     df = pd.read_parquet(path, columns=columns)
     if split is not None:
-        df = df[df["split"] == split].drop(columns=["split"])
+        df = df[df["split"] == split]
+        if expected_start is not None and expected_end is not None and {
+            "split_start_date",
+            "split_end_date",
+        }.issubset(df.columns):
+            starts = set(pd.to_datetime(df["split_start_date"]).dt.date)
+            ends = set(pd.to_datetime(df["split_end_date"]).dt.date)
+            if starts != {expected_start} or ends != {expected_end}:
+                raise ValueError(
+                    f"mart split {split!r} covers {sorted(starts)}..{sorted(ends)}, "
+                    f"but args requested {expected_start}..{expected_end}; rebuild marts "
+                    "or use --use-marts never."
+                )
+        drop_cols = [
+            col
+            for col in ["split", "split_start_date", "split_end_date"]
+            if col in df
+        ]
+        df = df.drop(columns=drop_cols)
     out = df.rename(columns={"weighted_score": "score"})
     out = out.dropna(subset=["actor_id", "repo_id", "score"])
     return out.astype({"actor_id": "int64", "repo_id": "int64", "score": "float32"})
@@ -891,6 +923,39 @@ def hybridize_candidates(
     return out
 
 
+def add_label_only_candidates(
+    candidates_by_user: dict[int, list[tuple[int, float, int]]],
+    labels_by_user: dict[int, set[int]],
+    train_seen: dict[int, set[int]],
+    item2idx: dict[int, int],
+) -> dict[int, list[tuple[int, float, int]]]:
+    """Ensure ranker training sees every positive label for each training user."""
+    valid_items = set(item2idx)
+    out: dict[int, list[tuple[int, float, int]]] = {}
+    for uid, candidates in candidates_by_user.items():
+        rows = list(candidates)
+        existing = {int(cand[0]) for cand in rows}
+        seen = train_seen.get(uid, set())
+        for repo_id in sorted(labels_by_user.get(uid, set())):
+            if repo_id in valid_items and repo_id not in seen and repo_id not in existing:
+                rows.append((int(repo_id), 0.0, SOURCE_LABEL_ONLY))
+                existing.add(int(repo_id))
+        out[uid] = rows
+    return out
+
+
+def count_source_rows(
+    candidates_by_user: dict[int, list[tuple[int, float, int]]],
+    source: int,
+) -> int:
+    return sum(
+        1
+        for candidates in candidates_by_user.values()
+        for candidate in candidates
+        if len(candidate) > 2 and int(candidate[2]) == source
+    )
+
+
 def precision_recall_ndcg(recommended: list[int], relevant: set[int], k: int):
     recs = recommended[:k]
     hits = set(recs) & relevant
@@ -910,10 +975,24 @@ def source_mix_for_recs(
     recs = recommended[:k]
     denom = max(len(recs), 1)
     return {
-        f"top{k}_source_als_share": sum(1 for rid in recs if source_map.get(rid) == 1) / denom,
-        f"top{k}_source_recent_share": sum(1 for rid in recs if source_map.get(rid) == 2) / denom,
-        f"top{k}_source_popular_share": sum(1 for rid in recs if source_map.get(rid) == 3) / denom,
-        f"top{k}_source_related_share": sum(1 for rid in recs if source_map.get(rid) == 4) / denom,
+        f"top{k}_source_als_share": sum(1 for rid in recs if source_map.get(rid) == SOURCE_ALS)
+        / denom,
+        f"top{k}_source_recent_share": sum(
+            1 for rid in recs if source_map.get(rid) == SOURCE_RECENT
+        )
+        / denom,
+        f"top{k}_source_popular_share": sum(
+            1 for rid in recs if source_map.get(rid) == SOURCE_POPULAR
+        )
+        / denom,
+        f"top{k}_source_related_share": sum(
+            1 for rid in recs if source_map.get(rid) == SOURCE_RELATED
+        )
+        / denom,
+        f"top{k}_source_label_only_share": sum(
+            1 for rid in recs if source_map.get(rid) == SOURCE_LABEL_ONLY
+        )
+        / denom,
     }
 
 
@@ -1208,10 +1287,10 @@ def features_for_candidates(
     )
 
     source_arr = np.array(sources, dtype=np.int8)
-    source_is_als = (source_arr == 1).astype(np.float32)
-    source_is_recent = (source_arr == 2).astype(np.float32)
-    source_is_popular = (source_arr == 3).astype(np.float32)
-    source_is_related = (source_arr == 4).astype(np.float32)
+    source_is_als = (source_arr == SOURCE_ALS).astype(np.float32)
+    source_is_recent = (source_arr == SOURCE_RECENT).astype(np.float32)
+    source_is_popular = (source_arr == SOURCE_POPULAR).astype(np.float32)
+    source_is_related = (source_arr == SOURCE_RELATED).astype(np.float32)
     candidate_rank = np.array(original_ranks, dtype=np.float32)
     candidate_rank_pct = candidate_rank / max(len(candidates), 1)
     reciprocal_candidate_rank = 1.0 / candidate_rank
@@ -1371,7 +1450,7 @@ def train_ranker(
         positive_labels += int(y.sum())
 
     if not xs:
-        raise RuntimeError("No positive ranker labels found in ALS candidates.")
+        raise RuntimeError("No positive ranker labels found in ranker candidates.")
 
     x_train = np.vstack(xs)
     y_train = np.concatenate(ys)
@@ -1430,14 +1509,27 @@ def train_ranker_from_feature_parquet(
             f"ranker feature parquet contains unknown feature columns: {missing[:10]}"
         )
 
+    parquet = pq.ParquetFile(parquet_path)
     columns = ["group_index", "label", *feature_names]
-    frame = pd.read_parquet(parquet_path, columns=columns)
-    if frame.empty:
+    x_parts: list[np.ndarray] = []
+    y_parts: list[np.ndarray] = []
+    group_parts: list[np.ndarray] = []
+    for batch in parquet.iter_batches(columns=columns, batch_size=100_000):
+        frame = batch.to_pandas()
+        if frame.empty:
+            continue
+        group_parts.append(frame["group_index"].to_numpy(np.int32, copy=True))
+        y_parts.append(frame["label"].to_numpy(np.int32, copy=True))
+        x_parts.append(frame[feature_names].to_numpy(np.float32, copy=True))
+
+    if not y_parts:
         raise RuntimeError(f"ranker feature parquet is empty: {parquet_path}")
 
-    groups = frame.groupby("group_index", sort=False, observed=True).size().astype(int).tolist()
-    y_train = frame["label"].astype(np.int32).to_numpy()
-    x_train = frame[feature_names].astype(np.float32).to_numpy()
+    group_index = np.concatenate(group_parts)
+    _, counts = np.unique(group_index, return_counts=True)
+    groups = counts.astype(int).tolist()
+    y_train = np.concatenate(y_parts).astype(np.int32, copy=False)
+    x_train = np.vstack(x_parts).astype(np.float32, copy=False)
 
     ranker = lgb.LGBMRanker(
         objective="lambdarank",
@@ -1823,8 +1915,8 @@ def main():
         prior_fb = empty_feedback_frame()
         history_fb = load_mart_feedback(args.mart_dir / "user_repo_interaction_mart.parquet")
         split_mart = args.mart_dir / "experiment_split_mart.parquet"
-        rank_fb = load_mart_feedback(split_mart, "rank_label")
-        test_fb = load_mart_feedback(split_mart, "test")
+        rank_fb = load_mart_feedback(split_mart, "rank_label", args.rank_start, args.rank_end)
+        test_fb = load_mart_feedback(split_mart, "test", args.test_start, args.test_end)
     else:
         history_df = load_period(DATA_DIR, args.history_start, args.history_end)
         recent_start = max(args.history_start, args.history_end - timedelta(days=13))
@@ -1964,6 +2056,12 @@ def main():
         args.related_candidate_cap,
         related_seed_items,
     )
+    rank_hybrid = add_label_only_candidates(
+        rank_hybrid,
+        rank_labels,
+        train_seen,
+        item2idx,
+    )
     test_hybrid = hybridize_candidates(
         test_retrieval,
         test_users,
@@ -2064,6 +2162,7 @@ def main():
         "history_users": int(history_fb.actor_id.nunique()),
         "history_repos": int(history_fb.repo_id.nunique()),
         "rank_label_interactions": int(len(rank_fb)),
+        "rank_label_only_candidates": count_source_rows(rank_hybrid, SOURCE_LABEL_ONLY),
         "test_label_interactions": int(len(test_fb)),
         "eval_users": eval_user_count,
         "eval_warm_users": int(sum(1 for uid in test_labels if uid in user2idx)),
