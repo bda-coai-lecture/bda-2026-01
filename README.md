@@ -5,6 +5,7 @@ GitHub Archive(BigQuery) 데이터를 활용한 **repo 추천 시스템** 구축
 
 로컬 Airflow + Metabase + BigQuery metric mart 운영 노트는 [docs/data_platform_local.md](docs/data_platform_local.md)에 정리되어 있습니다.
 추천 실험 MLflow 기록/비교 방법은 [docs/mlflow_recsys_tracking.html](docs/mlflow_recsys_tracking.html)에 분리되어 있습니다.
+추천 MLOps API 구조와 로컬 user simulator 흐름은 [docs/recsys_api_architecture.html](docs/recsys_api_architecture.html)에 정리되어 있습니다.
 
 1~6주차 강의 경계와 다음 주차 진행안은 [docs/week6_checkpoint_and_week7_plan.md](docs/week6_checkpoint_and_week7_plan.md)에 정리되어 있습니다.
 
@@ -54,6 +55,7 @@ bda-2/
 ├── pyproject.toml
 ├── uv.lock
 ├── app_reco.py                     # Streamlit 정성평가 대시보드
+├── app_recsys_user_simulator.py    # 로컬 GitHub user 추천 시뮬레이터
 ├── src/
 │   ├── gharchive/                  # 데이터 핸들링
 │   │   ├── client.py               # BigQuery 클라이언트 + 로거
@@ -83,6 +85,7 @@ bda-2/
 │   ├── data_platform_local.md      # 로컬 데이터 플랫폼 운영 문서
 │   ├── mlflow_recsys_tracking.html # 추천 실험 MLflow tracking 문서
 │   ├── mlflow_recsys_tracking.md   # 추천 실험 MLflow tracking 문서
+│   ├── recsys_api_architecture.html # 추천 MLOps API 구조도
 │   └── week6_checkpoint_and_week7_plan.md # 1~6주차 완료선 + Week 7 진행안
 ├── notebooks/
 │   ├── gharchive/                  # 데이터 파이프라인
@@ -171,9 +174,32 @@ uv run streamlit run app_reco.py
 - GitHub API → SQLite 자동 캐싱으로 메타데이터 표시
 - FAISS FlatIP으로 3ms 검색
 
+로컬 GitHub user 추천 시뮬레이터:
+
+```bash
+uv run streamlit run app_recsys_user_simulator.py
+```
+
+- GitHub user 입력 기반 추천 API 시뮬레이션
+- 로컬 FastAPI 추천 서버와 함께 실행
+
+## FastAPI 서빙
+
+추천 API 앱은 `ghrec.api:app` ASGI 엔트리포인트를 기준으로 실행합니다.
+
+```bash
+uv run uvicorn ghrec.api:app --host 0.0.0.0 --port 8000
+```
+
+Docker Compose 실행:
+
+```bash
+docker compose up api
+```
+
 ## 로컬 데이터 플랫폼
 
-Airflow 3.2.1로 metadata cache refresh와 BigQuery metric mart sync를 오케스트레이션하고, Metabase에서 기초 지표, AI agent trendy repo, OSS Signal 운영 대시보드를 확인합니다.
+Airflow 3.2.1로 metadata cache refresh와 BigQuery metric mart sync를 오케스트레이션하고, Metabase에서 기초 지표, AI agent trendy repo, GitHub Core Metrics 대시보드를 확인합니다.
 Week 7부터는 `dbt/gharchive_metrics`에서 core metric mart와 semantic layer를 정의하고, `dags/gharchive_dbt_metrics.py`에서 Cosmos로 dbt model/test를 Airflow task group으로 실행합니다.
 
 ```bash
@@ -182,7 +208,7 @@ docker compose up airflow-apiserver airflow-scheduler airflow-dag-processor meta
 
 - Airflow: `http://localhost:8080`
 - Metabase: `http://localhost:3001`
-- OSS Signal 운영 대시보드: `http://localhost:3001/dashboard/4`
+- GitHub Core Metrics: `http://localhost:3001/dashboard/4`
 - 운영 문서: [docs/data_platform_local.md](docs/data_platform_local.md)
 
 dbt 단독 실행:

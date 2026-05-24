@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Recsys MLOps API 구조도</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f2937'/%3E%3Cpath d='M14 20h18v12H14zM14 42h18v8H14zM40 14h10v36H40z' fill='%23f8fafc'/%3E%3Cpath d='M32 26h8M32 46h8' stroke='%230f766e' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7fa;
+        --paper: #ffffff;
+        --ink: #172033;
+        --muted: #64748b;
+        --line: #cbd5e1;
+        --soft: #eef2f7;
+        --offline: #0f766e;
+        --registry: #b45309;
+        --serving: #2563eb;
+        --runtime: #6d28d9;
+        --verify: #15803d;
+        --warn: #b91c1c;
+      }
+
+      * {
+        box-sizing: border-box;
+        min-width: 0;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.45;
+        letter-spacing: 0;
+      }
+
+      .page {
+        width: min(1480px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 28px 0 44px;
+      }
+
+      .slide {
+        min-height: calc(100vh - 56px);
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 30px;
+        box-shadow: 0 18px 45px rgb(15 23 42 / 0.08);
+      }
+
+      .title-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 22px;
+        align-items: flex-start;
+        margin-bottom: 24px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .eyebrow {
+        margin: 0 0 7px;
+        color: var(--serving);
+        font-size: 13px;
+        font-weight: 850;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(30px, 4vw, 48px);
+        line-height: 1.08;
+        font-weight: 900;
+      }
+
+      .subtitle {
+        max-width: 850px;
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 17px;
+      }
+
+      .facts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(145px, 1fr));
+        gap: 10px;
+        min-width: 370px;
+      }
+
+      .fact {
+        padding: 11px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfcfe;
+      }
+
+      .fact b {
+        display: block;
+        font-size: 18px;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+      }
+
+      .fact span {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .architecture {
+        position: relative;
+        display: grid;
+        grid-template-columns:
+          minmax(220px, 1fr) 42px
+          minmax(230px, 1fr) 42px
+          minmax(300px, 1.25fr) 42px
+          minmax(250px, 1.05fr);
+        gap: 14px 10px;
+        align-items: stretch;
+        margin-top: 14px;
+      }
+
+      .zone {
+        display: grid;
+        gap: 12px;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        background: #fbfcfe;
+      }
+
+      .zone-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 850;
+        text-transform: uppercase;
+        overflow-wrap: anywhere;
+      }
+
+      .node {
+        min-height: 124px;
+        padding: 15px;
+        border: 2px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+      }
+
+      .node.offline {
+        border-color: var(--offline);
+      }
+      .node.registry {
+        border-color: var(--registry);
+      }
+      .node.serving {
+        border-color: var(--serving);
+      }
+      .node.runtime {
+        border-color: var(--runtime);
+      }
+      .node.verify {
+        border-color: var(--verify);
+      }
+
+      .node.compact {
+        min-height: 0;
+        padding: 12px;
+      }
+
+      .node.compact h2 {
+        font-size: 15px;
+      }
+
+      .node.compact p {
+        font-size: 12px;
+      }
+
+      .node-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+
+      .icon {
+        display: grid;
+        place-items: center;
+        flex: 0 0 34px;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        color: white;
+        font-size: 17px;
+        font-weight: 900;
+      }
+
+      .offline .icon {
+        background: var(--offline);
+      }
+      .registry .icon {
+        background: var(--registry);
+      }
+      .serving .icon {
+        background: var(--serving);
+      }
+      .runtime .icon {
+        background: var(--runtime);
+      }
+      .verify .icon {
+        background: var(--verify);
+      }
+
+      .node h2 {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.2;
+      }
+
+      .node p {
+        margin: 7px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 11px;
+      }
+
+      .tag {
+        padding: 4px 7px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--soft);
+        color: #334155;
+        font-size: 12px;
+        font-weight: 750;
+        overflow-wrap: anywhere;
+      }
+
+      .arrow {
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+      }
+
+      .arrow svg {
+        width: 42px;
+        height: 42px;
+      }
+
+      .wide {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+        gap: 18px;
+        margin-top: 16px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfcfe;
+        padding: 16px;
+      }
+
+      .panel h3 {
+        margin: 0 0 12px;
+        font-size: 16px;
+      }
+
+      .bundle-panel {
+        display: grid;
+        grid-template-columns: minmax(270px, 0.75fr) minmax(0, 1.25fr);
+        gap: 16px;
+        margin-top: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfcfe;
+        padding: 16px;
+      }
+
+      .bundle-copy {
+        display: grid;
+        align-content: start;
+        gap: 10px;
+      }
+
+      .bundle-copy h3 {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .bundle-copy p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .scenario {
+        display: grid;
+        gap: 7px;
+        margin-top: 2px;
+        padding: 12px;
+        border: 1px solid #f1c27d;
+        border-radius: 8px;
+        background: #fff8ed;
+      }
+
+      .scenario b {
+        font-size: 13px;
+        color: #7c2d12;
+      }
+
+      .scenario span {
+        color: #7c2d12;
+        font-size: 13px;
+      }
+
+      .bundle-card {
+        border: 2px solid var(--registry);
+        border-radius: 8px;
+        background: var(--paper);
+        padding: 14px;
+      }
+
+      .bundle-card h4 {
+        margin: 0 0 10px;
+        color: var(--registry);
+        font-size: 15px;
+      }
+
+      .bundle-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .bundle-item {
+        min-height: 72px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfcfe;
+      }
+
+      .bundle-item b {
+        display: block;
+        font-size: 13px;
+      }
+
+      .bundle-item span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .step {
+        position: relative;
+        min-height: 108px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+      }
+
+      .step::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: -8px;
+        width: 12px;
+        height: 12px;
+        border-top: 2px solid var(--line);
+        border-right: 2px solid var(--line);
+        transform: translateY(-50%) rotate(45deg);
+        background: #fbfcfe;
+      }
+
+      .step:last-child::after {
+        display: none;
+      }
+
+      .step b {
+        display: block;
+        font-size: 14px;
+      }
+
+      .step span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .contracts {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .contracts li {
+        display: grid;
+        grid-template-columns: 118px 1fr;
+        gap: 10px;
+        padding: 9px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        font-size: 13px;
+      }
+
+      .contracts b {
+        color: var(--serving);
+        overflow-wrap: anywhere;
+      }
+
+      .contracts span {
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.92em;
+      }
+
+      .footer {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .note {
+        border-left: 4px solid var(--line);
+        padding: 10px 12px;
+        background: #fbfcfe;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .note strong {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--ink);
+      }
+
+      @media (max-width: 1120px) {
+        .title-row,
+        .wide,
+        .bundle-panel {
+          grid-template-columns: 1fr;
+        }
+
+        .title-row {
+          display: grid;
+        }
+
+        .facts {
+          min-width: 0;
+        }
+
+        .architecture {
+          grid-template-columns: 1fr;
+        }
+
+        .arrow {
+          min-height: 24px;
+          transform: rotate(90deg);
+        }
+
+        .flow,
+        .footer {
+          grid-template-columns: 1fr;
+        }
+
+        .step::after {
+          display: none;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .page {
+          width: min(100% - 18px, 1480px);
+          padding: 9px 0 18px;
+        }
+
+        .slide {
+          padding: 18px;
+        }
+
+        .facts,
+        .contracts li,
+        .bundle-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="slide" aria-labelledby="page-title">
+        <div class="title-row">
+          <div>
+            <p class="eyebrow">BDA Week 6-7 Recommendation Serving</p>
+            <h1 id="page-title">Recsys MLOps API 구조도</h1>
+            <p class="subtitle">
+              오프라인 학습 산출물을 하나의 bundle로 등록하고, promoted bundle만
+              FastAPI가 로딩해서 추천을 서빙하는 구조. 로컬 uv 실행과 Docker
+              실행은 같은 API 계약을 사용한다.
+            </p>
+          </div>
+          <div class="facts" aria-label="current runtime facts">
+            <div class="fact">
+              <b>http://localhost:8000</b>
+              <span>API base URL</span>
+            </div>
+            <div class="fact">
+              <b>/docs</b>
+              <span>Swagger UI</span>
+            </div>
+            <div class="fact">
+              <b>recsys_v2_20260502_hybrid_lgbm_n20</b>
+              <span>현재 promoted bundle</span>
+            </div>
+            <div class="fact">
+              <b>5 tests passed</b>
+              <span>API/metric contract</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="architecture"
+          aria-label="recommendation API architecture diagram"
+        >
+          <div class="zone">
+            <div class="zone-title">
+              <span>Offline Pipeline</span>
+              <span>scripts</span>
+            </div>
+            <article class="node offline">
+              <div class="node-head">
+                <div class="icon">1</div>
+                <h2>학습/평가 산출물 생성</h2>
+              </div>
+              <p>
+                canonical dataset, hybrid candidates, LGBM ranker, eval
+                metrics를 재현 가능한 파일로 남긴다.
+              </p>
+              <div class="tags">
+                <span class="tag"><code>canonical_*.parquet</code></span>
+                <span class="tag"
+                  ><code>retrieval_candidates_*.parquet</code></span
+                >
+                <span class="tag"><code>ranker_lgbm_*.pkl</code></span>
+              </div>
+            </article>
+          </div>
+
+          <div class="arrow" aria-hidden="true">
+            <svg viewBox="0 0 42 42" fill="none">
+              <path
+                d="M6 21h27M24 12l9 9-9 9"
+                stroke="currentColor"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+
+          <div class="zone">
+            <div class="zone-title">
+              <span>Bundle Registry</span>
+              <span>local JSON</span>
+            </div>
+            <article class="node registry">
+              <div class="node-head">
+                <div class="icon">2</div>
+                <h2>등록과 승격</h2>
+              </div>
+              <p>
+                산출물 경로와 metric을 bundle manifest로 묶고, 명시적으로
+                promotion된 bundle만 active로 사용한다.
+              </p>
+              <div class="tags">
+                <span class="tag"><code>mlops_registry.py</code></span>
+                <span class="tag"><code>recsys_register_bundle.py</code></span>
+                <span class="tag"><code>data/registry/*.json</code></span>
+              </div>
+            </article>
+          </div>
+
+          <div class="arrow" aria-hidden="true">
+            <svg viewBox="0 0 42 42" fill="none">
+              <path
+                d="M6 21h27M24 12l9 9-9 9"
+                stroke="currentColor"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+
+          <div class="zone">
+            <div class="zone-title">
+              <span>Serving Engine</span>
+              <span>FastAPI module</span>
+            </div>
+            <article class="node serving">
+              <div class="node-head">
+                <div class="icon">3</div>
+                <h2>후보 로딩 + LGBM rerank</h2>
+              </div>
+              <p>
+                actor별 candidate parquet을 읽고 history 기반 feature를 붙인 뒤,
+                bundle의 feature_names로 ranker score를 계산한다.
+              </p>
+              <div class="tags">
+                <span class="tag"><code>recsys_serving.py</code></span>
+                <span class="tag"><code>candidate_source</code></span>
+                <span class="tag"><code>feature_names</code></span>
+              </div>
+            </article>
+          </div>
+
+          <div class="arrow" aria-hidden="true">
+            <svg viewBox="0 0 42 42" fill="none">
+              <path
+                d="M6 21h27M24 12l9 9-9 9"
+                stroke="currentColor"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+
+          <div class="zone">
+            <div class="zone-title">
+              <span>Runtime API</span>
+              <span>uv / Docker</span>
+            </div>
+            <article class="node runtime">
+              <div class="node-head">
+                <div class="icon">4</div>
+                <h2>동일 계약으로 서빙</h2>
+              </div>
+              <p>
+                로컬 uvicorn과 Docker compose가 같은 app을 실행한다. Docker
+                이미지는 serving 최소 의존성만 설치한다.
+              </p>
+              <div class="tags">
+                <span class="tag"><code>ghrec.api:app</code></span>
+                <span class="tag"><code>docker/api/Dockerfile</code></span>
+                <span class="tag"><code>docker compose up -d api</code></span>
+              </div>
+            </article>
+            <article class="node runtime compact">
+              <div class="node-head">
+                <div class="icon">UI</div>
+                <h2>Local user simulator</h2>
+              </div>
+              <p>
+                강의 중 GitHub user를 입력해 추천 API 응답을 바로 확인하는
+                Streamlit 시뮬레이터.
+              </p>
+              <div class="tags">
+                <span class="tag"
+                  ><code>app_recsys_user_simulator.py</code></span
+                >
+                <span class="tag"><code>streamlit run</code></span>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <section class="bundle-panel" aria-labelledby="bundle-concept-title">
+          <div class="bundle-copy">
+            <h3 id="bundle-concept-title">Bundle은 왜 필요한가</h3>
+            <p>
+              추천 API는 <code>model.pkl</code> 하나만으로 동작하지 않는다. 먼저
+              추천 후보를 찾고, 후보별 feature를 만들고, 그 feature를 ranker에
+              넣어 최종 순위를 계산한다.
+            </p>
+            <p>
+              bundle은 이 파일들이 서로 맞는 버전인지 기록한 체크리스트다. 즉
+              “이 candidate 파일과 이 feature 규칙으로 검증된 모델만 API에
+              올린다”는 약속이다.
+            </p>
+            <div class="scenario">
+              <b>모델 파일만 바꾸면 생길 수 있는 일</b>
+              <span>
+                새 ranker는 <code>candidate_source_code</code> feature를
+                기대하는데 API가 예전 candidate 파일을 읽으면, 추천 점수가
+                깨지거나 에러가 난다. bundle은 이런 mismatch를 줄이기 위한 최소
+                장치다.
+              </span>
+            </div>
+            <div class="tags">
+              <span class="tag">파일 버전 맞추기</span>
+              <span class="tag">실험 결과 추적</span>
+              <span class="tag">배포 실수 줄이기</span>
+              <span class="tag">이전 버전 복구</span>
+            </div>
+          </div>
+
+          <div class="bundle-card">
+            <h4>
+              <code>recsys_v2_20260502_hybrid_lgbm_n20</code> 안에 묶인 것
+            </h4>
+            <div class="bundle-grid">
+              <div class="bundle-item">
+                <b>Canonical data</b>
+                <span>유저가 과거에 본 repo와 평가용 split의 기준 데이터</span>
+              </div>
+              <div class="bundle-item">
+                <b>Candidate cache</b>
+                <span>ranker가 점수를 매길 actor별 후보 repo 목록</span>
+              </div>
+              <div class="bundle-item">
+                <b>LGBM ranker</b>
+                <span>후보 repo를 1등, 2등, 3등 순서로 다시 정렬하는 모델</span>
+              </div>
+              <div class="bundle-item">
+                <b>Feature contract</b>
+                <span>모델 입력 컬럼 이름과 순서가 맞는지 확인하는 규칙</span>
+              </div>
+              <div class="bundle-item">
+                <b>Eval metrics</b>
+                <span
+                  >이 조합이 얼마나 좋았는지 비교하는
+                  <code>rerank.ndcg@100</code> 같은 점수</span
+                >
+              </div>
+              <div class="bundle-item">
+                <b>Promotion state</b>
+                <span>여러 실험 중 지금 API가 써야 하는 버전 표시</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="wide">
+          <section class="panel" aria-labelledby="request-flow-title">
+            <h3 id="request-flow-title">추천 요청 처리 흐름</h3>
+            <div class="flow">
+              <div class="step">
+                <b>1. 요청</b>
+                <span
+                  ><code>POST /v1/recsys/recommendations</code><br />actor_id,
+                  k, bundle_id optional</span
+                >
+              </div>
+              <div class="step">
+                <b>2. Bundle 결정</b>
+                <span
+                  ><code>bundle_id=null</code>이면
+                  <code>recsys_promoted.json</code>의 active bundle 사용</span
+                >
+              </div>
+              <div class="step">
+                <b>3. Candidate 조회</b>
+                <span
+                  >parquet filter로 actor_id 후보만 읽고 candidate_rank 기준
+                  정렬</span
+                >
+              </div>
+              <div class="step">
+                <b>4. Feature + Rerank</b>
+                <span
+                  >history 통계 feature 생성 후 LGBM score 내림차순 정렬</span
+                >
+              </div>
+              <div class="step">
+                <b>5. 응답</b>
+                <span
+                  >repo_id, rank, score, candidate_source, metadata 반환</span
+                >
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" aria-labelledby="api-contract-title">
+            <h3 id="api-contract-title">API 계약</h3>
+            <ul class="contracts">
+              <li>
+                <b><code>GET /health</code></b>
+                <span>서비스 상태와 promoted bundle id 확인</span>
+              </li>
+              <li>
+                <b><code>GET /v1/recsys/bundles/active</code></b>
+                <span>현재 API가 서빙하는 manifest 조회</span>
+              </li>
+              <li>
+                <b><code>POST /v1/recsys/bundles/{id}/promote</code></b>
+                <span>artifact 존재 검증 후 active bundle 교체</span>
+              </li>
+              <li>
+                <b><code>GET /v1/recsys/users/{actor_id}/candidates</code></b>
+                <span>rerank 전 candidate/source 분포 디버깅</span>
+              </li>
+            </ul>
+          </section>
+        </div>
+
+        <div class="footer" aria-label="operating notes">
+          <div class="note">
+            <strong>Registry boundary</strong>
+            API는 latest 파일을 직접 고르지 않는다. bundle manifest와 explicit
+            promotion이 운영 기준이다.
+          </div>
+          <div class="note">
+            <strong>Runtime boundary</strong>
+            Docker는 torch, CUDA, implicit 없이 serving에 필요한 FastAPI,
+            pandas, pyarrow, LightGBM 중심으로 구성했다.
+          </div>
+          <div class="note">
+            <strong>Verification boundary</strong>
+            ruff, pytest, health, actor smoke test, docker build/up까지 확인된
+            상태를 기준으로 설명한다.
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
