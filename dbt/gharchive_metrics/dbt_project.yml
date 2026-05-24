@@ -18,9 +18,14 @@ clean-targets:
 
 vars:
   source_dataset: mart
+  raw_start_date: "2026-02-23"
+  raw_end_date: "2026-05-23"
 
 models:
   gharchive_metrics:
+    raw:
+      +materialized: view
+      +tags: ["lineage_reference"]
     staging:
       +materialized: view
     marts:

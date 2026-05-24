@@ -13,6 +13,8 @@ import pandas as pd
 import requests
 
 logger = logging.getLogger(__name__)
+FRESH_HTTP_STATUSES = {200, 404}
+RETRYABLE_HTTP_STATUSES = {403, 408, 429, 500, 502, 503, 504}
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS repo_metadata (
@@ -143,6 +145,9 @@ def fetch_and_cache_repos(
             continue
 
         should_refresh = force_refresh
+        http_status = cached.get("http_status")
+        if http_status not in FRESH_HTTP_STATUSES:
+            should_refresh = True
         if stale_before is not None:
             fetched_at = cached.get("fetched_at")
             should_refresh = should_refresh or fetched_at is None or fetched_at < stale_before
@@ -165,6 +170,16 @@ def fetch_and_cache_repos(
     for repo_id, repo_name in to_fetch.items():
         meta = fetch_repo_metadata(repo_name, token=token, session=session)
         now = datetime.now(timezone.utc).isoformat()
+        status = int(meta.get("http_status", 200))
+        cached = existing.get(int(repo_id))
+        cached_status = cached.get("http_status") if cached else None
+        if cached_status == 200 and status in RETRYABLE_HTTP_STATUSES:
+            logger.warning(
+                "keeping cached 200 metadata for %s after retryable status %s",
+                repo_name,
+                status,
+            )
+            continue
 
         conn.execute(
             """INSERT OR REPLACE INTO repo_metadata
@@ -185,7 +200,7 @@ def fetch_and_cache_repos(
                 meta.get("updated_at"),
                 int(meta.get("archived", 0)),
                 now,
-                int(meta.get("http_status", 200)),
+                status,
             ),
         )
         fetched += 1

@@ -12,4 +12,12 @@ ENV PATH="/home/airflow/.local/bin:${PATH}"
 
 RUN pip install --no-cache-dir "astronomer-cosmos>=1.11,<2.0" "dbt-bigquery>=1.9,<2.0" \
     && python -m venv /home/airflow/dbt_venv \
-    && /home/airflow/dbt_venv/bin/pip install --no-cache-dir "dbt-bigquery>=1.9,<2.0"
+    && /home/airflow/dbt_venv/bin/pip install --no-cache-dir "dbt-bigquery>=1.9,<2.0" \
+    && python -m venv /home/airflow/bda_venv \
+    && /home/airflow/bda_venv/bin/pip install --no-cache-dir \
+        "pandas>=2.2,<3" \
+        "requests>=2.32.5" \
+        "duckdb>=1.5.2" \
+        "google-cloud-bigquery>=3.40.1" \
+        "google-cloud-bigquery-storage>=2.36.2" \
+        "db-dtypes>=1.4.4"

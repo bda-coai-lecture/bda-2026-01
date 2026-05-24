@@ -22,3 +22,6 @@ models:
       - name: week_start
         tests:
           - not_null
+      - name: month_start
+        tests:
+          - not_null

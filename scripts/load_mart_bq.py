@@ -1,7 +1,7 @@
 """Compatibility wrapper for the safer BigQuery metric sync script.
 
 Prefer using scripts/sync_bq_metrics.py directly. This wrapper preserves the
-old entry point while defaulting to bounded aggregate-only uploads.
+old entry point while defaulting to a bounded BigQuery fact and metric refresh.
 """
 
 from __future__ import annotations
@@ -16,8 +16,8 @@ DEFAULT_ARGS = [
     "bda-coai",
     "--dataset",
     "mart",
-    "--parquet-dir",
-    "data/daily_agg",
+    "--source",
+    "bigquery",
     "--start",
     "2026-04-04",
     "--end",
@@ -26,7 +26,6 @@ DEFAULT_ARGS = [
     "35",
     "--mode",
     "replace-all",
-    "--skip-fact",
     "--build-metrics",
 ]
 

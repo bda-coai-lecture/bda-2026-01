@@ -7,20 +7,17 @@ from zoneinfo import ZoneInfo
 
 from airflow import DAG
 from airflow.providers.standard.operators.bash import BashOperator
-from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig
-from cosmos.constants import ExecutionMode, InvocationMode
 
 PROJECT_DIR = os.environ.get("BDA_PROJECT_DIR", "/opt/airflow/project")
 if not Path(PROJECT_DIR).exists():
     PROJECT_DIR = str(Path(__file__).resolve().parents[1])
-DBT_PROJECT_DIR = f"{PROJECT_DIR}/dbt/gharchive_metrics"
-DBT_PROFILES_DIR = f"{PROJECT_DIR}/dbt/profiles"
-DBT_EXECUTABLE_PATH = os.environ.get("DBT_EXECUTABLE_PATH", "/home/airflow/dbt_venv/bin/dbt")
 LOCAL_TZ = ZoneInfo("Asia/Seoul")
 
-WINDOW_START = "2026-04-12"
-WINDOW_END = "2026-05-16"
-MAX_DAYS = 35
+# The 00:30 KST run is 15:30 UTC on the previous calendar day.  GitHub Archive
+# daily tables are usually ready through UTC yesterday at that point.
+WINDOW_START = "$(date -u -d '90 days ago' +%F)"
+WINDOW_END = "$(date -u -d 'yesterday' +%F)"
+MAX_DAYS = 90
 
 UV_BASE = (
     "uv run --no-project "
@@ -28,6 +25,7 @@ UV_BASE = (
     "--with pyarrow "
     "--with duckdb "
     "--with google-cloud-bigquery "
+    "--with google-cloud-bigquery-storage "
     "--with db-dtypes "
 )
 
@@ -36,15 +34,21 @@ PLAN_FACT_COMMAND = (
     + "python scripts/sync_bq_metrics.py "
     "--project bda-coai "
     "--dataset mart "
-    "--parquet-dir data/daily_agg "
+    "--source bigquery "
     f"--start {WINDOW_START} "
     f"--end {WINDOW_END} "
     f"--max-days {MAX_DAYS} "
-    "--mode replace-all "
+    "--mode replace-days "
     "--plan-only"
 )
 
 SYNC_FACT_COMMAND = PLAN_FACT_COMMAND.removesuffix(" --plan-only") + " --no-summary"
+
+DBT_BUILD_COMMAND = (
+    "dbt build "
+    "--project-dir dbt/gharchive_metrics "
+    "--profiles-dir dbt/profiles"
+)
 
 default_env = {
     "GCP_KEY_PATH": "/opt/airflow/gcp-key.json",
@@ -71,9 +75,9 @@ fact_task_defaults = {
 
 with DAG(
     dag_id="gharchive_dbt_metrics",
-    description="Load GitHub Archive fact data and build metric marts with dbt through Cosmos.",
+    description="Load the rolling GitHub Archive fact table used for drill-downs and dbt demos.",
     start_date=datetime(2026, 5, 12, tzinfo=LOCAL_TZ),
-    schedule="0 7 * * *",
+    schedule="30 0 * * *",
     catchup=False,
     max_active_runs=1,
     default_args=default_args,
@@ -93,25 +97,11 @@ with DAG(
         **fact_task_defaults,
     )
 
-    dbt_metrics = DbtTaskGroup(
-        group_id="dbt_metrics",
-        project_config=ProjectConfig(dbt_project_path=Path(DBT_PROJECT_DIR)),
-        profile_config=ProfileConfig(
-            profile_name="gharchive_metrics",
-            target_name="dev",
-            profiles_yml_filepath=Path(DBT_PROFILES_DIR) / "profiles.yml",
-        ),
-        execution_config=ExecutionConfig(
-            execution_mode=ExecutionMode.LOCAL,
-            invocation_mode=InvocationMode.DBT_RUNNER,
-            dbt_executable_path=DBT_EXECUTABLE_PATH,
-        ),
-        operator_args={
-            "env": default_env,
-            "append_env": True,
-            "install_deps": False,
-            "execution_timeout": timedelta(minutes=30),
-        },
+    build_dbt_metrics = BashOperator(
+        task_id="build_dbt_metrics",
+        bash_command=DBT_BUILD_COMMAND,
+        execution_timeout=timedelta(minutes=30),
+        **fact_task_defaults,
     )
 
-    plan_fact_sync >> sync_fact >> dbt_metrics
+    plan_fact_sync >> sync_fact >> build_dbt_metrics

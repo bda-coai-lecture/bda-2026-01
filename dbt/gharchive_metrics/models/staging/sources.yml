@@ -6,7 +6,7 @@ sources:
     schema: "{{ var('source_dataset', 'mart') }}"
     tables:
       - name: fact_user_repo_activity
-        description: Daily user-repo-action aggregate loaded from local GitHub Archive parquet.
+        description: Daily user-repo-action aggregate backfilled from GitHub Archive BigQuery tables. This is the only dbt source used by production dashboard marts; raw reference models document the upstream shape but are not the operational upstream for metrics_* models.
         columns:
           - name: user_id
             tests:

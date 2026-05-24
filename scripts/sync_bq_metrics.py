@@ -1,10 +1,10 @@
-"""Sync local GitHub Archive daily parquet files to BigQuery metric marts.
+"""Sync GitHub Archive daily aggregates to BigQuery metric marts.
 
 The script is intentionally boring and idempotent:
 
-1. Plan the selected local parquet range before touching BigQuery.
-2. Build metric tables locally from parquet and upload the small aggregates.
-3. Optionally rebuild a bounded fact table with BigQuery load jobs.
+1. Plan the selected date range before touching BigQuery.
+2. Backfill or refresh a bounded daily aggregate fact table in BigQuery.
+3. Rebuild metric tables from the BigQuery fact table or legacy local parquet.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ DEFAULT_PROJECT = "bda-coai"
 DEFAULT_DATASET = "mart"
 DEFAULT_FACT_TABLE = "fact_user_repo_activity"
 SANDBOX_EXPIRATION_DAYS = 58
-DEFAULT_MAX_DAYS = 35
+DEFAULT_MAX_DAYS = 90
 AGENT_SEED_REPOS = {
     1103012935: "openclaw/openclaw",
     1108837393: "code-yeongyu/oh-my-openagent",
@@ -94,6 +94,15 @@ def iter_parquet_files(parquet_dir: Path, start: date | None, end: date | None) 
     return selected
 
 
+def iter_dates(start: date, end: date) -> list[date]:
+    days = []
+    current = start
+    while current <= end:
+        days.append(current)
+        current += timedelta(days=1)
+    return days
+
+
 def print_plan(files: list[Path], mode: str, max_days: int) -> None:
     total_bytes = sum(path.stat().st_size for path in files)
     first_day = parse_day(files[0]) if files else None
@@ -102,6 +111,16 @@ def print_plan(files: list[Path], mode: str, max_days: int) -> None:
         "PLAN "
         f"days={len(files)} range={first_day}..{last_day} "
         f"local_bytes={total_bytes / 1024 ** 3:.2f}GiB mode={mode} max_days={max_days}"
+    )
+
+
+def print_bq_plan(days: list[date], mode: str, max_days: int) -> None:
+    first_day = days[0] if days else None
+    last_day = days[-1] if days else None
+    print(
+        "PLAN "
+        f"source=bigquery days={len(days)} range={first_day}..{last_day} "
+        f"mode={mode} max_days={max_days}"
     )
 
 
@@ -119,19 +138,24 @@ def bq_expiration(client: bigquery.Client) -> datetime:
 def ensure_dataset(client: bigquery.Client, names: TableNames, location: str) -> None:
     dataset = bigquery.Dataset(names.dataset_id)
     dataset.location = location
-    # BigQuery sandbox projects require table and partition expiration shorter than 60 days.
-    # Keeping the fact table non-partitioned lets old activity_date values stay queryable
-    # until the table itself expires.
-    expiration_ms = SANDBOX_EXPIRATION_DAYS * 24 * 60 * 60 * 1000
-    dataset.default_table_expiration_ms = expiration_ms
-    dataset.default_partition_expiration_ms = expiration_ms
     dataset = client.create_dataset(dataset, exists_ok=True)
-    dataset.default_table_expiration_ms = expiration_ms
-    dataset.default_partition_expiration_ms = expiration_ms
-    client.update_dataset(
-        dataset,
-        ["default_table_expiration_ms", "default_partition_expiration_ms"],
-    )
+    dataset.default_table_expiration_ms = None
+    dataset.default_partition_expiration_ms = None
+    try:
+        client.update_dataset(
+            dataset,
+            ["default_table_expiration_ms", "default_partition_expiration_ms"],
+        )
+    except Exception as exc:
+        if "Billing has not been enabled" not in str(exc):
+            raise
+        expiration_ms = SANDBOX_EXPIRATION_DAYS * 24 * 60 * 60 * 1000
+        dataset.default_table_expiration_ms = expiration_ms
+        dataset.default_partition_expiration_ms = expiration_ms
+        client.update_dataset(
+            dataset,
+            ["default_table_expiration_ms", "default_partition_expiration_ms"],
+        )
 
 
 def ensure_fact_table(client: bigquery.Client, names: TableNames) -> None:
@@ -143,12 +167,18 @@ def ensure_fact_table(client: bigquery.Client, names: TableNames) -> None:
         bigquery.SchemaField("activity_date", "DATE", mode="REQUIRED"),
     ]
     table = bigquery.Table(names.fact_id, schema=schema)
-    table.expires = bq_expiration(client)
+    table.time_partitioning = bigquery.TimePartitioning(field="activity_date")
     table.clustering_fields = ["action", "repo_id"]
     client.create_table(table, exists_ok=True)
     table = client.get_table(names.fact_id)
-    table.expires = bq_expiration(client)
-    client.update_table(table, ["expires"])
+    table.expires = None
+    try:
+        client.update_table(table, ["expires"])
+    except Exception as exc:
+        if "Billing has not been enabled" not in str(exc):
+            raise
+        table.expires = bq_expiration(client)
+        client.update_table(table, ["expires"])
 
 
 def partition_exists(client: bigquery.Client, names: TableNames, activity_date: date) -> bool:
@@ -220,6 +250,52 @@ def load_one_day(
     return len(df)
 
 
+def load_one_day_from_public_bigquery(
+    client: bigquery.Client,
+    names: TableNames,
+    activity_date: date,
+    mode: str,
+) -> int:
+    if mode == "skip-existing" and partition_exists(client, names, activity_date):
+        print(f"SKIP {activity_date} already exists")
+        return 0
+
+    if mode == "replace-days":
+        delete_sql = f"DELETE FROM `{names.fact_id}` WHERE activity_date = @activity_date"
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("activity_date", "DATE", activity_date)
+            ]
+        )
+        client.query(delete_sql, job_config=job_config).result()
+
+    date_str = activity_date.strftime("%Y%m%d")
+    query = f"""
+    SELECT
+      CAST(actor.id AS INT64) AS user_id,
+      CAST(repo.id AS INT64) AS repo_id,
+      CAST(type AS STRING) AS action,
+      COUNT(*) AS event_count,
+      DATE '{activity_date.isoformat()}' AS activity_date
+    FROM `githubarchive.day.{date_str}`
+    WHERE actor.id IS NOT NULL
+      AND repo.id IS NOT NULL
+      AND type IS NOT NULL
+    GROUP BY user_id, repo_id, action, activity_date
+    """
+    before_rows = client.get_table(names.fact_id).num_rows
+    job_config = bigquery.QueryJobConfig(
+        destination=names.fact_id,
+        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+    )
+    job = client.query(query, job_config=job_config)
+    print(f"BQ_JOB {activity_date} {job.job_id}", flush=True)
+    job.result()
+    rows = max(client.get_table(names.fact_id).num_rows - before_rows, 0)
+    print(f"LOADED {activity_date} rows={rows:,}")
+    return rows
+
+
 def read_activity_file(path: Path) -> pd.DataFrame:
     activity_date = parse_day(path)
     df = pd.read_parquet(path)
@@ -260,6 +336,24 @@ def load_repo_metadata(db_path: Path = Path("data/repo_metadata.db")) -> pd.Data
         )
     finally:
         conn.close()
+
+
+def load_repo_metadata_from_bq(client: bigquery.Client, names: TableNames) -> pd.DataFrame:
+    table_id = names.table_id("repo_metadata")
+    try:
+        return client.query(
+            f"""
+            SELECT repo_id, repo_name, description, topics, stargazers, forks
+            FROM `{table_id}`
+            """
+        ).to_dataframe()
+    except Exception as exc:
+        message = str(exc)
+        if "Not found" in message or "NotFound" in message:
+            return pd.DataFrame(
+                columns=["repo_id", "repo_name", "description", "topics", "stargazers", "forks"]
+            )
+        raise
 
 
 def metadata_keyword_mask(metadata: pd.DataFrame) -> pd.Series:
@@ -1219,6 +1313,233 @@ def rebuild_metrics(client: bigquery.Client, names: TableNames, files: list[Path
         print(f"LOADED {table_name} rows={len(metric_df):,}")
 
 
+def overwrite_query_table(client: bigquery.Client, table_id: str, sql: str) -> int:
+    job_config = bigquery.QueryJobConfig(
+        destination=table_id,
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+    )
+    job = client.query(sql, job_config=job_config)
+    job.result()
+    table = client.get_table(table_id)
+    return table.num_rows
+
+
+def rebuild_sql_metrics_from_bq(client: bigquery.Client, names: TableNames) -> None:
+    metric_queries = {
+        "metrics_daily": f"""
+            SELECT
+              activity_date,
+              COUNT(DISTINCT user_id) AS active_users,
+              COUNT(DISTINCT repo_id) AS active_repos,
+              SUM(event_count) AS total_events,
+              COUNT(*) AS user_repo_action_rows,
+              SAFE_DIVIDE(SUM(event_count), COUNT(DISTINCT user_id)) AS events_per_active_user,
+              SUM(IF(action = 'PushEvent', event_count, 0)) AS push_events,
+              SUM(IF(action = 'WatchEvent', event_count, 0)) AS watch_events,
+              SUM(IF(action = 'ForkEvent', event_count, 0)) AS fork_events,
+              SUM(IF(action = 'PullRequestEvent', event_count, 0)) AS pull_request_events,
+              SUM(IF(action = 'IssuesEvent', event_count, 0)) AS issue_events,
+              SUM(IF(action = 'IssueCommentEvent', event_count, 0)) AS issue_comment_events
+            FROM `{names.fact_id}`
+            GROUP BY activity_date
+        """,
+        "metrics_event_type_daily": f"""
+            SELECT
+              activity_date,
+              action,
+              COUNT(DISTINCT user_id) AS active_users,
+              COUNT(DISTINCT repo_id) AS active_repos,
+              SUM(event_count) AS total_events,
+              COUNT(*) AS user_repo_action_rows
+            FROM `{names.fact_id}`
+            GROUP BY activity_date, action
+        """,
+        "metrics_weekly": f"""
+            SELECT
+              DATE_TRUNC(activity_date, WEEK(MONDAY)) AS week_start,
+              COUNT(DISTINCT user_id) AS weekly_active_users,
+              COUNT(DISTINCT repo_id) AS weekly_active_repos,
+              SUM(event_count) AS total_events,
+              SAFE_DIVIDE(SUM(event_count), COUNT(DISTINCT user_id)) AS events_per_active_user
+            FROM `{names.fact_id}`
+            GROUP BY week_start
+        """,
+        "metrics_user_segments": f"""
+            WITH user_period AS (
+              SELECT
+                user_id,
+                COUNT(DISTINCT activity_date) AS active_days,
+                SUM(event_count) AS total_events,
+                COUNT(DISTINCT repo_id) AS active_repos
+              FROM `{names.fact_id}`
+              GROUP BY user_id
+            )
+            SELECT
+              CASE
+                WHEN active_days = 1 THEN 'one_day'
+                WHEN active_days BETWEEN 2 AND 4 THEN 'repeat_2d_4d'
+                WHEN active_days BETWEEN 5 AND 14 THEN 'regular_5d_14d'
+                ELSE 'power_15d_plus'
+              END AS user_segment,
+              COUNT(*) AS users,
+              SUM(total_events) AS total_events,
+              AVG(active_days) AS avg_active_days,
+              AVG(active_repos) AS avg_active_repos,
+              AVG(total_events) AS avg_total_events
+            FROM user_period
+            GROUP BY user_segment
+        """,
+        "metrics_retention_weekly": f"""
+            WITH user_week AS (
+              SELECT DISTINCT user_id, DATE_TRUNC(activity_date, WEEK(MONDAY)) AS week_start
+              FROM `{names.fact_id}`
+            ),
+            first_week AS (
+              SELECT user_id, MIN(week_start) AS cohort_week
+              FROM user_week
+              GROUP BY user_id
+            ),
+            cohort_activity AS (
+              SELECT
+                uw.user_id,
+                fw.cohort_week,
+                uw.week_start,
+                DATE_DIFF(uw.week_start, fw.cohort_week, WEEK) AS weeks_since
+              FROM user_week uw
+              JOIN first_week fw USING (user_id)
+            ),
+            cohort_sizes AS (
+              SELECT cohort_week, COUNT(*) AS cohort_users
+              FROM first_week
+              GROUP BY cohort_week
+            )
+            SELECT
+              ca.cohort_week,
+              ca.week_start,
+              ca.weeks_since,
+              cs.cohort_users,
+              COUNT(DISTINCT ca.user_id) AS active_users,
+              SAFE_DIVIDE(COUNT(DISTINCT ca.user_id), cs.cohort_users) AS retention_rate
+            FROM cohort_activity ca
+            JOIN cohort_sizes cs USING (cohort_week)
+            GROUP BY ca.cohort_week, ca.week_start, ca.weeks_since, cs.cohort_users
+        """,
+        "metrics_retention_summary": f"""
+            WITH user_week AS (
+              SELECT DISTINCT user_id, DATE_TRUNC(activity_date, WEEK(MONDAY)) AS week_start
+              FROM `{names.fact_id}`
+            ),
+            first_week AS (
+              SELECT user_id, MIN(week_start) AS cohort_week
+              FROM user_week
+              GROUP BY user_id
+            ),
+            cohort_sizes AS (
+              SELECT cohort_week, COUNT(*) AS cohort_users
+              FROM first_week
+              GROUP BY cohort_week
+            ),
+            retention AS (
+              SELECT
+                fw.cohort_week,
+                DATE_DIFF(uw.week_start, fw.cohort_week, WEEK) AS weeks_since,
+                COUNT(DISTINCT uw.user_id) AS active_users
+              FROM user_week uw
+              JOIN first_week fw USING (user_id)
+              GROUP BY fw.cohort_week, uw.week_start, weeks_since
+            )
+            SELECT
+              r.cohort_week,
+              cs.cohort_users,
+              MAX(IF(r.weeks_since = 0, SAFE_DIVIDE(r.active_users, cs.cohort_users), 0)) AS w0_retention,
+              MAX(IF(r.weeks_since = 1, SAFE_DIVIDE(r.active_users, cs.cohort_users), 0)) AS w1_retention,
+              MAX(IF(r.weeks_since = 2, SAFE_DIVIDE(r.active_users, cs.cohort_users), 0)) AS w2_retention,
+              MAX(IF(r.weeks_since = 3, SAFE_DIVIDE(r.active_users, cs.cohort_users), 0)) AS w3_retention
+            FROM retention r
+            JOIN cohort_sizes cs USING (cohort_week)
+            GROUP BY r.cohort_week, cs.cohort_users
+        """,
+    }
+
+    for table_name in [
+        "metrics_daily",
+        "metrics_event_type_daily",
+        "metrics_weekly",
+        "metrics_user_segments",
+        "metrics_retention_weekly",
+        "metrics_retention_summary",
+    ]:
+        rows = overwrite_query_table(client, names.table_id(table_name), metric_queries[table_name])
+        print(f"LOADED {table_name} rows={rows:,}")
+
+
+def build_agent_metrics_from_bq(client: bigquery.Client, names: TableNames) -> dict[str, pd.DataFrame]:
+    metadata = load_repo_metadata_from_bq(client, names)
+    seed_repo_ids = set(AGENT_SEED_REPOS)
+    if metadata.empty:
+        candidate_ids = seed_repo_ids
+    else:
+        candidate_ids = set(
+            metadata.loc[metadata_keyword_mask(metadata), "repo_id"]
+            .dropna()
+            .astype("int64")
+            .tolist()
+        ) | seed_repo_ids
+    if not candidate_ids:
+        return {
+            "metrics_agent_trendy_repos": pd.DataFrame(),
+            "metrics_agent_trend_validation": pd.DataFrame(),
+        }
+
+    sql = f"""
+    SELECT user_id, repo_id, action, event_count, activity_date
+    FROM `{names.fact_id}`
+    WHERE repo_id IN UNNEST(@repo_ids)
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ArrayQueryParameter("repo_ids", "INT64", sorted(candidate_ids))
+        ]
+    )
+    trend_activity = client.query(sql, job_config=job_config).to_dataframe()
+    if trend_activity.empty:
+        return {
+            "metrics_agent_trendy_repos": pd.DataFrame(),
+            "metrics_agent_trend_validation": pd.DataFrame(),
+        }
+
+    trend_activity["activity_date"] = pd.to_datetime(trend_activity["activity_date"])
+    weighted_df = weighted_activity(trend_activity)
+    return {
+        "metrics_agent_trendy_repos": make_agent_trendy_table(
+            weighted_df,
+            metadata,
+            baseline_days=28,
+            recent_days=7,
+        ),
+        "metrics_agent_trend_validation": evaluate_agent_trend(weighted_df, metadata),
+    }
+
+
+def rebuild_metrics_from_bq(client: bigquery.Client, names: TableNames) -> None:
+    for table_name in [
+        "metrics_daily",
+        "metrics_event_type_daily",
+        "metrics_weekly",
+        "metrics_user_segments",
+        "metrics_retention_weekly",
+        "metrics_retention_summary",
+        "metrics_agent_trendy_repos",
+        "metrics_agent_trend_validation",
+    ]:
+        client.delete_table(names.table_id(table_name), not_found_ok=True)
+
+    rebuild_sql_metrics_from_bq(client, names)
+    for table_name, metric_df in build_agent_metrics_from_bq(client, names).items():
+        load_dataframe_table(client, names.table_id(table_name), metric_df)
+        print(f"LOADED {table_name} rows={len(metric_df):,}")
+
+
 def print_summary(client: bigquery.Client, names: TableNames) -> None:
     sql = f"""
     SELECT
@@ -1259,6 +1580,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset", default=DEFAULT_DATASET)
     parser.add_argument("--fact-table", default=DEFAULT_FACT_TABLE)
     parser.add_argument("--location", default="US")
+    parser.add_argument(
+        "--source",
+        choices=["bigquery", "parquet"],
+        default="bigquery",
+        help="Read daily aggregates from GitHub Archive BigQuery tables or legacy local parquet.",
+    )
     parser.add_argument("--parquet-dir", type=Path, default=Path("data/daily_agg"))
     parser.add_argument("--key-path", default=os.environ.get("GCP_KEY_PATH"))
     parser.add_argument("--start")
@@ -1283,14 +1610,24 @@ def main() -> None:
     start = datetime.strptime(args.start, "%Y-%m-%d").date() if args.start else None
     end = datetime.strptime(args.end, "%Y-%m-%d").date() if args.end else None
     names = TableNames(args.project, args.dataset, args.fact_table)
-    files = iter_parquet_files(args.parquet_dir, start, end)
-    if not files:
-        raise FileNotFoundError(f"No parquet files found in {args.parquet_dir}")
-    print_plan(files, args.mode, args.max_days)
+    files: list[Path] = []
+    days: list[date] = []
+    if args.source == "parquet":
+        files = iter_parquet_files(args.parquet_dir, start, end)
+        if not files:
+            raise FileNotFoundError(f"No parquet files found in {args.parquet_dir}")
+        print_plan(files, args.mode, args.max_days)
+        selected_days = len(files)
+    else:
+        if not start or not end:
+            raise SystemExit("--source bigquery requires explicit --start and --end.")
+        days = iter_dates(start, end)
+        print_bq_plan(days, args.mode, args.max_days)
+        selected_days = len(days)
 
-    if len(files) > args.max_days and not args.allow_full_history:
+    if selected_days > args.max_days and not args.allow_full_history:
         raise SystemExit(
-            f"Refusing to sync {len(files)} days. Pass --start/--end for a bounded window "
+            f"Refusing to sync {selected_days} days. Pass --start/--end for a bounded window "
             f"or add --allow-full-history intentionally."
         )
     if args.plan_only:
@@ -1300,29 +1637,42 @@ def main() -> None:
 
     ensure_dataset(client, names, args.location)
     if args.skip_fact:
-        print("SKIP fact table sync; metric tables will be built from local parquet.")
+        print(f"SKIP fact table sync; metric tables will be built from {args.source}.")
     else:
         if args.mode == "replace-all":
             client.delete_table(names.fact_id, not_found_ok=True)
         ensure_fact_table(client, names)
 
-        print(f"SYNC files={len(files)} mode={args.mode} target={names.fact_id}")
+        print(f"SYNC source={args.source} days={selected_days} mode={args.mode} target={names.fact_id}")
         total_rows = 0
-        for index, path in enumerate(files):
-            write_disposition = None
-            load_mode = args.mode
-            if args.mode == "replace-all":
-                load_mode = "append"
-                write_disposition = (
-                    bigquery.WriteDisposition.WRITE_TRUNCATE
-                    if index == 0
-                    else bigquery.WriteDisposition.WRITE_APPEND
+        if args.source == "parquet":
+            for index, path in enumerate(files):
+                write_disposition = None
+                load_mode = args.mode
+                if args.mode == "replace-all":
+                    load_mode = "append"
+                    write_disposition = (
+                        bigquery.WriteDisposition.WRITE_TRUNCATE
+                        if index == 0
+                        else bigquery.WriteDisposition.WRITE_APPEND
+                    )
+                total_rows += load_one_day(client, names, path, load_mode, write_disposition)
+        else:
+            load_mode = "append" if args.mode == "replace-all" else args.mode
+            for activity_date in days:
+                total_rows += load_one_day_from_public_bigquery(
+                    client,
+                    names,
+                    activity_date,
+                    load_mode,
                 )
-            total_rows += load_one_day(client, names, path, load_mode, write_disposition)
         print(f"SYNCED rows={total_rows:,}")
 
     if args.build_metrics:
-        rebuild_metrics(client, names, files)
+        if args.source == "parquet":
+            rebuild_metrics(client, names, files)
+        else:
+            rebuild_metrics_from_bq(client, names)
     if args.summary:
         print_summary(client, names)
 

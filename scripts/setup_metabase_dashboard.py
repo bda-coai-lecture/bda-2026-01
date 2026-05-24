@@ -18,6 +18,40 @@ DEFAULT_EMAIL = "bda@local.dev"
 DEFAULT_PASSWORD = "bda-local-2026"
 DEFAULT_PROJECT = "bda-coai"
 DEFAULT_DATASET = "mart"
+OLD_DASHBOARD_CARD_NAMES = {
+    "Signal - Latest Active Users",
+    "Signal - Latest Events",
+    "Signal - Latest W1 Retention",
+    "Signal - Top Trend Score",
+    "Signal - Activity Trend",
+    "Signal - Event Mix",
+    "Signal - Trend Leaderboard",
+    "Signal - Growth vs Affinity",
+    "Signal - Retention Health",
+    "Signal - Model Validation",
+    "D1 Retention",
+    "D7 Retention",
+    "D30 Retention",
+    "Carrying Capacity",
+    "D1/D7/D30 Active Users",
+    "D1 Active Users",
+    "D7 Active Users",
+    "D30 Active Users",
+    "Weekly User Retention",
+    "Monthly User Retention",
+    "User Retention Latest Periods",
+    "Cohort retention heatmap",
+    "Weekly Cohort Retention Heatmap",
+    "Monthly Cohort Retention Heatmap",
+    "Monthly Active User Retention Heatmap",
+    "OSS Weekly Cohort Retention Heatmap",
+    "OSS Monthly Cohort Retention Heatmap",
+    "OSS Monthly Active User Retention Heatmap",
+    "GitHub Core Weekly Retention Heatmap",
+    "GitHub Core Weekly Active User Retention Heatmap",
+    "GitHub Core Monthly Active User Retention Heatmap",
+    "GitHub Core D1/D7/D30 Active Users",
+}
 
 
 @dataclass
@@ -174,6 +208,16 @@ def card_payload(
     }
 
 
+def percent_column_settings(prefix: str, count: int) -> dict[str, dict[str, Any]]:
+    settings: dict[str, dict[str, Any]] = {}
+    for index in range(1, count + 1):
+        name = f"{prefix}{index}"
+        value = {"number_style": "percent", "decimals": 1}
+        settings[json.dumps(["name", name], separators=(",", ":"))] = value
+        settings[json.dumps(["field", name, {"base-type": "type/Float"}], separators=(",", ":"))] = value
+    return settings
+
+
 def list_cards(mb: Metabase) -> list[dict[str, Any]]:
     return mb.get_json("/api/card")
 
@@ -239,9 +283,18 @@ def ensure_dashboard_with_description(
     name: str,
     collection_id: int,
     description: str,
+    aliases: list[str] | None = None,
 ) -> int:
-    existing = find_dashboard(mb, name)
+    existing = find_dashboard_by_names(mb, [*(aliases or []), name])
     if existing:
+        mb.put_json(
+            f"/api/dashboard/{existing['id']}",
+            {
+                "name": name,
+                "description": description,
+                "collection_id": collection_id,
+            },
+        )
         return int(existing["id"])
     dashboard = mb.post_json(
         "/api/dashboard",
@@ -386,20 +439,25 @@ def build_cards(database_id: int, collection_id: int, project: str, dataset: str
             },
         ),
         card_payload(
-            "Cohort retention heatmap",
+            "Weekly Cohort Retention Heatmap",
             database_id,
             f"""
             SELECT
               cohort_week,
               cohort_users,
-              MAX(CASE WHEN weeks_since = 0 THEN retention_rate END) AS w0,
-              MAX(CASE WHEN weeks_since = 1 THEN retention_rate END) AS w1,
-              MAX(CASE WHEN weeks_since = 2 THEN retention_rate END) AS w2,
-              MAX(CASE WHEN weeks_since = 3 THEN retention_rate END) AS w3,
-              MAX(CASE WHEN weeks_since = 4 THEN retention_rate END) AS w4
-            FROM {table("metrics_retention_weekly")}
-            WHERE weeks_since BETWEEN 0 AND 4
-            GROUP BY cohort_week, cohort_users
+              w1_retention AS w1,
+              w2_retention AS w2,
+              w3_retention AS w3,
+              w4_retention AS w4,
+              w5_retention AS w5,
+              w6_retention AS w6,
+              w7_retention AS w7,
+              w8_retention AS w8,
+              w9_retention AS w9,
+              w10_retention AS w10,
+              w11_retention AS w11,
+              w12_retention AS w12
+            FROM {table("metrics_cohort_retention_weekly_heatmap")}
             ORDER BY cohort_week
             """,
             "table",
@@ -408,15 +466,62 @@ def build_cards(database_id: int, collection_id: int, project: str, dataset: str
                 "table.columns": [
                     {"name": "cohort_week", "enabled": True},
                     {"name": "cohort_users", "enabled": True},
-                    {"name": "w0", "enabled": True, "number_style": "percent", "decimals": 1},
-                    {"name": "w1", "enabled": True, "number_style": "percent", "decimals": 1},
-                    {"name": "w2", "enabled": True, "number_style": "percent", "decimals": 1},
-                    {"name": "w3", "enabled": True, "number_style": "percent", "decimals": 1},
-                    {"name": "w4", "enabled": True, "number_style": "percent", "decimals": 1},
+                    *[
+                        {"name": f"w{index}", "enabled": True, "number_style": "percent", "decimals": 1}
+                        for index in range(1, 13)
+                    ],
                 ],
+                "column_settings": percent_column_settings("w", 12),
                 "table.column_formatting": [
                     {
-                        "columns": ["w0", "w1", "w2", "w3", "w4"],
+                        "columns": [f"w{index}" for index in range(1, 13)],
+                        "type": "range",
+                        "colors": ["#fee2e2", "#fef3c7", "#dcfce7"],
+                        "min_type": "custom",
+                        "min_value": 0,
+                        "max_type": "custom",
+                        "max_value": 1,
+                    },
+                ],
+            },
+        ),
+        card_payload(
+            "Monthly Active User Retention Heatmap",
+            database_id,
+            f"""
+            SELECT
+              cohort_month AS month_start,
+              cohort_users AS active_users,
+              m1_retention AS m1,
+              m2_retention AS m2,
+              m3_retention AS m3,
+              m4_retention AS m4,
+              m5_retention AS m5,
+              m6_retention AS m6,
+              m7_retention AS m7,
+              m8_retention AS m8,
+              m9_retention AS m9,
+              m10_retention AS m10,
+              m11_retention AS m11,
+              m12_retention AS m12
+            FROM {table("metrics_cohort_retention_monthly_heatmap")}
+            ORDER BY cohort_month
+            """,
+            "table",
+            collection_id,
+            {
+                "table.columns": [
+                    {"name": "month_start", "enabled": True},
+                    {"name": "active_users", "enabled": True},
+                    *[
+                        {"name": f"m{index}", "enabled": True, "number_style": "percent", "decimals": 1}
+                        for index in range(1, 13)
+                    ],
+                ],
+                "column_settings": percent_column_settings("m", 12),
+                "table.column_formatting": [
+                    {
+                        "columns": [f"m{index}" for index in range(1, 13)],
                         "type": "range",
                         "colors": ["#fee2e2", "#fef3c7", "#dcfce7"],
                         "min_type": "custom",
@@ -608,154 +713,175 @@ def build_trendy_repo_cards(
     ]
 
 
-def build_oss_signal_cards(
+def build_github_core_cards(
     database_id: int,
     collection_id: int,
     project: str,
     dataset: str,
 ) -> list[dict[str, Any]]:
     table = lambda name: f"`{project}.{dataset}.{name}`"
+    month_bounds = f"""
+      WITH bounds AS (
+        SELECT
+          DATE_TRUNC(MAX(activity_date), MONTH) AS month_start,
+          MAX(activity_date) AS latest_date
+        FROM {table("metrics_daily")}
+      )
+    """
+
+    active_user_windows_sql = f"""
+            WITH fact_bounds AS (
+              SELECT MIN(activity_date) AS min_date
+              FROM {table("fact_user_repo_activity")}
+            ),
+            date_spine AS (
+              SELECT activity_date
+              FROM {table("metrics_daily")}, fact_bounds
+              WHERE activity_date >= DATE_ADD(fact_bounds.min_date, INTERVAL 29 DAY)
+            )
+            SELECT
+              date_spine.activity_date,
+              COUNT(DISTINCT IF(fact.activity_date = date_spine.activity_date, fact.user_id, NULL)) AS d1_active_users,
+              COUNT(DISTINCT IF(fact.activity_date >= DATE_SUB(date_spine.activity_date, INTERVAL 6 DAY), fact.user_id, NULL)) AS d7_active_users,
+              COUNT(DISTINCT fact.user_id) AS d30_active_users
+            FROM date_spine
+            JOIN {table("fact_user_repo_activity")} fact
+              ON fact.activity_date BETWEEN DATE_SUB(date_spine.activity_date, INTERVAL 29 DAY)
+                                     AND date_spine.activity_date
+            GROUP BY date_spine.activity_date
+            ORDER BY date_spine.activity_date
+            """
+
     return [
         card_payload(
-            "Signal - Latest Active Users",
+            "이번 달 AU",
             database_id,
             f"""
-            SELECT active_users
-            FROM {table("metrics_daily")}
-            ORDER BY activity_date DESC
-            LIMIT 1
+            {month_bounds}
+            SELECT COUNT(DISTINCT user_id) AS au
+            FROM {table("fact_user_repo_activity")}, bounds
+            WHERE activity_date BETWEEN bounds.month_start AND bounds.latest_date
             """,
             "scalar",
             collection_id,
         ),
         card_payload(
-            "Signal - Latest Events",
+            "이번 달 AR",
             database_id,
             f"""
-            SELECT total_events
-            FROM {table("metrics_daily")}
-            ORDER BY activity_date DESC
-            LIMIT 1
+            {month_bounds}
+            SELECT COUNT(DISTINCT repo_id) AS ar
+            FROM {table("fact_user_repo_activity")}, bounds
+            WHERE activity_date BETWEEN bounds.month_start AND bounds.latest_date
             """,
             "scalar",
             collection_id,
         ),
         card_payload(
-            "Signal - Latest W1 Retention",
+            "GitHub Core D1/D7/D30 Active Users",
             database_id,
-            f"""
-            SELECT w1_retention
-            FROM {table("metrics_retention_summary")}
-            WHERE w1_retention > 0
-            ORDER BY cohort_week DESC
-            LIMIT 1
-            """,
-            "scalar",
-            collection_id,
-        ),
-        card_payload(
-            "Signal - Top Trend Score",
-            database_id,
-            f"""
-            SELECT trend_score
-            FROM {table("metrics_agent_trendy_repos")}
-            ORDER BY trend_score DESC
-            LIMIT 1
-            """,
-            "scalar",
-            collection_id,
-        ),
-        card_payload(
-            "Signal - Activity Trend",
-            database_id,
-            f"""
-            SELECT activity_date, active_users, active_repos, total_events
-            FROM {table("metrics_daily")}
-            ORDER BY activity_date
-            """,
+            active_user_windows_sql,
             "line",
             collection_id,
-        ),
-        card_payload(
-            "Signal - Event Mix",
-            database_id,
-            f"""
-            SELECT activity_date, action, total_events
-            FROM {table("metrics_event_type_daily")}
-            WHERE action IN ('PushEvent', 'WatchEvent', 'ForkEvent', 'PullRequestEvent', 'IssuesEvent', 'IssueCommentEvent')
-            ORDER BY activity_date, action
-            """,
-            "area",
-            collection_id,
-        ),
-        card_payload(
-            "Signal - Trend Leaderboard",
-            database_id,
-            f"""
-            SELECT
-              repo_name,
-              trend_score,
-              growth_ratio,
-              seed_affinity,
-              recent_active_users,
-              recent_score,
-              recent_top_action,
-              why_trendy
-            FROM {table("metrics_agent_trendy_repos")}
-            ORDER BY trend_score DESC
-            LIMIT 20
-            """,
-            "table",
-            collection_id,
-        ),
-        card_payload(
-            "Signal - Growth vs Affinity",
-            database_id,
-            f"""
-            SELECT growth_ratio, seed_affinity, recent_active_users, trend_score, repo_name
-            FROM {table("metrics_agent_trendy_repos")}
-            ORDER BY trend_score DESC
-            LIMIT 100
-            """,
-            "scatter",
-            collection_id,
             {
-                "graph.dimensions": ["growth_ratio"],
-                "graph.metrics": ["seed_affinity"],
-                "graph.x_axis.title_text": "Growth ratio",
-                "graph.y_axis.title_text": "Seed affinity",
-                "graph.x_axis.scale": "linear",
-                "graph.y_axis.scale": "linear",
-                "graph.show_values": False,
+                "graph.dimensions": ["activity_date"],
+                "graph.metrics": ["d1_active_users", "d7_active_users", "d30_active_users"],
+                "graph.y_axis.title_text": "Active users",
             },
         ),
         card_payload(
-            "Signal - Retention Health",
-            database_id,
-            f"""
-            SELECT cohort_week, cohort_users, w1_retention, w2_retention, w3_retention
-            FROM {table("metrics_retention_summary")}
-            ORDER BY cohort_week DESC
-            """,
-            "table",
-            collection_id,
-        ),
-        card_payload(
-            "Signal - Model Validation",
+            "GitHub Core Weekly Active User Retention Heatmap",
             database_id,
             f"""
             SELECT
-              model,
-              candidates,
-              spearman_next_score,
-              precision_at_20_next_top100,
-              ndcg_at_20,
-              avg_next_score_at_20
-            FROM {table("metrics_agent_trend_validation")}
-            ORDER BY ndcg_at_20 DESC
+              cohort_week AS week_start,
+              cohort_users AS active_users,
+              w1_retention AS w1,
+              w2_retention AS w2,
+              w3_retention AS w3,
+              w4_retention AS w4,
+              w5_retention AS w5,
+              w6_retention AS w6,
+              w7_retention AS w7,
+              w8_retention AS w8,
+              w9_retention AS w9,
+              w10_retention AS w10,
+              w11_retention AS w11,
+              w12_retention AS w12
+            FROM {table("metrics_cohort_retention_weekly_heatmap")}
+            ORDER BY cohort_week
             """,
             "table",
             collection_id,
+            {
+                "table.columns": [
+                    {"name": "week_start", "enabled": True},
+                    {"name": "active_users", "enabled": True},
+                    *[
+                        {"name": f"w{index}", "enabled": True, "number_style": "percent", "decimals": 1}
+                        for index in range(1, 13)
+                    ],
+                ],
+                "column_settings": percent_column_settings("w", 12),
+                "table.column_formatting": [
+                    {
+                        "columns": [f"w{index}" for index in range(1, 13)],
+                        "type": "range",
+                        "colors": ["#fee2e2", "#fef3c7", "#dcfce7"],
+                        "min_type": "custom",
+                        "min_value": 0,
+                        "max_type": "custom",
+                        "max_value": 1,
+                    },
+                ],
+            },
+        ),
+        card_payload(
+            "GitHub Core Monthly Active User Retention Heatmap",
+            database_id,
+            f"""
+            SELECT
+              cohort_month AS month_start,
+              cohort_users AS active_users,
+              m1_retention AS m1,
+              m2_retention AS m2,
+              m3_retention AS m3,
+              m4_retention AS m4,
+              m5_retention AS m5,
+              m6_retention AS m6,
+              m7_retention AS m7,
+              m8_retention AS m8,
+              m9_retention AS m9,
+              m10_retention AS m10,
+              m11_retention AS m11,
+              m12_retention AS m12
+            FROM {table("metrics_cohort_retention_monthly_heatmap")}
+            ORDER BY cohort_month
+            """,
+            "table",
+            collection_id,
+            {
+                "table.columns": [
+                    {"name": "month_start", "enabled": True},
+                    {"name": "active_users", "enabled": True},
+                    *[
+                        {"name": f"m{index}", "enabled": True, "number_style": "percent", "decimals": 1}
+                        for index in range(1, 13)
+                    ],
+                ],
+                "column_settings": percent_column_settings("m", 12),
+                "table.column_formatting": [
+                    {
+                        "columns": [f"m{index}" for index in range(1, 13)],
+                        "type": "range",
+                        "colors": ["#fee2e2", "#fef3c7", "#dcfce7"],
+                        "min_type": "custom",
+                        "min_value": 0,
+                        "max_type": "custom",
+                        "max_value": 1,
+                    },
+                ],
+            },
         ),
     ]
 
@@ -794,24 +920,26 @@ def main() -> None:
         collection_id,
         "OpenClaw와 oh-my-openagent seed를 기준으로 AI agent 생태계의 트렌디 repo를 설명하고 검증한다.",
     )
-    oss_signal_dashboard_id = ensure_dashboard_with_description(
+    github_core_dashboard_id = ensure_dashboard_with_description(
         mb,
-        "OSS Signal 운영 대시보드",
+        "GitHub Core Metrics",
         collection_id,
-        "GitHub Archive 기반 OSS/AI agent 생태계 신호를 운영 KPI, retention, trend leaderboard로 요약한다.",
+        "GitHub Archive 기반 핵심 활동 지표와 retention을 요약한다.",
+        aliases=["OSS Signal 운영 대시보드"],
     )
 
     cards = build_cards(database_id, collection_id, args.project, args.dataset)
     trendy_cards = build_trendy_repo_cards(database_id, collection_id, args.project, args.dataset)
-    oss_signal_cards = build_oss_signal_cards(database_id, collection_id, args.project, args.dataset)
+    github_core_cards = build_github_core_cards(database_id, collection_id, args.project, args.dataset)
     delete_existing_cards(
         mb,
         collection_id,
-        {card["name"] for card in cards + trendy_cards + oss_signal_cards},
+        {card["name"] for card in cards + trendy_cards + github_core_cards}
+        | OLD_DASHBOARD_CARD_NAMES,
     )
     clear_dashboard_cards(mb, dashboard_id)
     clear_dashboard_cards(mb, trendy_dashboard_id)
-    clear_dashboard_cards(mb, oss_signal_dashboard_id)
+    clear_dashboard_cards(mb, github_core_dashboard_id)
 
     card_ids = [create_card(mb, card) for card in cards]
     layout = [
@@ -820,7 +948,8 @@ def main() -> None:
         (8, 0, 12, 8),
         (8, 12, 12, 8),
         (16, 0, 24, 8),
-        (24, 0, 24, 8),
+        (24, 0, 24, 9),
+        (33, 0, 24, 9),
     ]
     replace_dashboard_cards(mb, dashboard_id, card_ids, layout)
 
@@ -839,20 +968,15 @@ def main() -> None:
     ]
     replace_dashboard_cards(mb, trendy_dashboard_id, trendy_card_ids, trendy_layout)
 
-    oss_signal_card_ids = [create_card(mb, card) for card in oss_signal_cards]
-    oss_signal_layout = [
-        (0, 0, 6, 4),
-        (0, 6, 6, 4),
-        (0, 12, 6, 4),
-        (0, 18, 6, 4),
-        (4, 0, 12, 7),
-        (4, 12, 12, 7),
-        (11, 0, 24, 8),
-        (19, 0, 12, 7),
-        (19, 12, 12, 7),
-        (26, 0, 24, 7),
+    github_core_card_ids = [create_card(mb, card) for card in github_core_cards]
+    github_core_layout = [
+        (0, 0, 12, 5),
+        (0, 12, 12, 5),
+        (5, 0, 24, 8),
+        (13, 0, 24, 10),
+        (23, 0, 24, 10),
     ]
-    replace_dashboard_cards(mb, oss_signal_dashboard_id, oss_signal_card_ids, oss_signal_layout)
+    replace_dashboard_cards(mb, github_core_dashboard_id, github_core_card_ids, github_core_layout)
 
     print(
         json.dumps(
@@ -864,11 +988,11 @@ def main() -> None:
                 "dashboard_url": f"{args.url}/dashboard/{dashboard_id}",
                 "trendy_dashboard_id": trendy_dashboard_id,
                 "trendy_dashboard_url": f"{args.url}/dashboard/{trendy_dashboard_id}",
-                "oss_signal_dashboard_id": oss_signal_dashboard_id,
-                "oss_signal_dashboard_url": f"{args.url}/dashboard/{oss_signal_dashboard_id}",
+                "github_core_dashboard_id": github_core_dashboard_id,
+                "github_core_dashboard_url": f"{args.url}/dashboard/{github_core_dashboard_id}",
                 "cards": len(card_ids),
                 "trendy_cards": len(trendy_card_ids),
-                "oss_signal_cards": len(oss_signal_card_ids),
+                "github_core_cards": len(github_core_card_ids),
             },
             ensure_ascii=False,
             indent=2,

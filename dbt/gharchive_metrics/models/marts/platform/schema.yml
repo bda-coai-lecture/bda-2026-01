@@ -42,7 +42,7 @@ models:
           - unique
 
   - name: metrics_retention_weekly
-    description: Weekly cohort retention long table.
+    description: First-observed weekly cohort retention long table built from stg_user_repo_activity. This is cohort retention, not previous-period lifecycle retention.
     columns:
       - name: cohort_week
         tests:
@@ -55,9 +55,181 @@ models:
           - not_null
 
   - name: metrics_retention_summary
-    description: Cohort retention summary with W0-W3 retention columns.
+    description: First-observed cohort retention summary with W0-W3 retention columns.
     columns:
       - name: cohort_week
         tests:
           - not_null
           - unique
+
+  - name: metrics_user_lifecycle_weekly
+    description: >
+      Weekly period-over-period user retention mart. Existing users were active in both the current
+      week and previous week. Returning_or_historical_unknown users are active in the current week
+      but not the previous week; this bucket also includes users whose earlier history is outside
+      the source window, so new users are not inferred separately. Churned users were active in the
+      previous week but not the current week.
+    columns:
+      - name: week_start
+        tests:
+          - not_null
+          - unique
+      - name: previous_week_start
+        tests:
+          - not_null
+      - name: active_users
+        tests:
+          - not_null
+      - name: previous_active_users
+        tests:
+          - not_null
+      - name: existing_users
+        tests:
+          - not_null
+      - name: returning_or_historical_unknown_users
+        tests:
+          - not_null
+      - name: churned_users
+        tests:
+          - not_null
+
+  - name: metrics_user_lifecycle_monthly
+    description: >
+      Monthly period-over-period user retention mart. Existing users were active in both the current
+      month and previous month. Returning_or_historical_unknown users are active in the current month
+      but not the previous month; this bucket also includes users whose earlier history is outside
+      the source window, so new users are not inferred separately. Churned users were active in the
+      previous month but not the current month.
+    columns:
+      - name: month_start
+        tests:
+          - not_null
+          - unique
+      - name: previous_month_start
+        tests:
+          - not_null
+      - name: active_users
+        tests:
+          - not_null
+      - name: previous_active_users
+        tests:
+          - not_null
+      - name: existing_users
+        tests:
+          - not_null
+      - name: returning_or_historical_unknown_users
+        tests:
+          - not_null
+      - name: churned_users
+        tests:
+          - not_null
+
+  - name: metrics_user_retention_weekly
+    description: >
+      Weekly retention mart exposed for dashboarding. This reuses metrics_user_lifecycle_weekly:
+      existing users were active in both the current and previous week; returning_or_historical_unknown
+      users were active in the current week but not the previous week and include users whose earlier
+      history is outside the source window; churned users were active in the previous week but not the
+      current week.
+    columns:
+      - name: week_start
+        tests:
+          - not_null
+          - unique
+      - name: previous_week_start
+        tests:
+          - not_null
+      - name: active_users
+        tests:
+          - not_null
+      - name: previous_active_users
+        tests:
+          - not_null
+      - name: existing_users
+        tests:
+          - not_null
+      - name: returning_or_historical_unknown_users
+        tests:
+          - not_null
+      - name: churned_users
+        tests:
+          - not_null
+
+  - name: metrics_user_retention_monthly
+    description: >
+      Monthly retention mart exposed for dashboarding. This reuses metrics_user_lifecycle_monthly:
+      existing users were active in both the current and previous month; returning_or_historical_unknown
+      users were active in the current month but not the previous month and include users whose earlier
+      history is outside the source window; churned users were active in the previous month but not the
+      current month.
+    columns:
+      - name: month_start
+        tests:
+          - not_null
+          - unique
+      - name: previous_month_start
+        tests:
+          - not_null
+      - name: active_users
+        tests:
+          - not_null
+      - name: previous_active_users
+        tests:
+          - not_null
+      - name: existing_users
+        tests:
+          - not_null
+      - name: returning_or_historical_unknown_users
+        tests:
+          - not_null
+      - name: churned_users
+        tests:
+          - not_null
+
+  - name: metrics_cohort_retention_weekly_heatmap
+    description: >
+      Weekly active-user retention wide table for Metabase heatmap-style tables.
+      Each row uses all users active in that week as the baseline, and W1-W12 are
+      the share of that baseline that returned in subsequent weeks. Missing future
+      periods are left null instead of zero.
+    columns:
+      - name: cohort_week
+        tests:
+          - not_null
+          - unique
+      - name: cohort_users
+        tests:
+          - not_null
+      - name: max_observed_weeks_since
+        tests:
+          - not_null
+      - name: w0_active_users
+        tests:
+          - not_null
+      - name: w0_retention
+        tests:
+          - not_null
+
+  - name: metrics_cohort_retention_monthly_heatmap
+    description: >
+      Monthly active-user retention wide table for Metabase heatmap-style tables.
+      Each row uses all users active in that month as the baseline, and M1-M12 are
+      the share of that baseline that returned in subsequent months. Missing future
+      periods are left null instead of zero.
+    columns:
+      - name: cohort_month
+        tests:
+          - not_null
+          - unique
+      - name: cohort_users
+        tests:
+          - not_null
+      - name: max_observed_months_since
+        tests:
+          - not_null
+      - name: m0_active_users
+        tests:
+          - not_null
+      - name: m0_retention
+        tests:
+          - not_null
