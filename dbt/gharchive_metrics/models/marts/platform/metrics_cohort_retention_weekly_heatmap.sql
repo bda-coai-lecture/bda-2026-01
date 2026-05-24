@@ -43,22 +43,19 @@ retention as (
 )
 
 select
-  cohort_week,
-  max(cohort_users) as cohort_users,
-  max(weeks_since) as max_observed_weeks_since,
-  max(if(weeks_since = 0, active_users, null)) as w0_active_users,
-  max(if(weeks_since = 0, retention_rate, null)) as w0_retention,
-  max(if(weeks_since = 1, retention_rate, null)) as w1_retention,
-  max(if(weeks_since = 2, retention_rate, null)) as w2_retention,
-  max(if(weeks_since = 3, retention_rate, null)) as w3_retention,
-  max(if(weeks_since = 4, retention_rate, null)) as w4_retention,
-  max(if(weeks_since = 5, retention_rate, null)) as w5_retention,
-  max(if(weeks_since = 6, retention_rate, null)) as w6_retention,
-  max(if(weeks_since = 7, retention_rate, null)) as w7_retention,
-  max(if(weeks_since = 8, retention_rate, null)) as w8_retention,
-  max(if(weeks_since = 9, retention_rate, null)) as w9_retention,
-  max(if(weeks_since = 10, retention_rate, null)) as w10_retention,
-  max(if(weeks_since = 11, retention_rate, null)) as w11_retention,
-  max(if(weeks_since = 12, retention_rate, null)) as w12_retention
+  cohort_week as week_start,
+  max(cohort_users) as active_users,
+  max(if(weeks_since = 1, retention_rate, null)) as w1,
+  max(if(weeks_since = 2, retention_rate, null)) as w2,
+  max(if(weeks_since = 3, retention_rate, null)) as w3,
+  max(if(weeks_since = 4, retention_rate, null)) as w4,
+  max(if(weeks_since = 5, retention_rate, null)) as w5,
+  max(if(weeks_since = 6, retention_rate, null)) as w6,
+  max(if(weeks_since = 7, retention_rate, null)) as w7,
+  max(if(weeks_since = 8, retention_rate, null)) as w8,
+  max(if(weeks_since = 9, retention_rate, null)) as w9,
+  max(if(weeks_since = 10, retention_rate, null)) as w10,
+  max(if(weeks_since = 11, retention_rate, null)) as w11,
+  max(if(weeks_since = 12, retention_rate, null)) as w12
 from retention
 group by cohort_week

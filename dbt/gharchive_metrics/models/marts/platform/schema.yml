@@ -187,49 +187,75 @@ models:
           - not_null
 
   - name: metrics_cohort_retention_weekly_heatmap
-    description: >
-      Weekly active-user retention wide table for Metabase heatmap-style tables.
-      Each row uses all users active in that week as the baseline, and W1-W12 are
-      the share of that baseline that returned in subsequent weeks. Missing future
-      periods are left null instead of zero.
+    description: "{{ doc('weekly_active_user_retention_heatmap') }}"
     columns:
-      - name: cohort_week
+      - name: week_start
+        description: Monday-start week used as the baseline active-user period.
         tests:
           - not_null
           - unique
-      - name: cohort_users
+      - name: active_users
+        description: Distinct users active during `week_start`; this is the baseline denominator for `w1`-`w12` and should match `metrics_weekly.weekly_active_users`.
         tests:
           - not_null
-      - name: max_observed_weeks_since
-        tests:
-          - not_null
-      - name: w0_active_users
-        tests:
-          - not_null
-      - name: w0_retention
-        tests:
-          - not_null
+      - name: w1
+        description: Share of `active_users` who were also active 1 week after `week_start`; for example, 0.42 means 42%.
+      - name: w2
+        description: Share of `active_users` who were also active 2 weeks after `week_start`.
+      - name: w3
+        description: Share of `active_users` who were also active 3 weeks after `week_start`.
+      - name: w4
+        description: Share of `active_users` who were also active 4 weeks after `week_start`.
+      - name: w5
+        description: Share of `active_users` who were also active 5 weeks after `week_start`.
+      - name: w6
+        description: Share of `active_users` who were also active 6 weeks after `week_start`.
+      - name: w7
+        description: Share of `active_users` who were also active 7 weeks after `week_start`.
+      - name: w8
+        description: Share of `active_users` who were also active 8 weeks after `week_start`.
+      - name: w9
+        description: Share of `active_users` who were also active 9 weeks after `week_start`.
+      - name: w10
+        description: Share of `active_users` who were also active 10 weeks after `week_start`.
+      - name: w11
+        description: Share of `active_users` who were also active 11 weeks after `week_start`.
+      - name: w12
+        description: Share of `active_users` who were also active 12 weeks after `week_start`.
 
   - name: metrics_cohort_retention_monthly_heatmap
-    description: >
-      Monthly active-user retention wide table for Metabase heatmap-style tables.
-      Each row uses all users active in that month as the baseline, and M1-M12 are
-      the share of that baseline that returned in subsequent months. Missing future
-      periods are left null instead of zero.
+    description: "{{ doc('monthly_active_user_retention_heatmap') }}"
     columns:
-      - name: cohort_month
+      - name: month_start
+        description: Calendar month used as the baseline active-user period.
         tests:
           - not_null
           - unique
-      - name: cohort_users
+      - name: active_users
+        description: Distinct users active during `month_start`; this is the baseline denominator for `m1`-`m12`.
         tests:
           - not_null
-      - name: max_observed_months_since
-        tests:
-          - not_null
-      - name: m0_active_users
-        tests:
-          - not_null
-      - name: m0_retention
-        tests:
-          - not_null
+      - name: m1
+        description: Share of `active_users` who were also active 1 month after `month_start`; for example, 0.38 means 38%.
+      - name: m2
+        description: Share of `active_users` who were also active 2 months after `month_start`.
+      - name: m3
+        description: Share of `active_users` who were also active 3 months after `month_start`.
+      - name: m4
+        description: Share of `active_users` who were also active 4 months after `month_start`.
+      - name: m5
+        description: Share of `active_users` who were also active 5 months after `month_start`.
+      - name: m6
+        description: Share of `active_users` who were also active 6 months after `month_start`.
+      - name: m7
+        description: Share of `active_users` who were also active 7 months after `month_start`.
+      - name: m8
+        description: Share of `active_users` who were also active 8 months after `month_start`.
+      - name: m9
+        description: Share of `active_users` who were also active 9 months after `month_start`.
+      - name: m10
+        description: Share of `active_users` who were also active 10 months after `month_start`.
+      - name: m11
+        description: Share of `active_users` who were also active 11 months after `month_start`.
+      - name: m12
+        description: Share of `active_users` who were also active 12 months after `month_start`.

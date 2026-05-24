@@ -5,7 +5,8 @@ models:
     description: >
       Reference view over GitHub Archive public raw event shards for the current
       90-day dashboard window. This exists to make the raw layer visible in dbt
-      docs; the production fact table is still loaded by scripts/sync_bq_metrics.py.
+      docs; the production fact table is the dbt-owned incremental
+      `fact_user_repo_activity` model.
     columns:
       - name: user_id
         description: GitHub actor id from actor.id.
@@ -20,8 +21,8 @@ models:
     description: >
       Reference transformation showing how raw GitHub Archive events collapse
       into the user-repo-action-date grain used by mart.fact_user_repo_activity.
-      It is a docs and education lineage reference only, not the production
-      upstream consumed by dashboard marts.
+      It is a docs lineage reference only; the production path uses the
+      incremental `fact_user_repo_activity` model directly.
     columns:
       - name: user_id
       - name: repo_id

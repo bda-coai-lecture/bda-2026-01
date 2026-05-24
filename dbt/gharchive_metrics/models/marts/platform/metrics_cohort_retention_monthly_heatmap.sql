@@ -43,22 +43,19 @@ retention as (
 )
 
 select
-  cohort_month,
-  max(cohort_users) as cohort_users,
-  max(months_since) as max_observed_months_since,
-  max(if(months_since = 0, active_users, null)) as m0_active_users,
-  max(if(months_since = 0, retention_rate, null)) as m0_retention,
-  max(if(months_since = 1, retention_rate, null)) as m1_retention,
-  max(if(months_since = 2, retention_rate, null)) as m2_retention,
-  max(if(months_since = 3, retention_rate, null)) as m3_retention,
-  max(if(months_since = 4, retention_rate, null)) as m4_retention,
-  max(if(months_since = 5, retention_rate, null)) as m5_retention,
-  max(if(months_since = 6, retention_rate, null)) as m6_retention,
-  max(if(months_since = 7, retention_rate, null)) as m7_retention,
-  max(if(months_since = 8, retention_rate, null)) as m8_retention,
-  max(if(months_since = 9, retention_rate, null)) as m9_retention,
-  max(if(months_since = 10, retention_rate, null)) as m10_retention,
-  max(if(months_since = 11, retention_rate, null)) as m11_retention,
-  max(if(months_since = 12, retention_rate, null)) as m12_retention
+  cohort_month as month_start,
+  max(cohort_users) as active_users,
+  max(if(months_since = 1, retention_rate, null)) as m1,
+  max(if(months_since = 2, retention_rate, null)) as m2,
+  max(if(months_since = 3, retention_rate, null)) as m3,
+  max(if(months_since = 4, retention_rate, null)) as m4,
+  max(if(months_since = 5, retention_rate, null)) as m5,
+  max(if(months_since = 6, retention_rate, null)) as m6,
+  max(if(months_since = 7, retention_rate, null)) as m7,
+  max(if(months_since = 8, retention_rate, null)) as m8,
+  max(if(months_since = 9, retention_rate, null)) as m9,
+  max(if(months_since = 10, retention_rate, null)) as m10,
+  max(if(months_since = 11, retention_rate, null)) as m11,
+  max(if(months_since = 12, retention_rate, null)) as m12
 from retention
 group by cohort_month

@@ -28,5 +28,7 @@ models:
       +tags: ["lineage_reference"]
     staging:
       +materialized: view
+    facts:
+      +materialized: incremental
     marts:
       +materialized: table

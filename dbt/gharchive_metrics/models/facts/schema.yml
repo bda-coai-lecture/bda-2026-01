@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: fact_user_repo_activity
+    description: >
+      Incremental daily user-repo-action fact table built from GitHub Archive daily
+      sharded tables. This is the dbt-owned ingestion boundary for downstream
+      staging and metric marts. Each build scans only the GitHub Archive shards
+      between `raw_start_date` and `raw_end_date`, then overwrites those
+      `activity_date` partitions in BigQuery.
+
+      Grain: one row per `activity_date`, GitHub event `actor.id`, `repo.id`,
+      and event `type`. The current model intentionally tracks the actor who
+      triggered the event, not the organization context. For example, if user A
+      performs an event under organization B, this fact counts A as the active
+      actor. Organization B is not counted as an active user/actor unless it is
+      the event actor. The GitHub Archive `org` object is not persisted in this
+      model yet.
+    columns:
+      - name: activity_date
+        description: Event date parsed from the GitHub Archive daily table suffix.
+        tests:
+          - not_null
+      - name: user_id
+        description: >
+          GitHub event actor id from `actor.id`. This is named `user_id` for
+          dashboard continuity, but semantically it is `actor_id`. It identifies
+          the account that triggered the event; it does not identify the
+          organization context from the event `org` object.
+        tests:
+          - not_null
+      - name: repo_id
+        description: GitHub repository id from `repo.id`.
+        tests:
+          - not_null
+      - name: action
+        description: GitHub Archive event type.
+        tests:
+          - not_null
+      - name: event_count
+        description: Number of raw events for the user-repo-action-date grain.
+        tests:
+          - not_null

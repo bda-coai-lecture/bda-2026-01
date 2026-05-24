@@ -2,7 +2,12 @@ version: 2
 
 semantic_models:
   - name: user_repo_activity
-    description: Semantic model over cleaned GitHub Archive user-repo activity.
+    description: >
+      Semantic model over cleaned GitHub Archive actor-repo activity. The
+      `user` entity maps to GitHub Archive `actor.id` via the `user_id` column;
+      it is retained as `user` for dashboard continuity, but semantically means
+      event actor. Organization context from the GitHub Archive `org` object is
+      not currently modeled.
     model: ref('stg_user_repo_activity')
     defaults:
       agg_time_dimension: activity_date
@@ -61,7 +66,7 @@ semantic_models:
         agg: count
         expr: user_id
       - name: active_users
-        description: Distinct active GitHub users.
+        description: Distinct GitHub event actors from `actor.id`; organization context is not counted separately.
         agg: count_distinct
         expr: user_id
       - name: active_repos
@@ -78,7 +83,7 @@ metrics:
       measure: total_events
 
   - name: active_users
-    description: Distinct users with at least one event.
+    description: Distinct GitHub event actors with at least one event. If user A acts under organization B, A is counted; B is not counted as an active user by this metric.
     type: simple
     label: Active Users
     type_params:

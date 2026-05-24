@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>추천 모델 개발 프로세스</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --paper: #ffffff;
+      --ink: #172033;
+      --muted: #64748b;
+      --line: #d7dee8;
+      --soft: #eef3f7;
+      --data: #0f766e;
+      --analysis: #2563eb;
+      --model: #7c3aed;
+      --api: #b45309;
+      --todo: #b91c1c;
+      --done: #15803d;
+    }
+
+    * {
+      box-sizing: border-box;
+      min-width: 0;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+      letter-spacing: 0;
+    }
+
+    main {
+      width: min(1240px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 52px;
+    }
+
+    .sheet {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 18px 45px rgb(15 23 42 / 0.08);
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+      gap: 26px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--analysis);
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(32px, 4.6vw, 56px);
+      line-height: 1.05;
+      font-weight: 900;
+    }
+
+    .lead {
+      max-width: 780px;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .status-panel {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .metric {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .metric strong {
+      font-size: 13px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .badge {
+      display: inline-flex;
+      width: max-content;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .badge.done {
+      background: #dcfce7;
+      color: var(--done);
+    }
+
+    .badge.todo {
+      background: #fee2e2;
+      color: var(--todo);
+    }
+
+    section {
+      margin-top: 28px;
+    }
+
+    h2 {
+      margin: 0 0 13px;
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .step {
+      position: relative;
+      min-height: 210px;
+      padding: 16px;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .step::after {
+      content: "";
+      position: absolute;
+      top: 40px;
+      right: -18px;
+      width: 22px;
+      height: 2px;
+      background: var(--line);
+      z-index: 1;
+    }
+
+    .step:last-child::after {
+      display: none;
+    }
+
+    .step.data { border-color: var(--data); }
+    .step.analysis { border-color: var(--analysis); }
+    .step.model { border-color: var(--model); }
+    .step.api { border-color: var(--api); }
+    .step.todo { border-color: var(--todo); }
+
+    .step h3 {
+      margin: 12px 0 8px;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .step ul,
+    .compact-list {
+      margin: 12px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .step li,
+    .compact-list li {
+      position: relative;
+      margin-top: 7px;
+      padding-left: 14px;
+      color: #334155;
+      font-size: 13px;
+    }
+
+    .step li::before,
+    .compact-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 9px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--line);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      background: #fbfcfe;
+    }
+
+    .panel h3 {
+      margin: 0 0 10px;
+      font-size: 17px;
+    }
+
+    .pipeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .pipe-row {
+      display: grid;
+      grid-template-columns: 148px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+    }
+
+    .pipe-row strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .pipe-row span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: var(--soft);
+      color: #0f172a;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 10px 9px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--soft);
+      color: #334155;
+      font-weight: 750;
+    }
+
+    .next {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .perspective-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .perspective {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      background: #fbfcfe;
+    }
+
+    .perspective.business {
+      border-top: 5px solid var(--analysis);
+    }
+
+    .perspective.dev {
+      border-top: 5px solid var(--model);
+    }
+
+    .perspective h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+
+    .perspective p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .detail-section {
+      display: grid;
+      gap: 18px;
+    }
+
+    .detail-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      padding: 20px;
+    }
+
+    .detail-card h3 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
+    .detail-card > p {
+      margin: 0 0 14px;
+      color: var(--muted);
+    }
+
+    .split-table th:first-child,
+    .split-table td:first-child {
+      width: 150px;
+      font-weight: 750;
+    }
+
+    .todo-box {
+      border: 2px solid var(--todo);
+      border-radius: 8px;
+      padding: 17px;
+      background: #fff7f7;
+    }
+
+    .todo-box h3 {
+      margin: 8px 0 8px;
+      font-size: 18px;
+    }
+
+    footer {
+      margin-top: 22px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      header,
+      .grid-2,
+      .next,
+      .perspective-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .flow {
+        grid-template-columns: 1fr;
+      }
+
+      .step {
+        min-height: 0;
+      }
+
+      .step::after {
+        display: none;
+      }
+    }
+
+    @media (max-width: 620px) {
+      main {
+        width: min(100% - 20px, 1240px);
+        padding-top: 12px;
+      }
+
+      .sheet {
+        padding: 20px;
+      }
+
+      .metric,
+      .pipe-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <article class="sheet">
+    <header>
+      <div>
+        <p class="eyebrow">BDA 2기 / GitHub Repo 추천 시스템</p>
+        <h1>추천 모델 개발 프로세스</h1>
+        <p class="lead">
+          GitHub Archive 로그를 추천 문제로 바꾸고, EDA와 baseline을 거쳐
+          ALS retrieval, LGBM re-rank, Two-Tower, FAISS, FastAPI까지 연결한 현재 진행 흐름이다.
+          이 문서는 단순히 모델 성능표를 보여주는 것이 아니라, 데이터 제품이 만들어지는 순서를
+          비즈니스 판단과 개발 구현으로 나누어 설명한다. 남은 과제는 실제 서비스 적용과 운영 체계화다.
+        </p>
+      </div>
+      <div class="status-panel" aria-label="현재 상태 요약">
+        <div class="metric">
+          <strong>완료 범위</strong>
+          <span>데이터 수집, 분석, 모델 실험, API 생성</span>
+        </div>
+        <div class="metric">
+          <strong>현재 기준</strong>
+          <span>Two-Stage/Fallback 최고 run 기준 NDCG@100 0.025509, Recall@100 0.074161</span>
+        </div>
+        <div class="metric">
+          <strong>미완료</strong>
+          <span>서비스 적용, 배포 운영, 모니터링, 재학습 루프</span>
+        </div>
+      </div>
+    </header>
+
+    <section>
+      <h2>전체 흐름</h2>
+      <div class="flow">
+        <div class="step data">
+          <span class="badge done">완료</span>
+          <h3>1. 데이터 수집</h3>
+          <p>BigQuery의 GitHub Archive 원천 로그를 비용 확인 후 Parquet 집계 데이터로 저장한다.</p>
+          <ul>
+            <li><code>notebooks/gharchive/00_setup.ipynb</code></li>
+            <li><code>01_extract_daily_agg.ipynb</code></li>
+            <li><code>data/daily_agg</code></li>
+          </ul>
+        </div>
+        <div class="step analysis">
+          <span class="badge done">완료</span>
+          <h3>2. 데이터 분석</h3>
+          <p>이벤트 로그를 user-repo interaction으로 재정의하고, 품질과 활동 패턴을 확인한다.</p>
+          <ul>
+            <li>DAU, retention, activity 분석</li>
+            <li>repo metadata SQLite cache</li>
+            <li>sparse user-item matrix 설계</li>
+          </ul>
+        </div>
+        <div class="step model">
+          <span class="badge done">완료</span>
+          <h3>3. 모델 실험</h3>
+          <p>인기 추천부터 ALS, Two-Stage, Two-Tower까지 단계적으로 비교한다.</p>
+          <ul>
+            <li>Popularity baseline</li>
+            <li>ALS retrieval + LGBM ranker</li>
+            <li>FAISS, Two-Tower, diagnostics</li>
+          </ul>
+        </div>
+        <div class="step api">
+          <span class="badge done">완료</span>
+          <h3>4. API 생성</h3>
+          <p>학습 산출물을 bundle로 묶고 FastAPI에서 추천 결과와 메타데이터를 조회한다.</p>
+          <ul>
+            <li><code>src/ghrec/api.py</code></li>
+            <li><code>src/ghrec/recsys_serving.py</code></li>
+            <li><code>docker compose up api</code></li>
+          </ul>
+        </div>
+        <div class="step todo">
+          <span class="badge todo">남음</span>
+          <h3>5. 서비스 적용·운영</h3>
+          <p>추천 API를 실제 제품 화면과 연결하고, 운영 지표와 재학습 프로세스를 붙여야 한다.</p>
+          <ul>
+            <li>서비스 UI/백엔드 연동</li>
+            <li>온라인 로그 수집</li>
+            <li>모니터링, 알림, 배포 정책</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>왜 추천 시스템으로 보는가</h2>
+      <div class="perspective-grid">
+        <div class="perspective business">
+          <h3>비즈니스 관점</h3>
+          <p>
+            추천 시스템의 목적은 좋은 모델을 만드는 데서 끝나지 않는다. 사용자가 다음에 볼 만한 repo를 더 빨리 찾게 만들고,
+            탐색 시간을 줄이며, 서비스 안에서 더 많은 의미 있는 행동이 발생하게 만드는 것이 핵심이다.
+          </p>
+          <ul class="compact-list">
+            <li>사용자 문제: GitHub에는 repo가 너무 많아서 관심 있는 프로젝트를 직접 찾기 어렵다.</li>
+            <li>제품 기회: 개인화 추천, 유사 repo 추천, 트렌드 repo 추천은 탐색 비용을 낮춘다.</li>
+            <li>성과 지표: 클릭률, 저장/Star, Fork, 재방문, 활동 지속률 같은 행동 지표로 검증해야 한다.</li>
+            <li>리스크: 인기 repo만 반복 추천하면 다양성이 떨어지고, 작은 repo 발견 기회가 줄어든다.</li>
+          </ul>
+        </div>
+        <div class="perspective dev">
+          <h3>개발 관점</h3>
+          <p>
+            개발의 핵심은 원천 로그를 모델 입력으로 바꾸고, 실험을 재현 가능하게 만들고,
+            학습 결과를 API가 안정적으로 읽을 수 있는 산출물로 고정하는 것이다.
+          </p>
+          <ul class="compact-list">
+            <li>로그를 바로 모델에 넣지 않고, user-item interaction mart로 압축한다.</li>
+            <li>시간 기준 split으로 train/test leakage를 막는다.</li>
+            <li>baseline, retrieval, ranker를 분리해 어떤 단계가 성능 병목인지 확인한다.</li>
+            <li>모델 파일 단위가 아니라 bundle 단위로 서빙 버전을 관리한다.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <h2>개발 산출물</h2>
+        <div class="pipeline">
+          <div class="pipe-row">
+            <strong>Raw log</strong>
+            <span>GitHub Archive event: actor, repo, event type, created_at 중심의 원천 로그</span>
+          </div>
+          <div class="pipe-row">
+            <strong>Interaction mart</strong>
+            <span><code>actor_id, repo_id</code> 단위로 event weight를 적용한 feedback score 생성</span>
+          </div>
+          <div class="pipe-row">
+            <strong>Feature set</strong>
+            <span>유저 활동량, repo 인기도, metadata, related candidate source, ALS score 등</span>
+          </div>
+          <div class="pipe-row">
+            <strong>Model artifacts</strong>
+            <span>ALS 후보, LGBM ranker, Two-Tower, FAISS index, 평가 summary</span>
+          </div>
+          <div class="pipe-row">
+            <strong>Serving bundle</strong>
+            <span>candidate cache, ranker, metric, manifest를 하나의 API 배포 단위로 관리</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>모델링 기준</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>항목</th>
+              <th>현재 기준</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>추천 구조</td>
+              <td>ALS retrieval → hybrid candidates → LGBM re-rank</td>
+            </tr>
+            <tr>
+              <td>대표 split</td>
+              <td>history, rank-label, test를 시간 기준으로 분리</td>
+            </tr>
+            <tr>
+              <td>주요 지표</td>
+              <td>NDCG@100, Recall@100, unique recommended</td>
+            </tr>
+            <tr>
+              <td>성능 해석</td>
+              <td>Popularity &lt; ALS &lt; Two-Stage 흐름이 유지됨</td>
+            </tr>
+            <tr>
+              <td>남은 실험</td>
+              <td>negative sampling 재설계, neural ranker, source/feature ablation</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>단계별 상세 설명</h2>
+      <div class="detail-section">
+        <div class="detail-card">
+          <h3>1. 데이터 수집: 큰 로그를 비용과 재현 가능한 형태로 줄이기</h3>
+          <p>
+            첫 단계는 “추천 모델을 학습할 데이터가 있는가”가 아니라 “반복해서 다룰 수 있는 데이터 형태를 만들었는가”를 확인하는 단계다.
+            GitHub Archive 원천 로그는 이벤트 단위라 크고, 같은 사용자가 같은 repo에 여러 번 행동하면 row가 계속 늘어난다.
+          </p>
+          <table class="split-table">
+            <thead>
+              <tr>
+                <th>관점</th>
+                <th>구체 설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>비즈니스</td>
+                <td>
+                  데이터 수집 비용이 너무 크면 실험을 자주 할 수 없다. 추천 품질 개선은 한 번의 학습보다 반복 실험이 중요하므로,
+                  BigQuery dry run으로 비용을 먼저 확인하고 필요한 컬럼과 기간만 추출한다.
+                </td>
+              </tr>
+              <tr>
+                <td>개발</td>
+                <td>
+                  <code>notebooks/gharchive/00_setup.ipynb</code>에서 BigQuery 연결을 잡고,
+                  <code>01_extract_daily_agg.ipynb</code>에서 일별 집계 Parquet를 만든다.
+                  이후 모델 실험은 원천 로그를 매번 다시 쿼리하지 않고 <code>data/daily_agg</code>와 mart를 읽는다.
+                </td>
+              </tr>
+              <tr>
+                <td>산출물</td>
+                <td>
+                  분석 가능한 Parquet 파일, 날짜 범위, row count, event type 분포, 이후 mart 생성을 위한 공통 입력 데이터.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="detail-card">
+          <h3>2. 데이터 분석: 로그를 추천 문제로 번역하기</h3>
+          <p>
+            추천 모델은 “사용자와 아이템 사이의 관계”를 학습한다. 그래서 원천 event를 그대로 보는 대신,
+            actor를 사용자, repo를 아이템, event를 관심 신호로 해석한다.
+          </p>
+          <table class="split-table">
+            <thead>
+              <tr>
+                <th>관점</th>
+                <th>구체 설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>비즈니스</td>
+                <td>
+                  모든 행동의 의미가 같지 않다. Watch는 관심 표현, Fork는 재사용 의도, Pull Request는 강한 기여 신호로 볼 수 있다.
+                  반대로 Push는 본인 repo의 반복 작업일 수 있어 추천 신호로는 약하게 볼 수 있다.
+                </td>
+              </tr>
+              <tr>
+                <td>개발</td>
+                <td>
+                  event type별 weight를 적용해 <code>actor_id, repo_id</code> 단위 score를 만든다.
+                  이후 sparse matrix를 구성하고, repo metadata는 GitHub API 호출 비용과 rate limit을 줄이기 위해 SQLite cache로 관리한다.
+                </td>
+              </tr>
+              <tr>
+                <td>검증</td>
+                <td>
+                  row count, null, 중복, 날짜 범위, event type 분포, 유저별 interaction 수, repo별 popularity long-tail을 확인한다.
+                  이 단계에서 이상치를 놓치면 모델 성능 문제가 아니라 데이터 정의 문제가 된다.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="detail-card">
+          <h3>3. 모델 실험: baseline부터 two-stage까지 단계적으로 개선하기</h3>
+          <p>
+            추천 모델 실험은 복잡한 모델을 바로 쓰는 방식이 아니라, 비교 기준을 만들고 하나씩 개선하는 방식으로 진행한다.
+            이 프로젝트에서는 Popularity, ALS, Two-Stage, Two-Tower를 순서대로 비교했다.
+          </p>
+          <table class="split-table">
+            <thead>
+              <tr>
+                <th>관점</th>
+                <th>구체 설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>비즈니스</td>
+                <td>
+                  모델 성능은 “정확도 하나”로 판단하지 않는다. 상위 10개 추천이 잘 맞는지, 100개 안에 정답 후보가 들어오는지,
+                  매번 같은 인기 repo만 추천하지 않는지 함께 본다. 그래서 NDCG, Recall, coverage를 같이 본다.
+                </td>
+              </tr>
+              <tr>
+                <td>개발</td>
+                <td>
+                  ALS는 전체 catalog에서 빠르게 후보를 뽑는 retrieval 역할을 맡고, LGBM은 그 후보를 다시 정렬하는 ranker 역할을 맡는다.
+                  이 two-stage 구조는 실제 서비스에서도 자주 쓰이는 패턴이다. 전체 아이템을 매번 정렬하는 대신 후보 수백 개만 정교하게 정렬한다.
+                </td>
+              </tr>
+              <tr>
+                <td>결과</td>
+                <td>
+                  현재 기준에서 Popularity보다 ALS가 낫고, ALS 후보를 LGBM으로 재정렬한 Two-Stage가 한 번 더 좋아진다.
+                  최고 run은 <code>Two-Stage/Fallback NDCG@100 = 0.025509</code>, <code>Recall@100 = 0.074161</code>이다.
+                </td>
+              </tr>
+              <tr>
+                <td>주의점</td>
+                <td>
+                  시간 기준 split을 지키지 않으면 test label이 학습에 섞이는 leakage가 생긴다.
+                  최근 재설계 문서에서는 canonical positive, mixed negative sampling, ranker 학습 데이터 분리 문제를 따로 정리했다.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="detail-card">
+          <h3>4. API 생성: 노트북 실험을 호출 가능한 제품 기능으로 바꾸기</h3>
+          <p>
+            모델 실험이 끝났다고 사용자가 추천을 받을 수 있는 것은 아니다. 학습 산출물을 API가 읽을 수 있게 묶고,
+            어떤 모델 버전이 현재 추천에 쓰이는지 명확히 관리해야 한다.
+          </p>
+          <table class="split-table">
+            <thead>
+              <tr>
+                <th>관점</th>
+                <th>구체 설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>비즈니스</td>
+                <td>
+                  서비스에서 중요한 것은 “제일 최근 모델”이 아니라 “검증되어 배포하기로 선택한 모델”이다.
+                  성능이 좋은 후보라도 latency, coverage, fallback, 장애 대응이 준비되지 않으면 바로 적용하기 어렵다.
+                </td>
+              </tr>
+              <tr>
+                <td>개발</td>
+                <td>
+                  <code>src/ghrec/api.py</code>를 FastAPI entrypoint로 두고,
+                  active bundle 조회, 추천 요청, 후보 source 확인, health check 같은 endpoint를 정의한다.
+                  bundle manifest에는 candidate cache, ranker model, metric summary, artifact path를 함께 저장한다.
+                </td>
+              </tr>
+              <tr>
+                <td>계약</td>
+                <td>
+                  API 요청은 <code>actor_id</code>, <code>k</code>, <code>bundle_id</code>를 받고,
+                  응답은 <code>repo_id</code>, <code>rank</code>, <code>score</code>, <code>candidate_source</code>, metadata를 돌려준다.
+                  unknown user, 후보 부족, fallback 같은 예외도 응답 정책에 포함해야 한다.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="detail-card">
+          <h3>5. 서비스 적용·운영: 아직 남은 실제 제품화 단계</h3>
+          <p>
+            현재는 추천 모델 개발과 API 생성까지 온 상태다. 다음 단계는 추천을 실제 화면에 넣고,
+            사용자의 반응을 다시 데이터로 모아 모델과 제품을 계속 개선하는 운영 루프를 만드는 것이다.
+          </p>
+          <table class="split-table">
+            <thead>
+              <tr>
+                <th>관점</th>
+                <th>구체 설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>비즈니스</td>
+                <td>
+                  추천 위치를 정해야 한다. 개인화 홈에 넣을지, repo 상세 페이지의 유사 repo 영역에 넣을지,
+                  신규 사용자를 위한 트렌드 추천으로 쓸지에 따라 성공 지표가 달라진다.
+                </td>
+              </tr>
+              <tr>
+                <td>개발</td>
+                <td>
+                  프론트엔드는 API 응답을 카드 UI로 보여주고, 백엔드는 노출 로그와 클릭 로그를 남겨야 한다.
+                  이후 offline metric과 online metric을 연결해 모델 개선이 실제 사용자 행동 개선으로 이어졌는지 본다.
+                </td>
+              </tr>
+              <tr>
+                <td>운영</td>
+                <td>
+                  latency, error rate, empty result rate, 추천 coverage, 모델 drift, 데이터 freshness를 모니터링한다.
+                  새 bundle은 자동 배포하지 않고 명시적 promotion과 rollback 정책을 둔다.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>단계별 핵심 질문</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>단계</th>
+            <th>비즈니스 질문</th>
+            <th>개발 질문</th>
+            <th>현재 답</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>데이터 수집</td>
+            <td>이 데이터가 사용자의 관심과 탐색 행동을 설명할 수 있는가?</td>
+            <td>원천 로그를 모델이 먹을 수 있는 안정적인 단위로 줄였는가?</td>
+            <td>일별 Parquet와 week6 mart로 반복 집계를 줄였다.</td>
+          </tr>
+          <tr>
+            <td>분석</td>
+            <td>어떤 행동을 강한 관심 신호로 볼 것인가?</td>
+            <td>추천 문제의 유저, 아이템, positive signal을 정의했는가?</td>
+            <td>event type별 weight로 user-repo feedback score를 만들었다.</td>
+          </tr>
+          <tr>
+            <td>모델 실험</td>
+            <td>사용자에게 더 나은 추천이라고 말할 근거가 있는가?</td>
+            <td>baseline 대비 성능 개선과 병목을 분리해서 봤는가?</td>
+            <td>Popularity, ALS, Two-Stage, source diagnostics를 비교했다.</td>
+          </tr>
+          <tr>
+            <td>API 생성</td>
+            <td>검증된 추천 버전을 제품 기능으로 안정적으로 제공할 수 있는가?</td>
+            <td>모델 파일이 아니라 버전 있는 추천 제품 단위로 서빙되는가?</td>
+            <td>bundle manifest, active bundle, recommendation endpoint 설계를 만들었다.</td>
+          </tr>
+          <tr>
+            <td>서비스 적용</td>
+            <td>추천이 클릭, 저장, 재방문 같은 실제 지표를 개선하는가?</td>
+            <td>추천 결과가 실제 사용자 행동과 다시 연결되는가?</td>
+            <td>아직 미완료. 화면 적용, 로그 수집, A/B 검증이 필요하다.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>실험 결과를 해석하는 방식</h2>
+      <div class="perspective-grid">
+        <div class="perspective business">
+          <h3>비즈니스 해석</h3>
+          <ul class="compact-list">
+            <li><code>NDCG@100</code>은 추천 후보 100개 안에서 정답이 얼마나 위쪽에 배치되는지 본다. 이 문서의 주 평가 기준이다.</li>
+            <li><code>Recall@100</code>은 후보 100개 안에 실제 정답을 얼마나 놓치지 않고 포함했는지 본다. retrieval 병목 판단에 중요하다.</li>
+            <li><code>unique_recommended</code>는 추천 다양성을 본다. 인기 repo만 반복 추천하는지 확인한다.</li>
+            <li>offline metric이 좋아도 서비스 KPI가 좋아진다는 보장은 없다. 그래서 적용 후 노출/클릭/행동 로그가 필요하다.</li>
+          </ul>
+        </div>
+        <div class="perspective dev">
+          <h3>개발 해석</h3>
+          <ul class="compact-list">
+            <li>Popularity는 가장 단순한 기준선이다. 이것보다 못하면 개인화 모델을 쓸 이유가 약하다.</li>
+            <li>ALS는 collaborative signal로 후보를 잘 찾는지 본다. <code>NDCG@100</code>과 <code>Recall@100</code>으로 후보 품질을 비교한다.</li>
+            <li>LGBM re-rank는 ALS score, repo metadata, user activity, source feature를 함께 사용해 100개 후보의 순서를 다시 정한다.</li>
+            <li>FAISS는 모델 품질 개선이 아니라 검색 속도 개선이다. offline 모델을 실시간 API에 가깝게 연결하는 기술이다.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>남은 작업</h2>
+      <div class="next">
+        <div class="todo-box">
+          <span class="badge todo">서비스 적용</span>
+          <h3>추천 API를 제품 경험으로 연결</h3>
+          <ul class="compact-list">
+            <li>repo 상세 화면, 개인화 홈, 유사 repo 영역 중 어디에 추천을 둘지 결정한다.</li>
+            <li>각 위치별 성공 지표를 다르게 잡는다. 예: 상세 화면은 유사 repo 클릭, 홈은 재방문과 탐색 깊이.</li>
+            <li>API 응답을 UI에 맞는 card/view model로 변환한다. repo name, language, stars, 설명, 추천 이유가 필요하다.</li>
+            <li>cold-start user, unknown actor, empty result 상황에서는 popularity 또는 recent fallback을 보여준다.</li>
+            <li>추천 결과에 대한 노출 로그, 클릭 로그, 이후 행동 로그를 반드시 남긴다.</li>
+          </ul>
+        </div>
+        <div class="todo-box">
+          <span class="badge todo">운영</span>
+          <h3>모델을 계속 믿을 수 있게 관리</h3>
+          <ul class="compact-list">
+            <li>API latency, error rate, timeout, empty result rate를 기본 운영 지표로 본다.</li>
+            <li>데이터 freshness와 feature 생성 실패를 감지한다. 오래된 데이터로 추천하면 품질이 빠르게 낡는다.</li>
+            <li>offline metric, online metric, 추천 coverage, item 다양성을 한 대시보드에서 본다.</li>
+            <li>새 모델은 candidate 상태로 등록하고, metric과 샘플 결과 확인 후 promoted 상태로 올린다.</li>
+            <li>문제가 생기면 이전 bundle로 rollback할 수 있어야 한다.</li>
+            <li>주기적 재학습과 A/B test 정책을 정해 “한 번 만든 모델”이 아니라 “운영되는 시스템”으로 만든다.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      참고 위치:
+      <code>README.md</code>,
+      <code>docs/week6_recsys_handoff.md</code>,
+      <code>docs/recsys_retrieval_rerank_redesign.md</code>,
+      <code>docs/recsys_mlops_api_design.md</code>,
+      <code>docs/recsys_api_architecture.html</code>
+    </footer>
+  </article>
+</main>
+</body>
+</html>

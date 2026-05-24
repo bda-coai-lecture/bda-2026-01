@@ -6,7 +6,7 @@ select
   cast(activity_date as date) as activity_date,
   date_trunc(cast(activity_date as date), week(monday)) as week_start,
   date_trunc(cast(activity_date as date), month) as month_start
-from {{ source('gharchive', 'fact_user_repo_activity') }}
+from {{ ref('fact_user_repo_activity') }}
 where user_id is not null
   and repo_id is not null
   and action is not null

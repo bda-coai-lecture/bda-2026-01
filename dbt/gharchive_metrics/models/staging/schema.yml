@@ -2,9 +2,14 @@ version: 2
 
 models:
   - name: stg_user_repo_activity
-    description: Clean BigQuery source for GitHub Archive user-repo-action activity.
+    description: >
+      Clean interface over the dbt-owned `fact_user_repo_activity` model for
+      GitHub Archive actor-repo-action activity. The `user_id` column is the
+      GitHub event actor id (`actor.id`), not an organization id. Organization
+      context from GitHub Archive `org` is not currently modeled.
     columns:
       - name: user_id
+        description: GitHub event actor id from `actor.id`; retained as `user_id` for compatibility, but semantically this is `actor_id`.
         tests:
           - not_null
       - name: repo_id

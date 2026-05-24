@@ -218,6 +218,37 @@ def percent_column_settings(prefix: str, count: int) -> dict[str, dict[str, Any]
     return settings
 
 
+def retention_heatmap_settings(
+    prefix: str,
+    count: int,
+    min_value: float,
+    max_value: float,
+    leading_columns: list[str],
+) -> dict[str, Any]:
+    columns = [f"{prefix}{index}" for index in range(1, count + 1)]
+    return {
+        "table.columns": [
+            *[{"name": column, "enabled": True} for column in leading_columns],
+            *[
+                {"name": column, "enabled": True, "number_style": "percent", "decimals": 1}
+                for column in columns
+            ],
+        ],
+        "column_settings": percent_column_settings(prefix, count),
+        "table.column_formatting": [
+            {
+                "columns": columns,
+                "type": "range",
+                "colors": ["#fca5a5", "#fde68a", "#86efac"],
+                "min_type": "custom",
+                "min_value": min_value,
+                "max_type": "custom",
+                "max_value": max_value,
+            },
+        ],
+    }
+
+
 def list_cards(mb: Metabase) -> list[dict[str, Any]]:
     return mb.get_json("/api/card")
 
@@ -443,94 +474,52 @@ def build_cards(database_id: int, collection_id: int, project: str, dataset: str
             database_id,
             f"""
             SELECT
-              cohort_week,
-              cohort_users,
-              w1_retention AS w1,
-              w2_retention AS w2,
-              w3_retention AS w3,
-              w4_retention AS w4,
-              w5_retention AS w5,
-              w6_retention AS w6,
-              w7_retention AS w7,
-              w8_retention AS w8,
-              w9_retention AS w9,
-              w10_retention AS w10,
-              w11_retention AS w11,
-              w12_retention AS w12
+              week_start,
+              active_users,
+              w1,
+              w2,
+              w3,
+              w4,
+              w5,
+              w6,
+              w7,
+              w8,
+              w9,
+              w10,
+              w11,
+              w12
             FROM {table("metrics_cohort_retention_weekly_heatmap")}
-            ORDER BY cohort_week
+            ORDER BY week_start
             """,
             "table",
             collection_id,
-            {
-                "table.columns": [
-                    {"name": "cohort_week", "enabled": True},
-                    {"name": "cohort_users", "enabled": True},
-                    *[
-                        {"name": f"w{index}", "enabled": True, "number_style": "percent", "decimals": 1}
-                        for index in range(1, 13)
-                    ],
-                ],
-                "column_settings": percent_column_settings("w", 12),
-                "table.column_formatting": [
-                    {
-                        "columns": [f"w{index}" for index in range(1, 13)],
-                        "type": "range",
-                        "colors": ["#fee2e2", "#fef3c7", "#dcfce7"],
-                        "min_type": "custom",
-                        "min_value": 0,
-                        "max_type": "custom",
-                        "max_value": 1,
-                    },
-                ],
-            },
+            retention_heatmap_settings("w", 12, 0.15, 0.55, ["week_start", "active_users"]),
         ),
         card_payload(
             "Monthly Active User Retention Heatmap",
             database_id,
             f"""
             SELECT
-              cohort_month AS month_start,
-              cohort_users AS active_users,
-              m1_retention AS m1,
-              m2_retention AS m2,
-              m3_retention AS m3,
-              m4_retention AS m4,
-              m5_retention AS m5,
-              m6_retention AS m6,
-              m7_retention AS m7,
-              m8_retention AS m8,
-              m9_retention AS m9,
-              m10_retention AS m10,
-              m11_retention AS m11,
-              m12_retention AS m12
+              month_start,
+              active_users,
+              m1,
+              m2,
+              m3,
+              m4,
+              m5,
+              m6,
+              m7,
+              m8,
+              m9,
+              m10,
+              m11,
+              m12
             FROM {table("metrics_cohort_retention_monthly_heatmap")}
-            ORDER BY cohort_month
+            ORDER BY month_start
             """,
             "table",
             collection_id,
-            {
-                "table.columns": [
-                    {"name": "month_start", "enabled": True},
-                    {"name": "active_users", "enabled": True},
-                    *[
-                        {"name": f"m{index}", "enabled": True, "number_style": "percent", "decimals": 1}
-                        for index in range(1, 13)
-                    ],
-                ],
-                "column_settings": percent_column_settings("m", 12),
-                "table.column_formatting": [
-                    {
-                        "columns": [f"m{index}" for index in range(1, 13)],
-                        "type": "range",
-                        "colors": ["#fee2e2", "#fef3c7", "#dcfce7"],
-                        "min_type": "custom",
-                        "min_value": 0,
-                        "max_type": "custom",
-                        "max_value": 1,
-                    },
-                ],
-            },
+            retention_heatmap_settings("m", 12, 0.20, 0.50, ["month_start", "active_users"]),
         ),
     ]
 
@@ -794,94 +783,52 @@ def build_github_core_cards(
             database_id,
             f"""
             SELECT
-              cohort_week AS week_start,
-              cohort_users AS active_users,
-              w1_retention AS w1,
-              w2_retention AS w2,
-              w3_retention AS w3,
-              w4_retention AS w4,
-              w5_retention AS w5,
-              w6_retention AS w6,
-              w7_retention AS w7,
-              w8_retention AS w8,
-              w9_retention AS w9,
-              w10_retention AS w10,
-              w11_retention AS w11,
-              w12_retention AS w12
+              week_start,
+              active_users,
+              w1,
+              w2,
+              w3,
+              w4,
+              w5,
+              w6,
+              w7,
+              w8,
+              w9,
+              w10,
+              w11,
+              w12
             FROM {table("metrics_cohort_retention_weekly_heatmap")}
-            ORDER BY cohort_week
+            ORDER BY week_start
             """,
             "table",
             collection_id,
-            {
-                "table.columns": [
-                    {"name": "week_start", "enabled": True},
-                    {"name": "active_users", "enabled": True},
-                    *[
-                        {"name": f"w{index}", "enabled": True, "number_style": "percent", "decimals": 1}
-                        for index in range(1, 13)
-                    ],
-                ],
-                "column_settings": percent_column_settings("w", 12),
-                "table.column_formatting": [
-                    {
-                        "columns": [f"w{index}" for index in range(1, 13)],
-                        "type": "range",
-                        "colors": ["#fee2e2", "#fef3c7", "#dcfce7"],
-                        "min_type": "custom",
-                        "min_value": 0,
-                        "max_type": "custom",
-                        "max_value": 1,
-                    },
-                ],
-            },
+            retention_heatmap_settings("w", 12, 0.15, 0.55, ["week_start", "active_users"]),
         ),
         card_payload(
             "GitHub Core Monthly Active User Retention Heatmap",
             database_id,
             f"""
             SELECT
-              cohort_month AS month_start,
-              cohort_users AS active_users,
-              m1_retention AS m1,
-              m2_retention AS m2,
-              m3_retention AS m3,
-              m4_retention AS m4,
-              m5_retention AS m5,
-              m6_retention AS m6,
-              m7_retention AS m7,
-              m8_retention AS m8,
-              m9_retention AS m9,
-              m10_retention AS m10,
-              m11_retention AS m11,
-              m12_retention AS m12
+              month_start,
+              active_users,
+              m1,
+              m2,
+              m3,
+              m4,
+              m5,
+              m6,
+              m7,
+              m8,
+              m9,
+              m10,
+              m11,
+              m12
             FROM {table("metrics_cohort_retention_monthly_heatmap")}
-            ORDER BY cohort_month
+            ORDER BY month_start
             """,
             "table",
             collection_id,
-            {
-                "table.columns": [
-                    {"name": "month_start", "enabled": True},
-                    {"name": "active_users", "enabled": True},
-                    *[
-                        {"name": f"m{index}", "enabled": True, "number_style": "percent", "decimals": 1}
-                        for index in range(1, 13)
-                    ],
-                ],
-                "column_settings": percent_column_settings("m", 12),
-                "table.column_formatting": [
-                    {
-                        "columns": [f"m{index}" for index in range(1, 13)],
-                        "type": "range",
-                        "colors": ["#fee2e2", "#fef3c7", "#dcfce7"],
-                        "min_type": "custom",
-                        "min_value": 0,
-                        "max_type": "custom",
-                        "max_value": 1,
-                    },
-                ],
-            },
+            retention_heatmap_settings("m", 12, 0.20, 0.50, ["month_start", "active_users"]),
         ),
     ]
 

@@ -1,0 +1,1173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GitHub Archive dbt 프로젝트 구조 설명</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --paper: #ffffff;
+      --ink: #20242a;
+      --muted: #667085;
+      --line: #d9dee7;
+      --soft: #eef4ff;
+      --soft-2: #f0f9f4;
+      --accent: #2563eb;
+      --accent-2: #18825f;
+      --warn: #9a5b00;
+      --code: #f1f3f5;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      line-height: 1.68;
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 36px 24px 64px;
+      background: var(--paper);
+    }
+
+    h1, h2, h3 { line-height: 1.28; }
+    h1 { margin: 0 0 10px; font-size: 32px; letter-spacing: 0; }
+    h2 { margin: 44px 0 14px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 24px; }
+    h3 { margin: 28px 0 10px; font-size: 18px; }
+    p { margin: 10px 0 14px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code {
+      background: var(--code);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      background: #111827;
+      color: #f8fafc;
+      padding: 16px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+      border-radius: 0;
+      color: inherit;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 26px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border-bottom: 1px solid #e6e8ee;
+      padding: 10px 11px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f3f5f8;
+      font-weight: 700;
+    }
+
+    ul, ol { padding-left: 22px; }
+    li { margin: 5px 0; }
+
+    .meta, .muted { color: var(--muted); }
+
+    .hero {
+      padding: 8px 0 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin: 24px 0 18px;
+    }
+
+    .tile {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      background: #fbfcfe;
+    }
+
+    .tile strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 15px;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--soft);
+      padding: 14px 18px;
+      margin: 18px 0;
+    }
+
+    .callout.green {
+      border-left-color: var(--accent-2);
+      background: var(--soft-2);
+    }
+
+    .callout.warn {
+      border-left-color: var(--warn);
+      background: #fff8e6;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
+      margin: 18px 0 24px;
+    }
+
+    .step {
+      min-height: 116px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfe;
+      position: relative;
+    }
+
+    .step::after {
+      content: ">";
+      position: absolute;
+      right: -10px;
+      top: 42px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .step:last-child::after { content: ""; }
+    .step .label { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+    .step .name { display: block; margin-top: 4px; font-weight: 700; }
+    .step .desc { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+    .tree {
+      background: #fbfcfe;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px 18px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 9px;
+      margin: 2px 4px 2px 0;
+      background: #fbfcfe;
+      color: #344054;
+      font-size: 12px;
+    }
+
+    .diagram {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      padding: 18px;
+      margin: 18px 0 26px;
+    }
+
+    .diagram-title {
+      margin: 0 0 14px;
+      font-weight: 700;
+      color: #344054;
+    }
+
+    .layer-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .layer {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .layer-name {
+      border-radius: 8px;
+      padding: 12px;
+      background: #e8eefc;
+      color: #1d4ed8;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+    }
+
+    .layer-items {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      border-left: 3px solid #c9d7f8;
+      padding-left: 12px;
+    }
+
+    .node {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      padding: 8px 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: #344054;
+    }
+
+    .dag {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      align-items: center;
+    }
+
+    .dag-col {
+      display: grid;
+      gap: 10px;
+    }
+
+    .dag-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .dag-arrow {
+      text-align: center;
+      color: var(--muted);
+      font-weight: 700;
+      margin: -4px 0;
+    }
+
+    .heatmap {
+      overflow-x: auto;
+      margin-top: 12px;
+    }
+
+    .heatmap table {
+      min-width: 720px;
+      margin: 0;
+      table-layout: fixed;
+    }
+
+    .heatmap th,
+    .heatmap td {
+      text-align: center;
+      padding: 9px 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .heat-low { background: #fee2e2; }
+    .heat-mid { background: #fde68a; }
+    .heat-high { background: #bbf7d0; }
+    .heat-null { background: #f3f4f6; color: var(--muted); }
+
+    .quality-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .quality-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      padding: 14px;
+      min-height: 132px;
+    }
+
+    .quality-card strong {
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .quality-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .concept-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin: 16px 0 24px;
+    }
+
+    .concept-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      padding: 14px 16px;
+    }
+
+    .concept-card strong {
+      display: block;
+      margin-bottom: 7px;
+      color: #1f2937;
+    }
+
+    .concept-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .semantic-map {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .semantic-box {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      padding: 12px;
+      min-height: 132px;
+    }
+
+    .semantic-box strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #1d4ed8;
+    }
+
+    .semantic-box span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .checklist li::marker { color: var(--accent-2); }
+
+    @media (max-width: 860px) {
+      main { padding: 28px 18px 48px; }
+      .summary { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .layer { grid-template-columns: 1fr; }
+      .dag { grid-template-columns: 1fr; }
+      .quality-grid { grid-template-columns: 1fr; }
+      .concept-grid { grid-template-columns: 1fr; }
+      .semantic-map { grid-template-columns: 1fr; }
+      .step::after { content: "v"; right: 16px; top: auto; bottom: -18px; }
+      .step:last-child::after { content: ""; }
+      table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <h1>GitHub Archive dbt 프로젝트 구조 설명</h1>
+    <p class="meta">대상: 데이터 분석/엔지니어링 입문자와 주니어 실무자 / 프로젝트: <code>dbt/gharchive_metrics</code></p>
+    <p>
+      이 문서는 dbt가 무엇인지부터 시작해서, 이 repo의 dbt 프로젝트가 어떤 순서로 데이터를 읽고,
+      정제하고, 지표 테이블을 만들고, 테스트와 문서를 붙이는지 실무 관점에서 설명한다.
+    </p>
+  </section>
+
+  <section class="summary">
+    <div class="tile">
+      <strong>한 줄 정의</strong>
+      dbt는 SQL 파일들을 의존성 있는 데이터 모델로 관리하고, 실행 순서와 테스트와 문서화를 자동화하는 도구다.
+    </div>
+    <div class="tile">
+      <strong>이 프로젝트의 역할</strong>
+      GitHub Archive 일자별 shard를 incremental fact로 집계하고, Metabase dashboard에서 쓰기 좋은 metric mart를 만든다.
+    </div>
+    <div class="tile">
+      <strong>핵심 산출물</strong>
+      DAU/WAU, 이벤트 믹스, user lifecycle, active user retention heatmap, semantic metrics.
+    </div>
+  </section>
+
+  <h2>1. dbt가 해결하는 문제</h2>
+  <p>
+    데이터 분석을 하다 보면 같은 SQL을 여러 번 복사해서 쓰게 된다. 처음에는 괜찮지만,
+    테이블이 많아지고 dashboard가 늘어나면 다음 문제가 생긴다.
+  </p>
+  <ul>
+    <li>어떤 SQL을 먼저 실행해야 하는지 사람이 기억해야 한다.</li>
+    <li>컬럼 이름이나 집계 정의가 dashboard마다 조금씩 달라진다.</li>
+    <li>원본 데이터가 바뀌었을 때 어떤 지표가 영향받는지 추적하기 어렵다.</li>
+    <li>테이블이 맞게 만들어졌는지 매번 눈으로 확인하게 된다.</li>
+  </ul>
+  <div class="callout">
+    dbt는 이 문제를 <strong>SQL 파일 + 의존성 그래프 + 테스트 + 문서</strong>로 푼다.
+    Python ETL처럼 데이터를 직접 들고 처리하기보다, warehouse 안에서 SQL을 실행해 모델 테이블을 만든다.
+  </div>
+
+  <h2>2. dbt의 기본 구성 요소</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>개념</th>
+        <th>무슨 뜻인가</th>
+        <th>이 프로젝트 예시</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>source</code></td>
+        <td>dbt 밖에서 이미 존재하는 원천 테이블. 이 프로젝트에서는 GitHub Archive daily shard가 외부 upstream이다.</td>
+        <td><code>githubarchive.day.20*</code> wildcard scan</td>
+      </tr>
+      <tr>
+        <td><code>model</code></td>
+        <td>하나의 SQL 파일. 실행되면 view 또는 table이 된다.</td>
+        <td><code>metrics_daily.sql</code>, <code>metrics_weekly.sql</code></td>
+      </tr>
+      <tr>
+        <td><code>ref()</code></td>
+        <td>다른 dbt 모델을 참조하는 함수. dbt가 이걸 보고 실행 순서를 계산한다.</td>
+        <td><code>from {{ ref('fact_user_repo_activity') }}</code></td>
+      </tr>
+      <tr>
+        <td><code>schema.yml</code></td>
+        <td>모델 설명, 컬럼 설명, 테스트를 적는 YAML 파일.</td>
+        <td><code>models/marts/platform/schema.yml</code></td>
+      </tr>
+      <tr>
+        <td><code>test</code></td>
+        <td>데이터가 기대 조건을 만족하는지 확인하는 SQL 또는 YAML 테스트.</td>
+        <td><code>not_null</code>, <code>unique</code>, retention rate 0~1 검증</td>
+      </tr>
+      <tr>
+        <td><code>docs</code></td>
+        <td>모델과 컬럼 설명을 웹 문서로 보여주는 기능.</td>
+        <td><code>dbt docs generate</code>, <code>dbt docs serve</code></td>
+      </tr>
+      <tr>
+        <td><code>semantic model</code></td>
+        <td>BI나 MetricFlow에서 공통 지표를 같은 정의로 쓰기 위한 계층.</td>
+        <td><code>models/semantic/platform_activity.yml</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>3. dbt에서 말하는 모델</h2>
+  <p>
+    dbt에서 <strong>모델(model)</strong>은 보통 <code>models/</code> 아래에 있는 SQL 파일 하나를 뜻한다.
+    이 SQL 파일은 단순한 쿼리 저장소가 아니라, dbt DAG의 한 노드다.
+    dbt는 <code>ref()</code>를 읽어서 모델 간 의존성을 만들고, 그 순서대로 SQL을 warehouse에서 실행한다.
+  </p>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <strong>SQL 파일</strong>
+      <p><code>metrics_daily.sql</code>처럼 하나의 select 문을 담는다. dbt는 이 select 결과를 view/table/incremental table로 materialize한다.</p>
+    </div>
+    <div class="concept-card">
+      <strong>DAG 노드</strong>
+      <p><code>ref('stg_user_repo_activity')</code>를 쓰면 해당 모델이 staging 모델 뒤에 실행되어야 한다는 의존성이 생긴다.</p>
+    </div>
+    <div class="concept-card">
+      <strong>계약 단위</strong>
+      <p>모델은 downstream 사용자가 기대하는 컬럼과 grain을 제공한다. 예: <code>metrics_weekly</code>는 주별 한 행이다.</p>
+    </div>
+    <div class="concept-card">
+      <strong>테스트/문서 단위</strong>
+      <p><code>schema.yml</code>에서 모델 설명, 컬럼 설명, <code>not_null</code>, <code>unique</code> 같은 테스트를 붙인다.</p>
+    </div>
+  </div>
+
+  <h3>Materialization: 모델이 실제로 저장되는 방식</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>방식</th>
+        <th>의미</th>
+        <th>이 프로젝트에서 쓰는 곳</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>view</code></td>
+        <td>쿼리 정의만 저장한다. 조회할 때 계산된다. 가볍고 staging에 적합하다.</td>
+        <td><code>stg_user_repo_activity</code></td>
+      </tr>
+      <tr>
+        <td><code>table</code></td>
+        <td>쿼리 결과를 물리 테이블로 저장한다. dashboard가 반복 조회하는 mart에 적합하다.</td>
+        <td><code>metrics_daily</code>, <code>metrics_weekly</code></td>
+      </tr>
+      <tr>
+        <td><code>incremental</code></td>
+        <td>매번 전체를 다시 만들지 않고, 지정한 범위나 변경분만 반영한다. 대용량 raw를 다룰 때 필요하다.</td>
+        <td><code>fact_user_repo_activity</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    이 프로젝트의 핵심은 <code>fact_user_repo_activity</code>를 incremental 모델로 두고,
+    그 위의 staging과 marts는 <code>ref()</code>로 이어지는 dbt-owned DAG 안에 넣는 것이다.
+  </div>
+
+  <h2>4. 이 프로젝트의 전체 데이터 흐름</h2>
+  <div class="diagram">
+    <p class="diagram-title">계층별 책임 분리</p>
+    <div class="layer-stack">
+      <div class="layer">
+        <div class="layer-name">External</div>
+        <div class="layer-items">
+          <span class="node">GitHub Archive daily shards</span>
+          <span class="node">githubarchive.day.20*</span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">Fact</div>
+        <div class="layer-items">
+          <span class="node">fact_user_repo_activity</span>
+          <span class="node">partition: activity_date</span>
+          <span class="node">insert_overwrite</span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">Staging</div>
+        <div class="layer-items">
+          <span class="node">stg_user_repo_activity</span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">Marts</div>
+        <div class="layer-items">
+          <span class="node">metrics_daily</span>
+          <span class="node">metrics_weekly</span>
+          <span class="node">metrics_user_lifecycle_weekly</span>
+          <span class="node">metrics_cohort_retention_weekly_heatmap</span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">Serving</div>
+        <div class="layer-items">
+          <span class="node">Metabase dashboard</span>
+          <span class="node">dbt docs</span>
+          <span class="node">MetricFlow / semantic metrics</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow" aria-label="dbt data flow">
+    <div class="step">
+      <span class="label">upstream</span>
+      <span class="name">GitHub Archive</span>
+      <div class="desc">BigQuery public event data에서 활동 데이터를 가져온다.</div>
+    </div>
+    <div class="step">
+      <span class="label">fact</span>
+      <span class="name">fact_user_repo_activity</span>
+      <div class="desc">일별 user-repo-action 단위로 dbt가 incremental 집계하는 fact 테이블.</div>
+    </div>
+    <div class="step">
+      <span class="label">staging</span>
+      <span class="name">stg_user_repo_activity</span>
+      <div class="desc">타입 캐스팅, null 제거, week/month 컬럼 추가.</div>
+    </div>
+    <div class="step">
+      <span class="label">marts</span>
+      <span class="name">metrics_*</span>
+      <div class="desc">dashboard와 분석에 바로 쓰는 지표 테이블.</div>
+    </div>
+    <div class="step">
+      <span class="label">serving</span>
+      <span class="name">Metabase / dbt docs</span>
+      <div class="desc">dashboard 시각화와 지표 문서 확인.</div>
+    </div>
+  </div>
+
+  <h2>5. 폴더 구조 읽는 법</h2>
+  <p>
+    dbt 프로젝트 루트는 <code>dbt/gharchive_metrics</code>다. 여기서 중요한 파일만 보면 된다.
+  </p>
+  <div class="tree">dbt/gharchive_metrics/
+├── dbt_project.yml
+├── README.md
+├── models/
+│   ├── facts/
+│   │   ├── fact_user_repo_activity.sql
+│   │   └── schema.yml
+│   ├── raw/
+│   │   ├── raw_githubarchive_events_90d.sql
+│   │   └── fact_user_repo_activity_from_raw_reference.sql
+│   ├── staging/
+│   │   ├── stg_user_repo_activity.sql
+│   │   └── schema.yml
+│   ├── marts/
+│   │   └── platform/
+│   │       ├── metrics_daily.sql
+│   │       ├── metrics_weekly.sql
+│   │       ├── metrics_user_lifecycle_weekly.sql
+│   │       ├── metrics_cohort_retention_weekly_heatmap.sql
+│   │       ├── metrics_cohort_retention_monthly_heatmap.sql
+│   │       ├── schema.yml
+│   │       └── docs.md
+│   └── semantic/
+│       ├── platform_activity.yml
+│       └── time_spine_daily.sql
+├── tests/
+│   ├── assert_user_lifecycle_weekly_balances.sql
+│   └── metrics_cohort_retention_weekly_heatmap_active_users_match_wau.sql
+└── target/
+    ├── manifest.json
+    ├── catalog.json
+    └── index.html</div>
+
+  <div class="callout warn">
+    <strong><code>target/</code>는 사람이 직접 수정하는 곳이 아니다.</strong>
+    dbt가 실행되면서 만든 산출물이다. docs UI도 여기 있는 <code>manifest.json</code>, <code>catalog.json</code>을 읽는다.
+  </div>
+
+  <h2>6. <code>dbt_project.yml</code>: 프로젝트 설정의 입구</h2>
+  <p>
+    <code>dbt_project.yml</code>은 이 프로젝트의 이름, 모델 경로, 테스트 경로, materialization 기본값을 정한다.
+    이 파일을 보면 dbt가 어디에서 SQL을 찾고, 어떤 모델을 view/table로 만들지 알 수 있다.
+  </p>
+  <pre><code>name: gharchive_metrics
+profile: gharchive_metrics
+
+model-paths: ["models"]
+test-paths: ["tests"]
+
+models:
+  gharchive_metrics:
+    raw:
+      +materialized: view
+      +tags: ["lineage_reference"]
+    staging:
+      +materialized: view
+    facts:
+      +materialized: incremental
+    marts:
+      +materialized: table</code></pre>
+  <p>
+    여기서는 <code>facts</code>는 incremental, <code>staging</code>은 view, <code>marts</code>는 table로 만든다.
+    fact는 일자별 partition을 overwrite하고, staging은 가벼운 정제 계층이라 view로 충분하며, marts는 dashboard가 반복 조회하므로 table로 만들어 둔다.
+  </p>
+
+  <h2>7. Fact와 staging 계층</h2>
+  <h3>Fact: dbt가 소유하는 incremental 적재 경계</h3>
+  <p>
+    <code>models/facts/fact_user_repo_activity.sql</code>는 GitHub Archive의 일자별 shard를 읽어서
+    <code>activity_date</code>, <code>user_id</code>, <code>repo_id</code>, <code>action</code> grain의 fact table로 집계한다.
+    이 모델은 dbt가 소유하는 incremental table이다.
+  </p>
+  <div class="callout">
+    <strong>Actor 기준:</strong> 현재 <code>user_id</code>는 GitHub Archive의 <code>actor.id</code>다.
+    이름은 dashboard 호환성 때문에 <code>user_id</code>로 남아 있지만, 의미상으로는 <code>actor_id</code>에 가깝다.
+    예를 들어 A 유저가 B organization 아래에서 이벤트를 발생시키면 이 fact에는 B가 아니라 A가 active actor로 기록된다.
+    GitHub Archive의 <code>org</code> context는 아직 저장하지 않는다.
+  </div>
+  <pre><code>{{
+  config(
+    materialized='incremental',
+    partition_by={"field": "activity_date", "data_type": "date", "granularity": "day"},
+    cluster_by=["user_id", "repo_id", "action"],
+    incremental_strategy='insert_overwrite'
+  )
+}}</code></pre>
+  <p>
+    GitHub Archive는 날짜별 테이블이므로 전체 raw를 매번 스캔할 필요가 없다.
+    <code>raw_start_date</code>~<code>raw_end_date</code> 범위의 shard만 읽고, 해당 날짜 partition만 overwrite한다.
+  </p>
+  <div class="callout warn">
+    기존 <code>mart.fact_user_repo_activity</code>는 현재 BigQuery 메타데이터 기준 unpartitioned table이다.
+    따라서 <code>insert_overwrite</code> incremental 전략을 실제 적용하려면 한 번은 partitioned table로 마이그레이션해야 한다.
+    이후부터는 일자별 shard와 해당 날짜 partition만 다루면 된다.
+  </div>
+
+  <h3>Staging: 분석하기 좋은 기본 형태로 정리</h3>
+  <p>
+    <code>stg_user_repo_activity.sql</code>는 dbt fact 모델을 읽어서 타입을 확정하고, 주/월 분석에 필요한 날짜 컬럼을 만든다.
+  </p>
+  <pre><code>select
+  cast(user_id as int64) as user_id,
+  cast(repo_id as int64) as repo_id,
+  cast(action as string) as action,
+  cast(event_count as int64) as event_count,
+  cast(activity_date as date) as activity_date,
+  date_trunc(cast(activity_date as date), week(monday)) as week_start,
+  date_trunc(cast(activity_date as date), month) as month_start
+from {{ ref('fact_user_repo_activity') }}
+where user_id is not null
+  and repo_id is not null
+  and action is not null
+  and event_count is not null
+  and activity_date is not null</code></pre>
+  <div class="callout green">
+    staging의 목적은 복잡한 비즈니스 지표를 만들기보다, 모든 downstream 모델이 같은 깨끗한 입력을 쓰게 하는 것이다.
+  </div>
+
+  <h2>8. Mart 계층: dashboard가 바로 쓰는 지표 테이블</h2>
+  <p>
+    <code>models/marts/platform</code> 아래 모델들은 Metabase dashboard나 분석 노트북에서 바로 쓰기 좋게 만든 결과 테이블이다.
+    이름이 <code>metrics_</code>로 시작하는 이유도 "지표 mart"라는 의미다.
+  </p>
+  <p>
+    이 문서와 dashboard에서 쓰는 <code>active_users</code>, <code>weekly_active_users</code>, <code>WAU</code>, <code>MAU</code>는 모두
+    GitHub Archive event actor 기준이다. Organization 자체의 활성도를 보려면 별도 <code>org_id</code>, <code>org_login</code> 컬럼을 fact에 추가해야 한다.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>모델</th>
+        <th>역할</th>
+        <th>대표 컬럼</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>metrics_daily</code></td>
+        <td>일별 전체 활동 지표. DAU, active repos, events, 이벤트 타입별 count.</td>
+        <td><code>activity_date</code>, <code>active_users</code>, <code>total_events</code></td>
+      </tr>
+      <tr>
+        <td><code>metrics_weekly</code></td>
+        <td>주별 활동 지표. WAU와 weekly events를 본다.</td>
+        <td><code>week_start</code>, <code>weekly_active_users</code></td>
+      </tr>
+      <tr>
+        <td><code>metrics_event_type_daily</code></td>
+        <td>이벤트 타입별 일별 활동. Push, Watch, Fork 등의 구성 변화를 본다.</td>
+        <td><code>activity_date</code>, <code>action</code>, <code>active_users</code></td>
+      </tr>
+      <tr>
+        <td><code>metrics_user_segments</code></td>
+        <td>유저를 활동 빈도 기준으로 one-day, repeat, regular, power로 나눈다.</td>
+        <td><code>user_segment</code>, <code>users</code>, <code>avg_active_days</code></td>
+      </tr>
+      <tr>
+        <td><code>metrics_user_lifecycle_weekly</code></td>
+        <td>전주 대비 유지, 이탈, 재방문/과거미상 유저를 계산한다.</td>
+        <td><code>existing_users</code>, <code>churned_users</code>, <code>retention_rate</code></td>
+      </tr>
+      <tr>
+        <td><code>metrics_cohort_retention_weekly_heatmap</code></td>
+        <td>각 주의 전체 WAU를 기준으로 이후 1~12주 active user retention을 계산한다.</td>
+        <td><code>week_start</code>, <code>active_users</code>, <code>w1</code>~<code>w12</code></td>
+      </tr>
+      <tr>
+        <td><code>metrics_cohort_retention_monthly_heatmap</code></td>
+        <td>각 월의 전체 MAU를 기준으로 이후 1~12개월 active user retention을 계산한다.</td>
+        <td><code>month_start</code>, <code>active_users</code>, <code>m1</code>~<code>m12</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="diagram">
+    <p class="diagram-title">주요 mart 의존성 DAG</p>
+    <div class="dag">
+      <div class="dag-col">
+        <div class="dag-label">external</div>
+        <span class="node">githubarchive.day.20*</span>
+      </div>
+      <div class="dag-col">
+        <div class="dag-label">fact</div>
+        <span class="node">fact_user_repo_activity</span>
+      </div>
+      <div class="dag-col">
+        <div class="dag-label">staging</div>
+        <span class="node">stg_user_repo_activity</span>
+      </div>
+      <div class="dag-col">
+        <div class="dag-label">marts</div>
+        <span class="node">metrics_daily</span>
+        <span class="node">metrics_weekly</span>
+        <span class="node">metrics_event_type_daily</span>
+        <span class="node">metrics_user_lifecycle_weekly</span>
+        <span class="node">metrics_user_retention_weekly</span>
+        <span class="node">metrics_cohort_retention_weekly_heatmap</span>
+        <span class="node">metrics_cohort_retention_monthly_heatmap</span>
+      </div>
+    </div>
+    <div class="dag-arrow">external daily shards -> dbt incremental fact -> staging -> marts</div>
+  </div>
+
+  <h2>9. Retention 모델을 예시로 이해하기</h2>
+  <p>
+    이번에 중요한 모델은 <code>metrics_cohort_retention_weekly_heatmap</code>이다.
+    여기서 "cohort"라는 단어가 남아 있지만, 의미는 first-seen 신규 유저 cohort가 아니다.
+    각 주의 전체 WAU를 기준 집단으로 잡는다.
+  </p>
+  <pre><code>with user_week as (
+  select distinct
+    user_id,
+    week_start
+  from {{ ref('stg_user_repo_activity') }}
+),
+
+cohort_activity as (
+  select
+    cohort_week.week_start as cohort_week,
+    activity_week.week_start,
+    date_diff(activity_week.week_start, cohort_week.week_start, week) as weeks_since,
+    cohort_week.user_id
+  from user_week as cohort_week
+  join user_week as activity_week
+    on cohort_week.user_id = activity_week.user_id
+    and activity_week.week_start >= cohort_week.week_start
+    and activity_week.week_start <= date_add(cohort_week.week_start, interval 12 week)
+)</code></pre>
+  <p>
+    이 SQL은 같은 유저가 기준 주에도 활동했고, 이후 주에도 활동했는지 자기 자신과 join해서 확인한다.
+    마지막 출력은 dashboard에서 보기 쉽게 wide table로 만든다.
+  </p>
+  <pre><code>select
+  cohort_week as week_start,
+  max(cohort_users) as active_users,
+  max(if(weeks_since = 1, retention_rate, null)) as w1,
+  max(if(weeks_since = 2, retention_rate, null)) as w2,
+  ...
+  max(if(weeks_since = 12, retention_rate, null)) as w12
+from retention
+group by cohort_week</code></pre>
+
+  <h3>숫자로 보는 해석 예시</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>week_start</th>
+        <th>active_users</th>
+        <th>w1</th>
+        <th>w2</th>
+        <th>해석</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>2026-04-06</td>
+        <td>100,000</td>
+        <td>0.42</td>
+        <td>0.31</td>
+        <td>2026-04-06 주 활동자 100,000명 중 42,000명이 다음 주에도, 31,000명이 2주 뒤에도 활동했다.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="diagram">
+    <p class="diagram-title">Retention heatmap이 보여주는 형태</p>
+    <div class="heatmap">
+      <table>
+        <thead>
+          <tr>
+            <th>week_start</th>
+            <th>active_users</th>
+            <th>w1</th>
+            <th>w2</th>
+            <th>w3</th>
+            <th>w4</th>
+            <th>w5</th>
+            <th>w6</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2026-03-23</td>
+            <td>1,980,000</td>
+            <td class="heat-high">52%</td>
+            <td class="heat-mid">41%</td>
+            <td class="heat-mid">35%</td>
+            <td class="heat-low">29%</td>
+            <td class="heat-low">24%</td>
+            <td class="heat-low">21%</td>
+          </tr>
+          <tr>
+            <td>2026-03-30</td>
+            <td>2,050,000</td>
+            <td class="heat-high">50%</td>
+            <td class="heat-mid">39%</td>
+            <td class="heat-mid">34%</td>
+            <td class="heat-low">28%</td>
+            <td class="heat-low">23%</td>
+            <td class="heat-null">null</td>
+          </tr>
+          <tr>
+            <td>2026-04-06</td>
+            <td>2,120,000</td>
+            <td class="heat-mid">47%</td>
+            <td class="heat-mid">37%</td>
+            <td class="heat-low">31%</td>
+            <td class="heat-low">26%</td>
+            <td class="heat-null">null</td>
+            <td class="heat-null">null</td>
+          </tr>
+          <tr>
+            <td>2026-04-13</td>
+            <td>2,180,000</td>
+            <td class="heat-mid">45%</td>
+            <td class="heat-low">33%</td>
+            <td class="heat-low">27%</td>
+            <td class="heat-null">null</td>
+            <td class="heat-null">null</td>
+            <td class="heat-null">null</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">
+      색이 진할수록 같은 기준 주의 active users가 이후 기간에도 다시 활동한 비율이 높다는 뜻이다.
+      오른쪽 아래 null은 아직 미래 기간이라 관측되지 않은 값이다.
+    </p>
+  </div>
+
+  <div class="callout warn">
+    최신 주의 <code>w1</code> 이후 값이 null이면 "아직 미래 데이터가 없어서 모른다"는 뜻이다.
+    0% retention으로 해석하면 안 된다.
+  </div>
+
+  <h2>10. 테스트: 데이터가 맞는지 자동으로 확인하기</h2>
+  <p>
+    dbt test는 "테이블이 만들어졌다"에서 끝내지 않고, 만들어진 데이터가 기본 조건을 만족하는지 확인한다.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>테스트</th>
+        <th>검증하는 것</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>not_null</code></td>
+        <td>핵심 키나 지표 컬럼이 비어 있지 않은지 확인한다.</td>
+      </tr>
+      <tr>
+        <td><code>unique</code></td>
+        <td><code>metrics_daily.activity_date</code>, <code>metrics_weekly.week_start</code>처럼 한 기간에 한 행만 있는지 확인한다.</td>
+      </tr>
+      <tr>
+        <td><code>metrics_cohort_retention_weekly_heatmap_rates</code></td>
+        <td><code>w1</code>~<code>w12</code> 값이 0과 1 사이인지 확인한다.</td>
+      </tr>
+      <tr>
+        <td><code>metrics_cohort_retention_weekly_heatmap_active_users_match_wau</code></td>
+        <td>heatmap의 <code>active_users</code>가 <code>metrics_weekly.weekly_active_users</code>와 같은지 확인한다.</td>
+      </tr>
+      <tr>
+        <td><code>assert_user_lifecycle_weekly_balances</code></td>
+        <td>retention/churn/lifecycle 계산의 사용자 수 균형이 맞는지 확인한다.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="diagram">
+    <p class="diagram-title">품질 검증이 보는 네 가지 축</p>
+    <div class="quality-grid">
+      <div class="quality-card">
+        <strong>Completeness</strong>
+        <p>핵심 기간과 지표 컬럼이 비어 있지 않은지 확인한다. 예: <code>week_start</code>, <code>active_users</code>.</p>
+      </div>
+      <div class="quality-card">
+        <strong>Uniqueness</strong>
+        <p>일별/주별 mart가 한 기간에 한 행만 가지는지 확인한다. 중복 행은 dashboard 집계를 망친다.</p>
+      </div>
+      <div class="quality-card">
+        <strong>Range</strong>
+        <p>retention rate처럼 비율인 값이 0~1 범위를 벗어나지 않는지 확인한다.</p>
+      </div>
+      <div class="quality-card">
+        <strong>Reconciliation</strong>
+        <p>heatmap의 <code>active_users</code>가 독립적으로 계산한 WAU/MAU와 일치하는지 대조한다.</p>
+      </div>
+    </div>
+  </div>
+
+  <h2>11. 문서화: dbt docs에서 무엇을 볼 수 있나</h2>
+  <p>
+    <code>schema.yml</code>과 <code>docs.md</code>에 적은 설명은 <code>dbt docs generate</code> 후 웹 UI에서 볼 수 있다.
+    이번 retention heatmap 설명도 여기에 들어 있다.
+  </p>
+  <pre><code>GCP_KEY_PATH=/Users/kakao/bda-2/gcp-key.json \
+uv run --with dbt-bigquery dbt docs generate \
+  --project-dir dbt/gharchive_metrics \
+  --profiles-dir dbt/profiles
+
+GCP_KEY_PATH=/Users/kakao/bda-2/gcp-key.json \
+uv run --with dbt-bigquery dbt docs serve \
+  --project-dir dbt/gharchive_metrics \
+  --profiles-dir dbt/profiles \
+  --port 8088</code></pre>
+  <p>
+    현재 로컬에서 serve 중이면 <a href="http://localhost:8088/">http://localhost:8088/</a>에서 확인할 수 있다.
+  </p>
+
+  <h2>12. Semantic Layer는 왜 따로 있나</h2>
+  <p>
+    Semantic Layer는 mart table 위에 한 번 더 올라가는 <strong>지표 정의 계층</strong>이다.
+    mart가 "조회 가능한 테이블"을 만드는 계층이라면, semantic layer는 "이 테이블에서 어떤 차원으로 어떤 지표를 계산할 수 있는지"를 선언한다.
+    같은 지표를 여러 dashboard, notebook, API, MetricFlow query에서 쓰더라도 정의가 갈라지지 않게 하는 목적이다.
+  </p>
+  <p>
+    이 프로젝트의 semantic layer는 <code>models/semantic/platform_activity.yml</code>에 있다.
+    기반 모델은 <code>stg_user_repo_activity</code>이고, 그 위에 entity, dimension, measure, metric을 정의한다.
+  </p>
+  <div class="semantic-map">
+    <div class="semantic-box">
+      <strong>Semantic Model</strong>
+      <span>어떤 dbt 모델을 분석 가능한 의미 계층으로 볼지 정한다. 여기서는 <code>stg_user_repo_activity</code>를 사용한다.</span>
+    </div>
+    <div class="semantic-box">
+      <strong>Entity</strong>
+      <span>분석 대상의 식별자다. 예: <code>user</code>, <code>repo</code>, <code>activity</code>.</span>
+    </div>
+    <div class="semantic-box">
+      <strong>Dimension</strong>
+      <span>지표를 자르는 기준이다. 예: <code>activity_date</code>, <code>week_start</code>, <code>action</code>.</span>
+    </div>
+    <div class="semantic-box">
+      <strong>Measure</strong>
+      <span>원천 컬럼에 적용할 집계 규칙이다. 예: <code>sum(event_count)</code>, <code>count_distinct(user_id)</code>.</span>
+    </div>
+    <div class="semantic-box">
+      <strong>Metric</strong>
+      <span>외부에서 호출할 지표 이름이다. 예: <code>active_users</code>, <code>total_events</code>.</span>
+    </div>
+  </div>
+
+  <h3>이 프로젝트의 semantic model 예시</h3>
+  <pre><code>semantic_models:
+  - name: user_repo_activity
+    model: ref('stg_user_repo_activity')
+    defaults:
+      agg_time_dimension: activity_date
+    entities:
+      - name: user
+        type: foreign
+        expr: user_id
+      - name: repo
+        type: foreign
+        expr: repo_id
+    dimensions:
+      - name: activity_date
+        type: time
+      - name: action
+        type: categorical
+    measures:
+      - name: active_users
+        agg: count_distinct
+        expr: user_id</code></pre>
+
+  <p>
+    위 정의가 있으면 <code>active_users</code>는 "유저 수를 아무렇게나 세는 값"이 아니라
+    <code>user_id</code>의 distinct count라는 계약이 된다.
+    <code>total_events</code>도 <code>event_count</code>의 sum으로 정의된다.
+  </p>
+  <div>
+    <span class="pill">total_events</span>
+    <span class="pill">active_users</span>
+    <span class="pill">active_repos</span>
+    <span class="pill">push_events</span>
+    <span class="pill">watch_events</span>
+    <span class="pill">fork_events</span>
+    <span class="pill">pull_request_events</span>
+    <span class="pill">issue_events</span>
+  </div>
+
+  <h3>Mart와 Semantic Layer의 차이</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>구분</th>
+        <th>Mart</th>
+        <th>Semantic Layer</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>주요 질문</td>
+        <td>어떤 테이블을 만들어 dashboard가 빠르게 읽게 할 것인가?</td>
+        <td>어떤 지표를 어떤 차원으로, 같은 정의로 계산하게 할 것인가?</td>
+      </tr>
+      <tr>
+        <td>산출물</td>
+        <td>BigQuery view/table/incremental table</td>
+        <td>YAML에 선언된 entity, dimension, measure, metric</td>
+      </tr>
+      <tr>
+        <td>예시</td>
+        <td><code>metrics_daily</code>, <code>metrics_weekly</code></td>
+        <td><code>active_users</code>, <code>total_events</code></td>
+      </tr>
+      <tr>
+        <td>실무상 가치</td>
+        <td>조회 성능, dashboard 편의, 복잡한 SQL 캡슐화</td>
+        <td>지표 정의 통일, self-serve analytics, metric API 연동</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>13. 실행 명령어</h2>
+  <p>
+    보통 개발 중에는 특정 모델만 골라서 build하고, 발표나 배포 전에는 전체 build를 돌린다.
+  </p>
+  <pre><code># 특정 모델과 의존 테스트 실행
+GCP_KEY_PATH=/Users/kakao/bda-2/gcp-key.json \
+uv run --with dbt-bigquery dbt build \
+  --project-dir dbt/gharchive_metrics \
+  --profiles-dir dbt/profiles \
+  --select metrics_cohort_retention_weekly_heatmap metrics_cohort_retention_monthly_heatmap metrics_weekly
+
+# 전체 dbt 프로젝트 실행
+GCP_KEY_PATH=/Users/kakao/bda-2/gcp-key.json \
+uv run --with dbt-bigquery dbt build \
+  --project-dir dbt/gharchive_metrics \
+  --profiles-dir dbt/profiles</code></pre>
+
+  <h2>14. 실무 기준 체크포인트</h2>
+  <ul class="checklist">
+    <li>지표 모델은 이름보다 정의가 먼저다. 특히 retention은 denominator와 관측 기간을 명시해야 한다.</li>
+    <li>일자별 raw shard는 incremental fact로 관리하는 게 자연스럽다. 전체 raw scan을 기본값으로 두면 안 된다.</li>
+    <li>fact, staging, marts의 책임을 섞지 않는다. 적재 경계, 정제, 집계, serving 목적을 분리해야 변경 영향이 작다.</li>
+    <li><code>ref()</code> 기반 의존성을 유지해야 lineage, 선택 실행, 영향 분석이 가능하다.</li>
+    <li>dashboard에 노출되는 mart는 최소한 기간 키 unique, 핵심 지표 not null, 비율 범위, reconciliation 테스트를 갖춰야 한다.</li>
+    <li>문서화는 부가 작업이 아니다. 지표 정의, 예외 처리, null 해석은 dashboard 사용자에게 전달되는 계약이다.</li>
+  </ul>
+
+  <h2>15. 이 프로젝트를 면접에서 설명한다면</h2>
+  <p>
+    짧게 설명하면 이렇게 말할 수 있다.
+  </p>
+  <div class="callout green">
+    GitHub Archive 일자별 shard를 dbt incremental fact로 집계하고, 그 위에 staging, metric mart, retention mart, semantic metrics를 구성했습니다.
+    각 모델은 <code>ref()</code>로 의존성을 관리했고, fact는 <code>activity_date</code> partition overwrite로 스캔 범위를 제한했습니다.
+    핵심 기간 컬럼과 retention rate에 대해 dbt tests를 붙였습니다.
+    특히 weekly active user retention heatmap은 first-seen cohort가 아니라 해당 주 전체 WAU를 denominator로 정의했고,
+    dbt docs에 계산식과 예시까지 문서화했습니다.
+  </div>
+</main>
+</body>
+</html>
