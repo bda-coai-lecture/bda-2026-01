@@ -9,7 +9,7 @@ import re
 import sqlite3
 import subprocess
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -20,12 +20,13 @@ import requests
 from ghrec.metadata import fetch_and_cache_repos, get_metadata_df, init_db
 
 
-DEFAULT_API_URL = "http://localhost:8000"
+DEFAULT_API_URL = "http://localhost:8001"
 DEFAULT_HISTORY_PATH = Path("data/marts/week6/user_repo_interaction_mart.parquet")
 DEFAULT_CANONICAL_PATH = Path("data/features/recsys_v2/canonical_retrieval_rerank_v2_week7_full_20260502.parquet")
 DEFAULT_REPO_METADATA_DB = Path("data/repo_metadata.db")
 DEFAULT_REPO_NAME_MAP = Path("data/models/repo_name_map.pkl")
 DEFAULT_USER_CACHE_DB = Path("data/github_user_cache.db")
+DEFAULT_GCP_KEY_PATH = Path(os.environ.get("GCP_KEY_PATH", "gcp-key.json"))
 
 EVENT_COLUMNS = ["watch_cnt", "fork_cnt", "pr_cnt", "push_cnt", "issue_cnt", "comment_cnt"]
 
@@ -39,6 +40,27 @@ class GitHubUser:
     public_repos: int | None = None
     followers: int | None = None
     fetched_at: str | None = None
+
+
+class RecsysApiError(RuntimeError):
+    """Structured error returned by the local recommendation API."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int,
+        code: str = "api_error",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = int(status_code)
+        self.code = code
+        self.details = details or {}
+
+
+class ColdStartRecommendationError(RecsysApiError):
+    """Raised when the serving bundle has no candidates for an actor."""
 
 
 def parse_github_username(value: str) -> str:
@@ -211,6 +233,52 @@ def load_repo_name_map(path: Path = DEFAULT_REPO_NAME_MAP) -> dict[int, str]:
     return out
 
 
+def lookup_repo_names_bigquery(
+    repo_ids: list[int],
+    *,
+    key_path: Path = DEFAULT_GCP_KEY_PATH,
+    project: str = "bda-coai",
+    start: date = date(2026, 3, 1),
+    end: date = date(2026, 5, 23),
+) -> dict[int, str]:
+    """Resolve missing repo ids to owner/name from GitHub Archive shards."""
+    repo_ids = sorted({int(rid) for rid in repo_ids if rid is not None})
+    if not repo_ids or not key_path.exists():
+        return {}
+
+    from google.cloud import bigquery
+
+    client = bigquery.Client.from_service_account_json(str(key_path), project=project)
+    query = """
+    SELECT
+      CAST(repo.id AS INT64) AS repo_id,
+      ARRAY_AGG(repo.name IGNORE NULLS ORDER BY created_at DESC LIMIT 1)[OFFSET(0)] AS repo_name
+    FROM `githubarchive.day.20*`
+    WHERE _TABLE_SUFFIX BETWEEN @start_suffix AND @end_suffix
+      AND repo.id IN UNNEST(@repo_ids)
+      AND repo.name IS NOT NULL
+    GROUP BY repo_id
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("start_suffix", "STRING", start.strftime("%y%m%d")),
+            bigquery.ScalarQueryParameter("end_suffix", "STRING", end.strftime("%y%m%d")),
+            bigquery.ArrayQueryParameter("repo_ids", "INT64", repo_ids),
+        ],
+        use_query_cache=True,
+    )
+    frame = client.query(query, job_config=job_config).to_dataframe(
+        create_bqstorage_client=False
+    )
+    if frame.empty:
+        return {}
+    return {
+        int(row.repo_id): str(row.repo_name)
+        for row in frame.itertuples(index=False)
+        if row.repo_name
+    }
+
+
 def summarize_history(
     actor_id: int,
     history_path: Path = DEFAULT_HISTORY_PATH,
@@ -287,6 +355,11 @@ def metadata_lookup(meta: pd.DataFrame) -> dict[int, dict[str, Any]]:
     return {int(row["repo_id"]): row for row in records}
 
 
+def rows_dataframe(rows: list[dict[str, Any]], columns: list[str]) -> pd.DataFrame:
+    """Build a display DataFrame that keeps columns even when rows are empty."""
+    return pd.DataFrame(rows, columns=columns)
+
+
 def call_recommendation_api(
     actor_id: int,
     k: int,
@@ -310,8 +383,18 @@ def call_recommendation_api(
         try:
             detail = resp.json()
         except ValueError:
-            detail = resp.text
-        raise RuntimeError(f"Recommendation API failed: HTTP {resp.status_code} {detail}")
+            detail = {"error": {"code": "api_error", "message": resp.text, "details": {}}}
+        error = detail.get("detail", {}).get("error", {}) if isinstance(detail, dict) else {}
+        code = str(error.get("code") or "api_error")
+        message = str(error.get("message") or detail)
+        details = error.get("details") if isinstance(error.get("details"), dict) else {}
+        error_cls = ColdStartRecommendationError if resp.status_code == 404 and code == "actor_not_found" else RecsysApiError
+        raise error_cls(
+            message,
+            status_code=resp.status_code,
+            code=code,
+            details=details,
+        )
     return resp.json()
 
 

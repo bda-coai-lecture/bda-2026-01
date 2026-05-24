@@ -8,6 +8,7 @@ and test is reserved for final evaluation.
 from __future__ import annotations
 
 import argparse
+import os
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -41,10 +42,15 @@ DEFAULT_TEST_END = date(2026, 5, 8)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=["daily", "mart"], default="daily")
+    parser.add_argument("--source", choices=["daily", "mart", "bigquery"], default="daily")
     parser.add_argument("--daily-dir", type=Path, default=DATA_DIR)
     parser.add_argument("--mart-path", type=Path, default=MART_DIR / "experiment_split_mart.parquet")
     parser.add_argument("--allow-unversioned-mart", action="store_true")
+    parser.add_argument("--bq-project", default="bda-coai")
+    parser.add_argument("--bq-dataset", default="mart")
+    parser.add_argument("--bq-table", default="fact_user_repo_activity")
+    parser.add_argument("--bq-location", default="US")
+    parser.add_argument("--gcp-key-path", type=Path, default=Path(os.environ.get("GCP_KEY_PATH", "gcp-key.json")))
     parser.add_argument("--suffix", default="latest")
     parser.add_argument("--history-start", type=parse_date, default=DEFAULT_HISTORY_START)
     parser.add_argument("--history-end", type=parse_date, default=DEFAULT_HISTORY_END)
@@ -81,6 +87,10 @@ def validate_windows(args: argparse.Namespace) -> None:
         )
     if args.source == "mart" and args.event_weight:
         raise ValueError("--event-weight cannot be combined with --source mart")
+    if args.source == "bigquery" and not args.gcp_key_path.exists():
+        raise FileNotFoundError(
+            f"BigQuery source requires a service account key: {args.gcp_key_path}"
+        )
 
 
 def load_daily_feedback(
@@ -93,6 +103,48 @@ def load_daily_feedback(
     return build_feedback(events, event_weights)
 
 
+def load_bigquery_feedback(
+    project: str,
+    dataset: str,
+    table: str,
+    location: str,
+    key_path: Path,
+    start: date,
+    end: date,
+    event_weights: dict[str, float],
+) -> pd.DataFrame:
+    from google.cloud import bigquery
+
+    client = bigquery.Client.from_service_account_json(
+        str(key_path),
+        project=project,
+        location=location,
+    )
+    table_id = f"`{project}.{dataset}.{table}`"
+    query = f"""
+    SELECT
+      CAST(user_id AS INT64) AS actor_id,
+      CAST(repo_id AS INT64) AS repo_id,
+      CAST(action AS STRING) AS type,
+      SUM(CAST(event_count AS INT64)) AS cnt
+    FROM {table_id}
+    WHERE activity_date BETWEEN @start_date AND @end_date
+      AND user_id IS NOT NULL
+      AND repo_id IS NOT NULL
+      AND action IS NOT NULL
+    GROUP BY actor_id, repo_id, type
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("start_date", "DATE", start),
+            bigquery.ScalarQueryParameter("end_date", "DATE", end),
+        ],
+        use_query_cache=True,
+    )
+    events = client.query(query, job_config=job_config).to_dataframe()
+    return build_feedback(events, event_weights)
+
+
 def load_split_feedback(
     args: argparse.Namespace,
     event_weights: dict[str, float],
@@ -102,6 +154,39 @@ def load_split_feedback(
             load_daily_feedback(args.daily_dir, args.history_start, args.history_end, event_weights),
             load_daily_feedback(args.daily_dir, args.rank_start, args.rank_end, event_weights),
             load_daily_feedback(args.daily_dir, args.test_start, args.test_end, event_weights),
+        )
+    if args.source == "bigquery":
+        return (
+            load_bigquery_feedback(
+                args.bq_project,
+                args.bq_dataset,
+                args.bq_table,
+                args.bq_location,
+                args.gcp_key_path,
+                args.history_start,
+                args.history_end,
+                event_weights,
+            ),
+            load_bigquery_feedback(
+                args.bq_project,
+                args.bq_dataset,
+                args.bq_table,
+                args.bq_location,
+                args.gcp_key_path,
+                args.rank_start,
+                args.rank_end,
+                event_weights,
+            ),
+            load_bigquery_feedback(
+                args.bq_project,
+                args.bq_dataset,
+                args.bq_table,
+                args.bq_location,
+                args.gcp_key_path,
+                args.test_start,
+                args.test_end,
+                event_weights,
+            ),
         )
     return (
         load_mart_split(
@@ -186,6 +271,10 @@ def main() -> None:
         "daily_dir": str(args.daily_dir),
         "mart_path": str(args.mart_path),
         "allow_unversioned_mart": bool(args.allow_unversioned_mart),
+        "bq_project": args.bq_project if args.source == "bigquery" else None,
+        "bq_dataset": args.bq_dataset if args.source == "bigquery" else None,
+        "bq_table": args.bq_table if args.source == "bigquery" else None,
+        "bq_location": args.bq_location if args.source == "bigquery" else None,
         "suffix": args.suffix,
         "smoke": bool(args.smoke),
         "split_periods": {
