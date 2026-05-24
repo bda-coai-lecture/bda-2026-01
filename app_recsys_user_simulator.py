@@ -147,6 +147,10 @@ def repo_column_config(label: str = "GitHub") -> dict[str, object]:
     return {"Link": st.column_config.LinkColumn(label, display_text="open")}
 
 
+def table_height(row_count: int, *, max_height: int = 900) -> int:
+    return min(max_height, 38 + max(1, row_count) * 36)
+
+
 HISTORY_COLUMNS = ["Repo", "Repo ID", "Score", "Events", "Language", "Stars", "Last seen", "Topics", "Link"]
 RECOMMENDATION_COLUMNS = [
     "Rank",
@@ -321,6 +325,7 @@ with tabs[1]:
             rows_dataframe(rows, RECOMMENDATION_COLUMNS),
             hide_index=True,
             use_container_width=True,
+            height=table_height(len(rows)),
             column_config=repo_column_config(),
         )
 
@@ -328,10 +333,11 @@ with tabs[2]:
     if "result" not in locals() or not result:
         st.info("추천 결과가 생성되면 설명을 보여줍니다.")
     else:
-        items = result.get("items", [])[:10]
+        items = result.get("items", [])
         rec_repo_ids = [int(item["repo_id"]) for item in items]
         rec_repo_names = resolve_repo_names(rec_repo_ids, repo_names)
         rec_meta = enrich_repos(rec_repo_ids, repo_names)
+        st.caption(f"{len(items):,}개 추천 설명")
         for item in items:
             repo_id = int(item["repo_id"])
             repo_name = rec_repo_names.get(repo_id, f"repo_{repo_id}")

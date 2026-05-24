@@ -7,6 +7,11 @@ ENV PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     PYTHONPATH=/app/src
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN uv pip install --system --no-cache \
     "fastapi>=0.136.1" \
     "uvicorn>=0.46.0" \
