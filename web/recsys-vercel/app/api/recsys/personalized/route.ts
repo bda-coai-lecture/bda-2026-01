@@ -11,5 +11,9 @@ export async function GET(request: Request) {
     return Response.json({ message: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 
-  return proxyJson(upstream);
+  return proxyJson(upstream, undefined, {
+    cacheKey: `personalized:${actorId}:${limit}`,
+    freshTtlMs: 10 * 60 * 1000,
+    staleTtlMs: 24 * 60 * 60 * 1000,
+  });
 }

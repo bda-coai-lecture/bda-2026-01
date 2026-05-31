@@ -24,5 +24,10 @@ export async function GET(request: Request) {
   } catch (error) {
     return Response.json({ message: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
-  return proxyJson(upstream);
+  return proxyJson(upstream, undefined, {
+    cacheKey: `related:${owner.toLowerCase()}/${repo.toLowerCase()}:${limit}`,
+    cacheControl: "public, s-maxage=3600, stale-while-revalidate=604800",
+    freshTtlMs: 60 * 60 * 1000,
+    staleTtlMs: 7 * 24 * 60 * 60 * 1000,
+  });
 }
