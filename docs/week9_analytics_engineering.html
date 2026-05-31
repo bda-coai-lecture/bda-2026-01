@@ -1,0 +1,1623 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Week 9 Analytics Engineering</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef2f5;
+        --paper: #ffffff;
+        --ink: #172033;
+        --muted: #64748b;
+        --line: #d6dee8;
+        --soft: #f4f7fa;
+        --raw: #475569;
+        --collect: #2563eb;
+        --model: #0f766e;
+        --quality: #b45309;
+        --auto: #7c3aed;
+        --bi: #15803d;
+        --ops: #b91c1c;
+      }
+
+      * {
+        box-sizing: border-box;
+        min-width: 0;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+        letter-spacing: 0;
+      }
+
+      .deck {
+        width: min(1440px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 22px 0 72px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 12px 0;
+        background: linear-gradient(var(--bg) 72%, rgb(238 242 245 / 0));
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        background: var(--model);
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      button {
+        display: inline-grid;
+        place-items: center;
+        width: 38px;
+        height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #fff;
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: var(--model);
+      }
+
+      .counter {
+        min-width: 96px;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+
+      .slide {
+        display: grid;
+        min-height: 760px;
+        margin: 18px 0 34px;
+        padding: 48px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        box-shadow: 0 18px 42px rgb(15 23 42 / 0.08);
+        scroll-margin-top: 74px;
+      }
+
+      .slide.title {
+        grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+        gap: 34px;
+        align-items: center;
+      }
+
+      .slide.split {
+        grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+        gap: 34px;
+      }
+
+      .slide.center {
+        place-items: center;
+        text-align: center;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--model);
+        font-size: 13px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        line-height: 1.05;
+        font-weight: 900;
+      }
+
+      h1 {
+        font-size: clamp(48px, 6vw, 86px);
+      }
+
+      h2 {
+        font-size: clamp(36px, 4.6vw, 68px);
+      }
+
+      .subtitle {
+        max-width: 850px;
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 23px;
+        line-height: 1.45;
+      }
+
+      .section-label {
+        width: max-content;
+        max-width: 100%;
+        margin-bottom: 14px;
+        padding: 6px 11px;
+        border-radius: 999px;
+        background: #e7f6f2;
+        color: var(--model);
+        font-size: 13px;
+        font-weight: 850;
+      }
+
+      .tagline {
+        margin-top: 24px;
+        padding: 18px 20px;
+        border-left: 5px solid var(--model);
+        border-radius: 8px;
+        background: #f0fdfa;
+        font-size: 22px;
+        font-weight: 800;
+      }
+
+      .bullets {
+        display: grid;
+        gap: 15px;
+        margin: 30px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .bullets li {
+        position: relative;
+        padding-left: 30px;
+        color: #334155;
+        font-size: 24px;
+      }
+
+      .bullets li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 14px;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--model);
+      }
+
+      .note {
+        margin-top: 26px;
+        color: var(--muted);
+        font-size: 17px;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .card {
+        min-height: 148px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfcfe;
+      }
+
+      .card strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 18px;
+      }
+
+      .card span {
+        display: block;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .map {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 30px;
+      }
+
+      .map-step {
+        padding: 18px;
+        border: 2px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .map-step b {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 19px;
+      }
+
+      .map-step span {
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .map-step.raw { border-color: var(--raw); }
+      .map-step.collect { border-color: var(--collect); }
+      .map-step.model { border-color: var(--model); }
+      .map-step.quality { border-color: var(--quality); }
+      .map-step.auto { border-color: var(--auto); }
+      .map-step.bi { border-color: var(--bi); }
+      .map-step.ops { border-color: var(--ops); }
+
+      .codebox {
+        margin-top: 28px;
+        padding: 20px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #0f172a;
+        color: #e2e8f0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 16px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+      }
+
+      .path {
+        display: inline-block;
+        max-width: 100%;
+        margin-top: 20px;
+        padding: 8px 10px;
+        border-radius: 7px;
+        background: var(--soft);
+        color: #334155;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 14px;
+        overflow-wrap: anywhere;
+      }
+
+      .visual-panel {
+        margin-top: 30px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f8fafc;
+      }
+
+      .visual-title {
+        margin: 0 0 12px;
+        color: #334155;
+        font-size: 15px;
+        font-weight: 850;
+      }
+
+      .visual-panel svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .visual-panel text {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      .matrix {
+        width: 100%;
+        margin-top: 26px;
+        border-collapse: collapse;
+        font-size: 17px;
+      }
+
+      .matrix th,
+      .matrix td {
+        padding: 13px 14px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .matrix th {
+        background: var(--soft);
+        color: #334155;
+      }
+
+      .matrix td {
+        color: var(--muted);
+      }
+
+      .number {
+        color: var(--model);
+        font-size: 86px;
+        font-weight: 950;
+        line-height: 1;
+      }
+
+      @media (max-width: 920px) {
+        .slide,
+        .slide.title,
+        .slide.split {
+          grid-template-columns: 1fr;
+          min-height: auto;
+          padding: 28px;
+        }
+
+        .cards,
+        .map {
+          grid-template-columns: 1fr;
+        }
+
+        .bullets li {
+          font-size: 20px;
+        }
+      }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .topbar {
+          display: none;
+        }
+
+        .deck {
+          width: 100%;
+          padding: 0;
+        }
+
+        .slide {
+          min-height: 100vh;
+          margin: 0;
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+          break-after: page;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <div class="topbar">
+        <div class="brand"><span class="dot"></span><span>BDA 2기 데이터 핸들링 Week 9</span></div>
+        <div class="controls">
+          <button type="button" id="prev" aria-label="이전 슬라이드">‹</button>
+          <div class="counter" id="counter">1 / 1</div>
+          <button type="button" id="next" aria-label="다음 슬라이드">›</button>
+        </div>
+      </div>
+      <div id="slides"></div>
+    </main>
+
+    <script>
+      const slides = [
+              {
+                      "layout": "title",
+                      "section": "Week 9",
+                      "title": "Analytics Engineering",
+                      "subtitle": "분석 노트북에서 운영 가능한 데이터 제품까지",
+                      "note": "한 달 쉬기 전, 지금까지 만든 데이터 핸들링 결과물을 회사에서 설명 가능한 형태로 정리함.",
+                      "cards": [
+                              [
+                                      "오늘의 관점",
+                                      "왜 회사는 노트북 결과만으로 만족하지 않을까?"
+                              ],
+                              [
+                                      "오늘의 결과",
+                                      "수집, Silver/Golden, 자동화, 대시보드, 추천 feature pipeline을 하나의 흐름으로 말함."
+                              ]
+                      ]
+              },
+              {
+                      "section": "Opening",
+                      "title": "오늘은 새 알고리즘보다 연결이 중요하다",
+                      "bullets": [
+                              "이미 8주차까지 데이터 수집, 지표 mart, 자동화, 대시보드까지 구축.",
+                              "9주차는 이것들을 Analytics Engineering이라는 실무 언어로 묶음.",
+                              "목표는 프로젝트 전체를 “왜 필요했고 어떻게 연결됐는지” 설명할 수 있게 만드는 것."
+                      ],
+                      "note": "기술을 더 많이 넣는 회차가 아니라, 왜 그 기술들이 필요했는지 정리하는 회차."
+              },
+              {
+                      "section": "Opening",
+                      "title": "수업 끝나고 말할 수 있어야 하는 문장",
+                      "subtitle": "GitHub Archive 원천 로그를 BigQuery에서 수집하고, 분석 가능한 Silver fact로 정리한 뒤, dbt로 Golden metric mart를 만들고, Airflow로 자동화하고, Metabase 대시보드와 추천 feature pipeline까지 연결함.",
+                      "note": "수업 전체를 하나의 데이터 제품 흐름으로 요약하는 문장."
+              },
+              {
+                      "section": "Opening",
+                      "title": "중요한 건 도구 이름이 아니다",
+                      "bullets": [
+                              "BigQuery, dbt, Airflow, Metabase를 썼다는 말만으로는 부족함.",
+                              "왜 그 도구가 필요했는지 문제 상황과 함께 설명해야 함.",
+                              "실무에서는 분석 결과보다 반복 가능성, 신뢰성, 운영 가능성을 더 자주 물음."
+                      ]
+              },
+              {
+                      "section": "Opening",
+                      "title": "노트북은 출발점",
+                      "bullets": [
+                              "모르는 데이터를 빠르게 탐색하고 가설을 검증하기 좋음.",
+                              "중간 결과를 바로 보고, 시각화하고, 설명하기 쉬움.",
+                              "하지만 회사에서 매일 쓰는 시스템은 노트북 그대로 만들기 어려움."
+                      ]
+              },
+              {
+                      "section": "Opening",
+                      "title": "노트북이 운영에서 약한 이유",
+                      "bullets": [
+                              "셀 실행 순서와 숨은 중간 상태 때문에 재현성이 흔들릴 수 있음.",
+                              "로컬 파일 경로와 개인 환경에 의존하기 쉬움.",
+                              "실패 알림, 품질 테스트, downstream 영향 추적이 기본으로 붙어 있지 않음.",
+                              "그래서 검증된 로직은 pipeline으로 승격되어야 함."
+                      ]
+              },
+              {
+                      "section": "Opening",
+                      "title": "회사에서 데이터가 필요한 순간",
+                      "bullets": [
+                              "제품팀은 사용자가 줄었는지 알고 싶음.",
+                              "마케팅팀은 어떤 채널이나 세그먼트가 남는지 보고 싶음.",
+                              "추천/ML 팀은 학습 데이터와 feature가 믿을 만한지 확인해야 함.",
+                              "경영진은 같은 지표를 매주 같은 기준으로 보고 싶음."
+                      ]
+              },
+              {
+                      "section": "Opening",
+                      "title": "문제: 모두가 숫자를 다르게 만들 수 있음",
+                      "bullets": [
+                              "누군가는 raw event를 직접 세고, 누군가는 notebook 결과를 복사함.",
+                              "기간, 유저 기준, 봇 포함 여부, 중복 처리 기준이 달라짐.",
+                              "결국 회의는 의사결정이 아니라 숫자 출처 검증으로 끝남."
+                      ]
+              },
+              {
+                      "section": "Opening",
+                      "title": "Analytics Engineering의 한 줄 정의",
+                      "subtitle": "분석 질문을 반복 가능한 데이터 제품으로 바꾸는 일",
+                      "note": "데이터 제품은 테이블, 지표 정의, 테스트, 스케줄, 대시보드, 문서까지 포함함."
+              },
+              {
+                      "section": "Opening",
+                      "title": "전체 지도: 분석에서 운영까지",
+                      "visual": "pipeline",
+                      "note": "지도는 세부 기술 목록이 아니라 역할과 흐름을 보여주는 용도.",
+                      "bullets": [
+                              "왼쪽은 원천과 모델링, 오른쪽은 소비와 운영.",
+                              "BI와 추천 feature는 소비자는 다르지만 같은 원천 활동 로그에서 출발.",
+                              "Slack 알림은 “만든 것”을 “운영되는 것”으로 바꾸는 마지막 연결점."
+                      ]
+              },
+              {
+                      "section": "Opening",
+                      "title": "Grain: 테이블 한 행의 의미",
+                      "bullets": [
+                              "grain은 “이 테이블의 한 행이 무엇을 뜻하는가”에 대한 약속.",
+                              "예: activity_date, user_id, repo_id, action 한 조합이 하루의 유저-repo 활동을 의미.",
+                              "grain이 정해져야 중복 집계, 잘못된 join, 지표 불일치를 줄일 수 있음.",
+                              "AI가 SQL을 생성할 때도 grain 설명이 없으면 그럴듯하지만 틀린 집계를 만들기 쉬움."
+                      ],
+                      "table": [
+                              [
+                                      "나쁜 질문",
+                                      "좋은 질문"
+                              ],
+                              [
+                                      "이 테이블은 유저 활동 테이블임",
+                                      "한 행은 activity_date x user_id x repo_id x action 단위 활동임"
+                              ],
+                              [
+                                      "DAU를 세면 됨",
+                                      "activity_date별 distinct user_id를 세되 action 포함 범위를 명시함"
+                              ],
+                              [
+                                      "repo와 join하면 됨",
+                                      "repo_id grain과 join 후 row multiplication 여부 확인함"
+                              ]
+                      ]
+              },
+              {
+                      "section": "Role",
+                      "title": "Data Analyst와 Analytics Engineer의 차이",
+                      "table": [
+                              [
+                                      "역할",
+                                      "주요 질문",
+                                      "산출물"
+                              ],
+                              [
+                                      "Data Analyst",
+                                      "왜 DAU가 줄었지?",
+                                      "노트북, 리포트, 인사이트"
+                              ],
+                              [
+                                      "Analytics Engineer",
+                                      "DAU를 매일 같은 기준으로 믿고 볼 수 있나?",
+                                      "fact, mart, test, semantic metric, dashboard"
+                              ],
+                              [
+                                      "Data Engineer",
+                                      "원천 데이터를 안정적으로 가져오고 저장하나?",
+                                      "수집 인프라, 배치/스트리밍, 권한, 저장소"
+                              ]
+                      ]
+              },
+              {
+                      "section": "Role",
+                      "title": "AE는 분석과 엔지니어링 사이",
+                      "bullets": [
+                              "분석가처럼 지표 의미를 이해함.",
+                              "엔지니어처럼 코드, 테스트, 자동화를 신경 씀.",
+                              "BI와 ML이 같은 데이터 계약을 쓰도록 중간층을 만듦."
+                      ]
+              },
+              {
+                      "section": "Role",
+                      "title": "이 수업에서 AE 구간은 어디였나",
+                      "bullets": [
+                              "notebooks/gharchive에서 분석 질문을 탐색함.",
+                              "scripts와 dbt에서 그 계산을 반복 가능한 모델로 옮김.",
+                              "Airflow와 Metabase에서 운영과 소비면까지 연결함.",
+                              "추천 feature mart는 ML 실험을 위한 데이터 계약 역할을 함."
+                      ]
+              },
+              {
+                      "section": "Part 1",
+                      "title": "데이터 수집: raw를 그대로 쓰지 않는다",
+                      "bullets": [
+                              "GitHub Archive는 이벤트 단위 로그라 크고 비쌈.",
+                              "매번 raw를 직접 조회하면 비용과 시간이 커짐.",
+                              "먼저 분석에 필요한 grain으로 줄여서 가져오는 전략이 필요함."
+                      ],
+                      "path": "notebooks/gharchive/01_extract_daily_agg.ipynb"
+              },
+              {
+                      "section": "Part 1",
+                      "title": "왜 BigQuery를 썼나",
+                      "bullets": [
+                              "GitHub Archive public dataset을 바로 쿼리할 수 있음.",
+                              "대용량 로그를 로컬로 전부 다운로드하지 않아도 됨.",
+                              "dry run으로 쿼리 비용을 먼저 확인할 수 있음."
+                      ]
+              },
+              {
+                      "section": "Part 1",
+                      "title": "회사에서 비용 확인은 실력",
+                      "bullets": [
+                              "데이터가 크면 정답 쿼리보다 안전한 쿼리가 먼저.",
+                              "dry run은 실행 전 스캔량을 확인하는 방어 장치.",
+                              "비용을 고려했다는 설명은 대용량 데이터 작업의 핵심 포인트."
+                      ]
+              },
+              {
+                      "section": "Part 1",
+                      "title": "수집의 핵심 선택: event log를 activity fact로 줄이기",
+                      "bullets": [
+                              "원천은 개별 event지만 분석은 보통 일자, 유저, repo, action 단위로 충분함.",
+                              "이렇게 줄이면 DAU, WAU, retention, 추천 interaction까지 재사용할 수 있음.",
+                              "좋은 수집은 많은 데이터를 가져오는 것이 아니라 필요한 grain을 고르는 것."
+                      ]
+              },
+              {
+                      "section": "Part 1",
+                      "title": "Parquet를 선택한 이유",
+                      "bullets": [
+                              "분석용 컬럼 일부만 읽기 좋음.",
+                              "압축 효율이 좋아 저장 비용과 I/O를 줄임.",
+                              "pandas, pyarrow, DuckDB, BigQuery와 잘 맞음."
+                      ],
+                      "path": "notebooks/gharchive/02_storage_formats.ipynb"
+              },
+              {
+                      "section": "Part 1",
+                      "title": "CSV와 JSON도 나쁘지 않지만 목적이 다르다",
+                      "table": [
+                              [
+                                      "포맷",
+                                      "장점",
+                                      "분석 파이프라인에서의 한계"
+                              ],
+                              [
+                                      "CSV",
+                                      "사람이 보기 쉽고 어디서나 열린다",
+                                      "타입 정보가 약하고 큰 데이터에 느리다"
+                              ],
+                              [
+                                      "JSON",
+                                      "중첩 구조와 API 응답에 자연스럽다",
+                                      "대량 집계 분석에는 무겁다"
+                              ],
+                              [
+                                      "Parquet",
+                                      "컬럼형, 압축, 타입 보존",
+                                      "사람이 바로 읽기엔 불편하다"
+                              ]
+                      ]
+              },
+              {
+                      "section": "Part 2",
+                      "title": "Bronze, Silver, Golden Layer",
+                      "visual": "layers",
+                      "bullets": [
+                              "Bronze는 원천에 가까운 데이터.",
+                              "Silver는 분석 가능한 기준으로 정리된 fact다.",
+                              "Golden은 의사결정과 대시보드가 바로 쓰는 지표 mart다."
+                      ]
+              },
+              {
+                      "section": "Part 2",
+                      "title": "우리 수업의 Bronze",
+                      "bullets": [
+                              "GitHub Archive BigQuery daily shard가 원천.",
+                              "로컬에 전부 복제하지 않고 필요한 기간과 컬럼을 쿼리함.",
+                              "원천은 바꾸지 않고, downstream에서 쓰기 좋은 형태로 변환함."
+                      ]
+              },
+              {
+                      "section": "Part 2",
+                      "title": "우리 수업의 Silver",
+                      "subtitle": "fact_user_repo_activity",
+                      "bullets": [
+                              "activity_date, user_id, repo_id, action이 핵심 grain.",
+                              "원천 event를 분석과 모델링이 공통으로 이해할 수 있는 활동 fact로 정리함.",
+                              "플랫폼 지표는 이 dbt fact를 기준으로 만들고, 추천 feature는 같은 GitHub Archive 원천과 activity grain 철학을 공유함."
+                      ],
+                      "path": "dbt/gharchive_metrics/models/facts/fact_user_repo_activity.sql"
+              },
+              {
+                      "section": "Part 2",
+                      "title": "왜 grain이 중요한가",
+                      "bullets": [
+                              "grain은 테이블 한 행이 무엇을 의미하는지 정함.",
+                              "grain이 불명확하면 중복 집계와 잘못된 join 발생.",
+                              "fact table을 설명할 때 가장 먼저 말해야 하는 것이 grain."
+                      ]
+              },
+              {
+                      "section": "Part 2",
+                      "title": "activity fact 하나로 할 수 있는 것",
+                      "map": [
+                              [
+                                      "collect",
+                                      "DAU",
+                                      "일별 active user"
+                              ],
+                              [
+                                      "collect",
+                                      "WAU",
+                                      "주별 active user"
+                              ],
+                              [
+                                      "quality",
+                                      "Retention",
+                                      "주차 기준 활동 유지"
+                              ],
+                              [
+                                      "quality",
+                                      "Lifecycle",
+                                      "신규, 유지, 복귀, 이탈"
+                              ],
+                              [
+                                      "bi",
+                                      "Dashboard",
+                                      "Metabase 핵심 지표"
+                              ],
+                              [
+                                      "auto",
+                                      "ML Feature",
+                                      "동일 원천 기반 추천 interaction/profile"
+                              ]
+                      ]
+              },
+              {
+                      "section": "Part 2",
+                      "title": "우리 수업의 Golden",
+                      "bullets": [
+                              "metrics_daily와 metrics_weekly는 dashboard의 기본 시계열.",
+                              "metrics_retention 계열은 주차별 활동 유지와 retention summary를 고정함.",
+                              "metrics_user_lifecycle 계열은 신규, 유지, 복귀, 이탈을 설명함."
+                      ],
+                      "path": "dbt/gharchive_metrics/models/marts/platform"
+              },
+              {
+                      "section": "Part 2",
+                      "title": "Retention 이름을 조심해서 설명하기",
+                      "bullets": [
+                              "일반적인 신규 유저 cohort retention과 우리가 만든 WAU 기준 heatmap은 다른 개념.",
+                              "metrics_cohort_retention_weekly_heatmap은 각 주의 active user 집합을 기준으로 이후 활동을 봄.",
+                              "강의에서는 'cohort'라는 단어보다 어떤 기준 집합을 추적하는지 먼저 설명함."
+                      ],
+                      "path": "dbt/gharchive_metrics/models/marts/platform/metrics_cohort_retention_weekly_heatmap.sql"
+              },
+              {
+                      "section": "Part 2",
+                      "title": "Golden mart는 왜 필요한가",
+                      "bullets": [
+                              "대시보드가 raw event를 직접 집계하면 느리고 비쌈.",
+                              "계산식이 dashboard 카드마다 흩어지면 지표 정의가 달라짐.",
+                              "Golden mart는 검증된 작은 테이블을 여러 소비자가 같이 쓰게 만듦."
+                      ]
+              },
+              {
+                      "section": "Part 3",
+                      "title": "dbt: 지표 정의를 코드로 고정하기",
+                      "bullets": [
+                              "노트북 계산식은 개인 작업물에 가까움.",
+                              "dbt model은 팀이 반복 실행하고 리뷰할 수 있는 데이터 코드.",
+                              "source, staging, fact, mart 구조로 lineage 확인 가능."
+                      ],
+                      "path": "dbt/gharchive_metrics"
+              },
+              {
+                      "section": "Part 3",
+                      "title": "source와 staging",
+                      "bullets": [
+                              "source는 외부에서 들어오는 테이블을 선언함.",
+                              "staging은 이름, 타입, 기본 필터를 정리함.",
+                              "분석 로직을 바로 raw에 붙이지 않고 얇은 정리 계층 배치."
+                      ],
+                      "path": "dbt/gharchive_metrics/models/staging/stg_user_repo_activity.sql"
+              },
+              {
+                      "section": "Part 3",
+                      "title": "fact와 mart",
+                      "bullets": [
+                              "fact는 이벤트나 활동의 기준 테이블.",
+                              "mart는 특정 분석 목적에 맞춘 결과 테이블.",
+                              "fact는 재사용성이 중요하고, mart는 소비자가 바로 이해하기 쉬워야 함."
+                      ]
+              },
+              {
+                      "section": "Part 3",
+                      "title": "ref()는 단순한 SQL 문법이 아니다",
+                      "bullets": [
+                              "model 사이 의존성을 명확하게 만듦.",
+                              "dbt가 실행 순서와 lineage를 계산할 수 있음.",
+                              "어떤 dashboard 숫자가 어떤 upstream table에서 왔는지 추적할 수 있음."
+                      ]
+              },
+              {
+                      "section": "Part 3",
+                      "title": "Semantic Layer가 필요한 이유",
+                      "bullets": [
+                              "active_users라는 이름이 팀마다 다르게 계산되면 혼란 발생.",
+                              "metric 이름과 집계 방식을 YAML로 고정함.",
+                              "BI, 분석, 자동화가 같은 metric contract를 공유할 수 있음."
+                      ],
+                      "path": "dbt/gharchive_metrics/models/semantic/platform_activity.yml"
+              },
+              {
+                      "section": "Part 3",
+                      "title": "active_users는 그냥 count distinct가 아니다",
+                      "bullets": [
+                              "어떤 테이블에서 세는가?",
+                              "어떤 시간 grain으로 세는가?",
+                              "봇이나 중복은 어떻게 처리하는가?",
+                              "metric definition은 이런 질문의 답을 코드로 남김."
+                      ]
+              },
+              {
+                      "section": "Part 4",
+                      "title": "데이터 품질: 숫자가 나온다고 믿으면 안 됨",
+                      "bullets": [
+                              "쿼리가 성공해도 숫자가 틀릴 수 있음.",
+                              "row count가 줄었거나, 날짜가 빠졌거나, 중복이 생겼을 수 있음.",
+                              "좋은 파이프라인은 틀린 숫자가 조용히 배포되지 않게 함."
+                      ],
+                      "path": "notebooks/gharchive/07_data_quality.ipynb"
+              },
+              {
+                      "section": "Part 4",
+                      "title": "기본 dbt test",
+                      "bullets": [
+                              "not null: 필수 컬럼이 비어 있지 않은지 봄.",
+                              "unique: key가 중복되지 않는지 봄.",
+                              "accepted values: action이나 status가 기대한 값인지 봄.",
+                              "relationships: 참조 관계가 깨지지 않았는지 봄."
+                      ]
+              },
+              {
+                      "section": "Part 4",
+                      "title": "custom test가 필요한 이유",
+                      "bullets": [
+                              "비즈니스 지표에는 일반 테스트만으로 부족한 규칙이 있음.",
+                              "retention과 lifecycle은 숫자 사이의 관계가 맞아야 함.",
+                              "이런 규칙은 SQL test로 명시해야 함."
+                      ],
+                      "path": "dbt/gharchive_metrics/tests"
+              },
+              {
+                      "section": "Part 4",
+                      "title": "Lifecycle accounting test",
+                      "bullets": [
+                              "신규, 유지, 복귀, 이탈 유저의 관계가 맞는지 검증함.",
+                              "유저 상태 정의가 바뀌면 test가 깨져야 함.",
+                              "대시보드 숫자 뒤에 검증 가능한 회계식 생성."
+                      ],
+                      "path": "dbt/gharchive_metrics/tests/assert_user_lifecycle_weekly_balances.sql"
+              },
+              {
+                      "section": "Part 4",
+                      "title": "Cohort heatmap test",
+                      "bullets": [
+                              "cohort retention heatmap의 active user 수가 WAU와 논리적으로 맞는지 봄.",
+                              "시각화보다 underlying number 정합성이 먼저.",
+                              "분석 결과를 제품화하려면 chart보다 test가 앞에 있어야 함."
+                      ],
+                      "path": "dbt/gharchive_metrics/tests/metrics_cohort_retention_weekly_heatmap_active_users_match_wau.sql"
+              },
+              {
+                      "section": "Part 5",
+                      "title": "Airflow: 사람이 누르는 명령을 운영 파이프라인으로",
+                      "bullets": [
+                              "CLI 명령은 사람이 기억하고 실행해야 함.",
+                              "운영 파이프라인은 정해진 시간, 범위, 순서로 실행.",
+                              "실패하면 재시도하고 로그를 남겨야 함."
+                      ]
+              },
+              {
+                      "section": "Part 5",
+                      "title": "gharchive_dbt_metrics DAG",
+                      "visual": "dag",
+                      "bullets": [
+                              "plan_fact_sync로 처리 범위와 guardrail을 먼저 확인함.",
+                              "sync_fact로 BigQuery fact를 갱신함.",
+                              "build_dbt_metrics로 dbt model과 test를 실행함.",
+                              "detect_metric_drift로 입력 분포 이상을 warn-only로 확인함."
+                      ],
+                      "path": "dags/gharchive_dbt_metrics.py"
+              },
+              {
+                      "section": "Part 5",
+                      "title": "plan 단계가 있는 이유",
+                      "bullets": [
+                              "운영 작업은 바로 실행하지 않고 먼저 실행 계획을 확인함.",
+                              "날짜 범위가 너무 크거나 비용이 커질 수 있는 상황 차단.",
+                              "실무에서는 '실행 전 방어선'이 중요함."
+                      ]
+              },
+              {
+                      "section": "Part 5",
+                      "title": "rolling window",
+                      "bullets": [
+                              "기본 운영 범위는 최근 90일.",
+                              "매일 전체 이력을 다시 처리하면 비용과 시간이 커짐.",
+                              "전체 backfill은 별도 의도를 가지고 실행해야 함."
+                      ]
+              },
+              {
+                      "section": "Part 5",
+                      "title": "gharchive_platform_metrics DAG",
+                      "bullets": [
+                              "dashboard용 compact mart를 backfill 또는 갱신함.",
+                              "Metabase에서 쓰는 핵심 지표 테이블을 안정적으로 유지함.",
+                              "repo metadata refresh는 같은 파일 안에 정의된 별도 DAG인 gharchive_repo_metadata_refresh가 담당함."
+                      ],
+                      "path": "dags/gharchive_platform_metrics.py"
+              },
+              {
+                      "section": "Part 5",
+                      "title": "DAG 책임을 분리하는 이유",
+                      "bullets": [
+                              "metadata refresh와 metric mart sync는 실패 원인과 실행 주기가 다름.",
+                              "한 DAG에 모든 일을 몰아넣으면 장애 범위를 좁히기 어려움.",
+                              "그래서 repo metadata는 gharchive_repo_metadata_refresh, compact metrics는 gharchive_platform_metrics로 나눠 봄."
+                      ]
+              },
+              {
+                      "section": "Part 6",
+                      "title": "Metabase: 대시보드는 마지막 화면",
+                      "visual": "dashboard",
+                      "bullets": [
+                              "대시보드는 사용자가 보는 소비면.",
+                              "본체는 뒤에 있는 mart, test, schedule.",
+                              "좋은 dashboard는 raw table이 아니라 검증된 Golden mart를 봄."
+                      ],
+                      "path": "scripts/setup_metabase_dashboard.py"
+              },
+              {
+                      "section": "Part 6",
+                      "title": "왜 dashboard에서 직접 계산하지 않을까",
+                      "bullets": [
+                              "카드마다 계산식이 흩어지면 지표 정의가 깨짐.",
+                              "raw event를 직접 조회하면 느리고 비쌈.",
+                              "BI tool은 지표 소비에 집중하고, 계산은 mart에서 끝내는 편이 좋음."
+                      ]
+              },
+              {
+                      "section": "Part 6",
+                      "title": "대시보드에 올라간 지표들",
+                      "map": [
+                              [
+                                      "bi",
+                                      "DAU",
+                                      "일별 active user"
+                              ],
+                              [
+                                      "bi",
+                                      "WAU",
+                                      "주별 active user"
+                              ],
+                              [
+                                      "bi",
+                                      "Events",
+                                      "event type별 activity"
+                              ],
+                              [
+                                      "bi",
+                                      "Retention",
+                                      "주차별 활동 유지와 summary"
+                              ],
+                              [
+                                      "bi",
+                                      "Lifecycle",
+                                      "new, retained, resurrected, churned"
+                              ],
+                              [
+                                      "bi",
+                                      "Trends",
+                                      "repo trend dashboard"
+                              ]
+                      ]
+              },
+              {
+                      "section": "Part 7",
+                      "title": "추천 feature pipeline도 Analytics Engineering",
+                      "visual": "feature",
+                      "bullets": [
+                              "추천 알고리즘 자체는 별도 강의에서 다룸.",
+                              "여기서는 모델이 믿을 수 있는 데이터셋 위에서 돌아가게 만드는 부분을 봄.",
+                              "BI와 ML은 소비 방식이 다르지만 grain, 재현성, 품질이라는 같은 원칙이 필요함."
+                      ]
+              },
+              {
+                      "section": "Part 7",
+                      "title": "추천 mart의 입력은 dbt fact와 완전히 같지는 않다",
+                      "bullets": [
+                              "추천 mart는 주로 data/daily_agg parquet에서 actor_id, repo_id, type, cnt를 읽어 만듦.",
+                              "플랫폼 mart의 user_id, repo_id, action, event_count와 의미는 연결되지만 구현 경로는 분리되어 있음.",
+                              "강의 포인트는 '같은 원천 활동 로그를 다른 소비 목적에 맞게 모델링'함."
+                      ],
+                      "path": "scripts/week6_build_recsys_marts.py"
+              },
+              {
+                      "section": "Part 7",
+                      "title": "추천용 mart",
+                      "bullets": [
+                              "user_repo_interaction_mart: 유저와 repo의 interaction",
+                              "user_profile_mart: 유저 활동량과 이벤트 mix",
+                              "repo_feature_mart: repo popularity, growth, metadata feature",
+                              "experiment_split_mart: history, rank-label, test split"
+                      ],
+                      "path": "scripts/week6_build_recsys_marts.py"
+              },
+              {
+                      "section": "Part 7",
+                      "title": "추천 mart는 장난감 크기가 아니다",
+                      "table": [
+                              [
+                                      "산출물",
+                                      "역할",
+                                      "로컬 산출물 규모"
+                              ],
+                              [
+                                      "user_repo_interaction_mart",
+                                      "ALS matrix, label, seen filtering",
+                                      "약 2,008만 rows"
+                              ],
+                              [
+                                      "user_profile_mart",
+                                      "유저 활동량과 이벤트 mix",
+                                      "약 820만 rows"
+                              ],
+                              [
+                                      "repo_feature_mart",
+                                      "repo popularity, growth, metadata feature",
+                                      "약 1,514만 rows"
+                              ],
+                              [
+                                      "repo_repo_related_mart",
+                                      "related candidate source",
+                                      "약 547만 rows"
+                              ],
+                              [
+                                      "experiment_split_mart",
+                                      "history/rank-label/test split",
+                                      "약 2,429만 rows"
+                              ]
+                      ],
+                      "note": "크기가 커지면 feature 생성도 운영 파이프라인 관점으로 봐야 함."
+              },
+              {
+                      "section": "Part 7",
+                      "title": "왜 split mart가 중요한가",
+                      "bullets": [
+                              "추천 모델은 train/test 기간이 섞이면 성능이 과대평가됨.",
+                              "history, rank-label, test를 명시적으로 고정해야 함.",
+                              "성능 수치는 알고리즘뿐 아니라 데이터셋 정의의 결과."
+                      ]
+              },
+              {
+                      "section": "Part 7",
+                      "title": "Point-in-time 기준",
+                      "bullets": [
+                              "feature는 예측 시점에 알 수 있었던 정보만 써야 함.",
+                              "미래 정보를 feature에 넣으면 leakage 발생.",
+                              "repo_feature_mart의 snapshot_date, interaction mart의 window_end_date가 이런 문제를 다루는 출발점."
+                      ]
+              },
+              {
+                      "section": "Part 7",
+                      "title": "추천 feature DAG",
+                      "bullets": [
+                              "build_recsys_marts로 추천용 mart를 만듦.",
+                              "check_recsys_marts로 필요한 parquet이 있는지 확인함.",
+                              "build_ranker_features로 ranker feature cache를 만듦.",
+                              "detect_feature_drift로 train/serve feature skew를 확인함."
+                      ],
+                      "path": "dags/gharchive_recsys_features.py"
+              },
+              {
+                      "section": "Part 8",
+                      "title": "운영: 파이프라인은 언젠가 깨진다",
+                      "bullets": [
+                              "인증 키가 만료될 수 있음.",
+                              "쿼리 범위가 잘못될 수 있음.",
+                              "원천 데이터가 늦게 들어올 수 있음.",
+                              "task는 성공했지만 데이터 분포가 이상할 수 있음."
+                      ]
+              },
+              {
+                      "section": "Part 8",
+                      "title": "실패와 이상 징후는 다르다",
+                      "table": [
+                              [
+                                      "구분",
+                                      "예시",
+                                      "처리 방식"
+                              ],
+                              [
+                                      "실패",
+                                      "Airflow task가 exception으로 종료",
+                                      "failure callback, 재시도, 로그 확인"
+                              ],
+                              [
+                                      "이상 징후",
+                                      "task는 성공했지만 events_per_user 분포 급변",
+                                      "warn-only drift alert, 원인 조사"
+                              ],
+                              [
+                                      "비즈니스 변화",
+                                      "실제 사용자 행동 변화",
+                                      "대시보드와 외부 이벤트 함께 해석"
+                              ]
+                      ]
+              },
+              {
+                      "section": "Part 8",
+                      "title": "이번에 새로 추가한 것: Slack 알림",
+                      "visual": "alert",
+                      "bullets": [
+                              "운영 파이프라인은 사람이 UI를 계속 보고 있을 수 없음.",
+                              "실패나 drift가 생기면 일하는 채널로 알려줘야 함.",
+                              "Slack 알림은 데이터 플랫폼을 '돌아가는 것'에서 '운영되는 것'으로 옮기는 장치."
+                      ],
+                      "path": "dags/utils/slack_alert.py"
+              },
+              {
+                      "section": "Part 8",
+                      "title": "Slack 알림 1: task failure",
+                      "bullets": [
+                              "Airflow의 on_failure_callback에 notify_failure를 연결함.",
+                              "DAG ID, Task ID, Run ID, Error, Log URL을 메시지에 포함.",
+                              "실패한 순간 바로 어떤 task를 봐야 하는지 알 수 있음."
+                      ]
+              },
+              {
+                      "section": "Part 8",
+                      "title": "failure callback은 어디에 붙어 있나",
+                      "code": "default_args = {\n  \"retries\": 1,\n  \"retry_delay\": timedelta(minutes=5),\n  \"on_failure_callback\": notify_failure,\n}",
+                      "note": "DAG의 기본 설정에 붙이면 개별 task 실패가 같은 알림 경로로 모임."
+              },
+              {
+                      "section": "Part 8",
+                      "title": "실패 알림 메시지 예시",
+                      "code": ":rotating_light: Airflow 태스크 실패\nDAG: gharchive_dbt_metrics\nTask: build_dbt_metrics\nRun: scheduled__2026-05-31T00:30:00+09:00\nError: dbt test failed\n로그 보기: Airflow log URL",
+                      "note": "좋은 알림은 감정적인 문장이 아니라 바로 확인할 단서를 제공."
+              },
+              {
+                      "section": "Part 8",
+                      "title": "notify_failure가 받는 context",
+                      "bullets": [
+                              "task_instance에서 task_id와 log_url 추출.",
+                              "dag에서 dag_id 추출.",
+                              "run_id와 exception으로 실패한 실행과 에러를 특정함.",
+                              "메시지는 사람이 바로 행동할 수 있게 짧고 구체적이어야 함."
+                      ]
+              },
+              {
+                      "section": "Part 8",
+                      "title": "Slack 알림 2: drift warn-only",
+                      "bullets": [
+                              "drift는 task 실패가 아님.",
+                              "데이터 분포가 기준보다 많이 달라졌다는 경고.",
+                              "그래서 task는 성공으로 끝내고 Slack에 별도 경고 전송."
+                      ]
+              },
+              {
+                      "section": "Part 8",
+                      "title": "notify_drift 구조",
+                      "bullets": [
+                              "report의 overall_status가 ok면 알림 전송 없음.",
+                              "warn 또는 alert이면 변한 feature와 PSI 값을 요약함.",
+                              "alert 수준에서는 담당자를 mention하도록 설계함."
+                      ]
+              },
+              {
+                      "section": "Part 8",
+                      "title": "drift 알림 메시지 예시",
+                      "code": ":warning: 입력 드리프트 감지 (analytics) — status: warn\nDate: 2026-05-30\nevents_per_user PSI=0.1832 >= warn=0.1400\nrepos_per_user PSI=0.0961 >= warn=0.0820",
+                      "note": "drift 알림은 실패 로그가 아니라 조사할 feature와 기준 초과 정도 표시."
+              },
+              {
+                      "section": "Part 8",
+                      "title": "왜 warn-only인가",
+                      "bullets": [
+                              "분포 변화가 항상 장애는 아님.",
+                              "실제 사용자 행동 변화일 수도 있고, 수집 누락일 수도 있음.",
+                              "처음부터 pipeline을 실패시키면 운영 소음 증가.",
+                              "먼저 경고로 보고, 반복 패턴이 보이면 정책을 강화함."
+                      ]
+              },
+              {
+                      "section": "Part 8",
+                      "title": "Slack token은 코드에 넣지 않는다",
+                      "bullets": [
+                              "SLACK_BOT_TOKEN은 환경변수로 읽음.",
+                              "토큰이 없으면 알림 함수는 조용히 return하므로 로컬 실습에서는 설정 여부를 먼저 확인해야 함.",
+                              "SLACK_ALERT_CHANNEL과 SLACK_ALERT_MENTION은 운영 환경에서 env로 덮어씀.",
+                              "기본 channel/mention 값은 강사용 로컬 기본값. 토큰, PAT, API key는 repo 문서나 코드에 직접 기록하지 않음."
+                      ]
+              },
+              {
+                      "section": "Part 8",
+                      "title": "Slack 설정 체크리스트",
+                      "bullets": [
+                              "SLACK_BOT_TOKEN이 Airflow 컨테이너 환경에 들어 있는가?",
+                              "SLACK_ALERT_CHANNEL이 실제 알림 채널을 가리키는가?",
+                              "SLACK_ALERT_MENTION은 alert 수준에서만 호출해도 되는 사람인가?",
+                              "로컬 실습에서는 토큰이 없을 수 있으므로 no-op 동작을 정상으로 설명함."
+                      ]
+              },
+              {
+                      "section": "Part 8",
+                      "title": "알림을 받았을 때의 확인 순서",
+                      "bullets": [
+                              "1. 어떤 DAG와 task인지 확인함.",
+                              "2. Airflow log URL에서 stack trace 또는 명령 출력을 봄.",
+                              "3. BigQuery 테이블의 최신 partition과 row count를 확인함.",
+                              "4. dashboard에서 지표 변화가 실제로 보이는지 확인함.",
+                              "5. 필요하면 backfill 또는 재실행함."
+                      ]
+              },
+              {
+                      "section": "Part 9",
+                      "title": "Runbook: 알림 다음에는 행동 필요",
+                      "bullets": [
+                              "알림만 있고 대응 절차가 없으면 운영 아님.",
+                              "runbook은 어떤 순서로 무엇을 확인할지 적은 문서.",
+                              "초급자에게도 같은 방식으로 장애를 좁혀갈 수 있게 함."
+                      ]
+              },
+              {
+                      "section": "Part 9",
+                      "title": "Runbook 예시: fact sync 실패",
+                      "bullets": [
+                              "GCP key 경로와 권한을 확인함.",
+                              "쿼리 날짜 범위와 max-days guardrail을 확인함.",
+                              "BigQuery job error와 Airflow task log를 봄.",
+                              "필요하면 작은 날짜 범위로 재실행함."
+                      ]
+              },
+              {
+                      "section": "Part 9",
+                      "title": "Runbook 예시: dbt test 실패",
+                      "bullets": [
+                              "어떤 model과 test가 실패했는지 확인함.",
+                              "upstream fact row count와 날짜 범위를 확인함.",
+                              "지표 정의 변경인지 데이터 품질 문제인지 나눔.",
+                              "test를 끄는 것이 아니라 실패 의미를 해석함."
+                      ]
+              },
+              {
+                      "section": "Part 9",
+                      "title": "Runbook 예시: drift alert",
+                      "bullets": [
+                              "어떤 layer와 feature가 변했는지 봄.",
+                              "최근 배포, 원천 데이터 정책 변화, 요일 효과를 확인함.",
+                              "dashboard 지표와 같은 날짜 축에서 비교함.",
+                              "반복되면 threshold나 feature 정의를 다시 점검함."
+                      ]
+              },
+              {
+                      "section": "Part 9",
+                      "title": "대학생 프로젝트와 회사 프로젝트의 차이",
+                      "table": [
+                              [
+                                      "대학생 프로젝트",
+                                      "회사 프로젝트"
+                              ],
+                              [
+                                      "한 번 실행해서 결과 생성",
+                                      "매일 같은 기준으로 실행"
+                              ],
+                              [
+                                      "노트북 결과가 중심",
+                                      "테이블, 테스트, 대시보드, 알림이 중심"
+                              ],
+                              [
+                                      "혼자 이해하면 충분",
+                                      "팀원이 재실행하고 추적 가능"
+                              ],
+                              [
+                                      "에러 발생 시 직접 확인",
+                                      "에러 발생 시 자동 알림"
+                              ]
+                      ]
+              },
+              {
+                      "section": "Part 12",
+                      "title": "이번 회차의 기술 스택 정리",
+                      "map": [
+                              [
+                                      "collect",
+                                      "BigQuery",
+                                      "원천 로그 조회와 비용 관리"
+                              ],
+                              [
+                                      "collect",
+                                      "Parquet",
+                                      "로컬 분석 저장 포맷"
+                              ],
+                              [
+                                      "quality",
+                                      "dbt",
+                                      "fact, mart, test, semantic"
+                              ],
+                              [
+                                      "auto",
+                                      "Airflow",
+                                      "스케줄링과 재시도"
+                              ],
+                              [
+                                      "bi",
+                                      "Metabase",
+                                      "지표 소비면"
+                              ],
+                              [
+                                      "ops",
+                                      "Slack",
+                                      "실패와 이상 징후 알림"
+                              ]
+                      ]
+              },
+              {
+                      "section": "Part 12",
+                      "title": "전체 흐름을 다시 한 번",
+                      "map": [
+                              [
+                                      "raw",
+                                      "GitHub Archive",
+                                      "원천 이벤트"
+                              ],
+                              [
+                                      "collect",
+                                      "Aggregate",
+                                      "비용을 줄인 일별 집계"
+                              ],
+                              [
+                                      "model",
+                                      "Silver fact",
+                                      "분석 가능한 공통 기준"
+                              ],
+                              [
+                                      "quality",
+                                      "Golden mart",
+                                      "의사결정용 지표"
+                              ],
+                              [
+                                      "auto",
+                                      "Airflow",
+                                      "반복 실행"
+                              ],
+                              [
+                                      "bi",
+                                      "Dashboard",
+                                      "팀이 보는 화면"
+                              ],
+                              [
+                                      "auto",
+                                      "Recsys feature",
+                                      "모델 입력 데이터"
+                              ],
+                              [
+                                      "ops",
+                                      "Slack alert",
+                                      "운영 알림"
+                              ]
+                      ]
+              },
+              {
+                      "section": "Part 12",
+                      "title": "오늘의 핵심 4가지",
+                      "cards": [
+                              [
+                                      "1. 데이터 모델링",
+                                      "raw event를 바로 쓰지 않고 fact와 mart로 나눔."
+                              ],
+                              [
+                                      "2. 신뢰성",
+                                      "지표 정의, 테스트, lineage가 있어야 팀이 믿고 씀."
+                              ],
+                              [
+                                      "3. 운영",
+                                      "Airflow와 Slack으로 반복 실행과 이상 대응을 연결함."
+                              ],
+                              [
+                                      "4. 확장",
+                                      "같은 원천 활동 로그가 BI와 추천 feature pipeline으로 이어짐."
+                              ]
+                      ]
+              },
+              {
+                      "section": "AI 활용",
+                      "title": "AI는 분석가를 대체하기보다 반복 작업을 줄임",
+                      "bullets": [
+                              "SQL 초안, dbt model 초안, test 후보, runbook 초안 작성에 유용함.",
+                              "하지만 지표 정의, grain, 품질 기준이 없으면 AI도 틀린 답을 빠르게 만듦.",
+                              "그래서 AI 활용 전제는 “정리된 mart와 metric contract”."
+                      ]
+              },
+              {
+                      "section": "AI 활용",
+                      "title": "AI에게 바로 raw table을 맡기면 위험함",
+                      "bullets": [
+                              "raw event schema는 크고 복잡해서 의도와 다른 집계가 나오기 쉬움.",
+                              "AI는 컬럼 이름만 보고 의미를 추측할 수 있음.",
+                              "Silver/Golden layer와 semantic metric이 있으면 AI가 참고할 안정적인 표면이 생김."
+                      ]
+              },
+              {
+                      "section": "AI 활용",
+                      "title": "AI가 잘 도와주는 지점",
+                      "map": [
+                              [
+                                      "collect",
+                                      "SQL draft",
+                                      "metric mart 초안"
+                              ],
+                              [
+                                      "quality",
+                                      "Test idea",
+                                      "null, range, accounting 후보"
+                              ],
+                              [
+                                      "auto",
+                                      "DAG review",
+                                      "task 순서와 retry 점검"
+                              ],
+                              [
+                                      "ops",
+                                      "Runbook",
+                                      "알림 후 확인 절차 초안"
+                              ],
+                              [
+                                      "bi",
+                                      "Dashboard QA",
+                                      "차트와 지표 정의 비교"
+                              ],
+                              [
+                                      "model",
+                                      "Docs",
+                                      "grain과 lineage 설명 정리"
+                              ]
+                      ]
+              },
+              {
+                      "section": "AI 활용",
+                      "title": "AX로 넘어가기 위한 기반",
+                      "bullets": [
+                              "AX는 사람이 분석 도구를 쓰는 방식 자체를 바꾸는 흐름.",
+                              "자연어 질문, 자동 리포트, 이상 탐지 설명, dashboard QA가 모두 가능해짐.",
+                              "단, 자동화된 분석일수록 데이터 계약, lineage, test, alert가 더 중요해짐."
+                      ]
+              },
+              {
+                      "section": "Next",
+                      "title": "한 달 쉬고 이어질 주제",
+                      "bullets": [
+                              "지금까지는 데이터 기반 구축.",
+                              "다음에는 이 기반 위에서 AX와 분석 자동화를 다룸.",
+                              "AI/agent가 잘 동작하려면 믿을 수 있는 mart와 metric contract가 먼저 필요함."
+                      ]
+              },
+              {
+                      "section": "Next",
+                      "title": "AX와 분석 자동화로 넘어가기 전에",
+                      "bullets": [
+                              "자동화된 분석은 raw data에 바로 질문하지 않음.",
+                              "정의된 지표, 검증된 mart, 문서화된 lineage 위에서 더 잘 동작함.",
+                              "오늘 정리한 Analytics Engineering이 다음 파트의 기반."
+                      ]
+              },
+              {
+                      "layout": "center",
+                      "section": "Closing",
+                      "title": "분석은 결과 생성, Analytics Engineering은 그 결과를 계속 믿게 만드는 일",
+                      "subtitle": "Week 9 마무리"
+              }
+      ];
+
+      const root = document.getElementById("slides");
+      const counter = document.getElementById("counter");
+
+      function el(name, className, text) {
+        const node = document.createElement(name);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      function addBullets(parent, bullets) {
+        if (!bullets) return;
+        const ul = el("ul", "bullets");
+        bullets.forEach((item) => ul.appendChild(el("li", "", item)));
+        parent.appendChild(ul);
+      }
+
+      function addCards(parent, cards) {
+        if (!cards) return;
+        const wrap = el("div", "cards");
+        cards.forEach(([title, body]) => {
+          const card = el("div", "card");
+          card.appendChild(el("strong", "", title));
+          card.appendChild(el("span", "", body));
+          wrap.appendChild(card);
+        });
+        parent.appendChild(wrap);
+      }
+
+      function addMap(parent, items) {
+        if (!items) return;
+        const wrap = el("div", "map");
+        items.forEach(([kind, title, body]) => {
+          const step = el("div", `map-step ${kind}`);
+          step.appendChild(el("b", "", title));
+          step.appendChild(el("span", "", body));
+          wrap.appendChild(step);
+        });
+        parent.appendChild(wrap);
+      }
+
+      function addTable(parent, rows) {
+        if (!rows) return;
+        const table = el("table", "matrix");
+        const [head, ...bodyRows] = rows;
+        const thead = document.createElement("thead");
+        const trh = document.createElement("tr");
+        head.forEach((cell) => trh.appendChild(el("th", "", cell)));
+        thead.appendChild(trh);
+        table.appendChild(thead);
+        const tbody = document.createElement("tbody");
+        bodyRows.forEach((row) => {
+          const tr = document.createElement("tr");
+          row.forEach((cell) => tr.appendChild(el("td", "", cell)));
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        parent.appendChild(table);
+      }
+
+      function addVisual(parent, type) {
+        if (!type) return;
+        const wrap = el("div", "visual-panel");
+        const titles = {
+          pipeline: "End-to-end data product map",
+          layers: "Bronze / Silver / Golden",
+          dag: "Airflow task flow",
+          dashboard: "Dashboard consumption path",
+          feature: "ML feature data contract",
+          alert: "Failure vs drift alert"
+        };
+        const svgs = {
+          pipeline: `<svg viewBox="0 0 1100 560" role="img" aria-label="analytics engineering architecture"><defs><marker id="arrow-p2" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#475569"/></marker><filter id="shadow-p2" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.12"/></filter></defs><rect x="20" y="20" width="1060" height="520" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="550" y="64" text-anchor="middle" font-size="26" font-weight="900" fill="#172033">Analytics Engineering Map</text><text x="550" y="94" text-anchor="middle" font-size="15" fill="#64748b">원천 로그를 신뢰 가능한 지표, ML feature, 운영 알림으로 연결</text><g filter="url(#shadow-p2)"><rect x="70" y="150" width="180" height="96" rx="12" fill="#fff" stroke="#475569" stroke-width="3"/><text x="160" y="188" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">Raw</text><text x="160" y="216" text-anchor="middle" font-size="13" fill="#64748b">GitHub Archive</text></g><g filter="url(#shadow-p2)"><rect x="320" y="150" width="200" height="96" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/><text x="420" y="188" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">Collect</text><text x="420" y="216" text-anchor="middle" font-size="13" fill="#64748b">dry run · parquet</text></g><g filter="url(#shadow-p2)"><rect x="590" y="150" width="200" height="96" rx="12" fill="#ecfeff" stroke="#0f766e" stroke-width="3"/><text x="690" y="188" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">Silver</text><text x="690" y="216" text-anchor="middle" font-size="13" fill="#64748b">fact grain</text></g><g filter="url(#shadow-p2)"><rect x="860" y="150" width="180" height="96" rx="12" fill="#fff7ed" stroke="#b45309" stroke-width="3"/><text x="950" y="188" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">Golden</text><text x="950" y="216" text-anchor="middle" font-size="13" fill="#64748b">metric mart</text></g><path d="M250 198 H310" stroke="#475569" stroke-width="3" marker-end="url(#arrow-p2)"/><path d="M520 198 H580" stroke="#475569" stroke-width="3" marker-end="url(#arrow-p2)"/><path d="M790 198 H850" stroke="#475569" stroke-width="3" marker-end="url(#arrow-p2)"/><path d="M950 246 V320" stroke="#475569" stroke-width="3" marker-end="url(#arrow-p2)"/><path d="M690 246 V320" stroke="#475569" stroke-width="3" marker-end="url(#arrow-p2)"/><g filter="url(#shadow-p2)"><rect x="790" y="335" width="220" height="92" rx="12" fill="#f0fdf4" stroke="#15803d" stroke-width="3"/><text x="900" y="372" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">Consume</text><text x="900" y="400" text-anchor="middle" font-size="13" fill="#64748b">Metabase · report</text></g><g filter="url(#shadow-p2)"><rect x="530" y="335" width="220" height="92" rx="12" fill="#faf5ff" stroke="#7c3aed" stroke-width="3"/><text x="640" y="372" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">Feature</text><text x="640" y="400" text-anchor="middle" font-size="13" fill="#64748b">ML dataset · split</text></g><g filter="url(#shadow-p2)"><rect x="270" y="335" width="220" height="92" rx="12" fill="#faf5ff" stroke="#7c3aed" stroke-width="3"/><text x="380" y="372" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">Automate</text><text x="380" y="400" text-anchor="middle" font-size="13" fill="#64748b">Airflow · dbt build</text></g><g filter="url(#shadow-p2)"><rect x="70" y="335" width="160" height="92" rx="12" fill="#fef2f2" stroke="#b91c1c" stroke-width="3"/><text x="150" y="372" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">Operate</text><text x="150" y="400" text-anchor="middle" font-size="13" fill="#64748b">Slack alert</text></g><path d="M790 381 H760" stroke="#475569" stroke-width="3" marker-end="url(#arrow-p2)"/><path d="M530 381 H500" stroke="#475569" stroke-width="3" marker-end="url(#arrow-p2)"/><path d="M270 381 H240" stroke="#475569" stroke-width="3" marker-end="url(#arrow-p2)"/><text x="550" y="492" text-anchor="middle" font-size="18" font-weight="900" fill="#0f766e">핵심: grain과 metric contract가 있어야 BI, ML, AI 자동화가 같은 숫자를 봄</text></svg>`,
+          layers: `<svg viewBox="0 0 980 300" role="img" aria-label="bronze silver golden layers"><rect x="90" y="190" width="800" height="64" rx="8" fill="#f1f5f9" stroke="#475569" stroke-width="2"/><rect x="170" y="115" width="640" height="64" rx="8" fill="#ecfeff" stroke="#0f766e" stroke-width="2"/><rect x="250" y="40" width="480" height="64" rx="8" fill="#fff7ed" stroke="#b45309" stroke-width="2"/><text x="490" y="80" text-anchor="middle" font-size="22" font-weight="900" fill="#b45309">Golden: metric mart</text><text x="490" y="155" text-anchor="middle" font-size="22" font-weight="900" fill="#0f766e">Silver: fact / staging</text><text x="490" y="230" text-anchor="middle" font-size="22" font-weight="900" fill="#475569">Bronze: raw source</text><text x="490" y="284" text-anchor="middle" font-size="14" fill="#64748b">위로 갈수록 소비자에게 가까움, 아래로 갈수록 원천에 가까움</text></svg>`,
+          dag: `<svg viewBox="0 0 980 250" role="img" aria-label="airflow dag flow"><defs><marker id="arrow-d" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs><g transform="translate(80,70)"><circle cx="54" cy="54" r="54" fill="#fff" stroke="#7c3aed" stroke-width="3"/><text x="54" y="50" text-anchor="middle" font-size="18" font-weight="900" fill="#172033">plan</text><text x="54" y="74" text-anchor="middle" font-size="12" fill="#64748b">guardrail</text></g><line x1="188" y1="124" x2="245" y2="124" stroke="#64748b" stroke-width="2" marker-end="url(#arrow-d)"/><g transform="translate(300,70)"><circle cx="54" cy="54" r="54" fill="#fff" stroke="#7c3aed" stroke-width="3"/><text x="54" y="50" text-anchor="middle" font-size="18" font-weight="900" fill="#172033">sync</text><text x="54" y="74" text-anchor="middle" font-size="12" fill="#64748b">BigQuery</text></g><line x1="408" y1="124" x2="465" y2="124" stroke="#64748b" stroke-width="2" marker-end="url(#arrow-d)"/><g transform="translate(520,70)"><circle cx="54" cy="54" r="54" fill="#fff" stroke="#7c3aed" stroke-width="3"/><text x="54" y="50" text-anchor="middle" font-size="18" font-weight="900" fill="#172033">dbt</text><text x="54" y="74" text-anchor="middle" font-size="12" fill="#64748b">model+test</text></g><line x1="628" y1="124" x2="685" y2="124" stroke="#64748b" stroke-width="2" marker-end="url(#arrow-d)"/><g transform="translate(740,70)"><circle cx="54" cy="54" r="54" fill="#fff" stroke="#7c3aed" stroke-width="3"/><text x="54" y="50" text-anchor="middle" font-size="18" font-weight="900" fill="#172033">drift</text><text x="54" y="74" text-anchor="middle" font-size="12" fill="#64748b">warn-only</text></g><text x="490" y="220" text-anchor="middle" font-size="15" fill="#64748b">수동 명령어 묶음이 아니라 실패/재시도/로그가 남는 workflow</text></svg>`,
+          dashboard: `<svg viewBox="0 0 980 300" role="img" aria-label="dashboard from mart"><defs><marker id="arrow-b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs><rect x="70" y="55" width="240" height="180" rx="8" fill="#fff" stroke="#b45309" stroke-width="3"/><text x="190" y="90" text-anchor="middle" font-size="20" font-weight="900" fill="#b45309">Golden Mart</text><rect x="105" y="120" width="170" height="18" rx="4" fill="#fed7aa"/><rect x="105" y="152" width="130" height="18" rx="4" fill="#fed7aa"/><rect x="105" y="184" width="190" height="18" rx="4" fill="#fed7aa"/><path d="M330 145 H430" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-b)"/><rect x="455" y="45" width="450" height="210" rx="10" fill="#fff" stroke="#15803d" stroke-width="3"/><text x="680" y="82" text-anchor="middle" font-size="22" font-weight="900" fill="#15803d">Metabase Dashboard</text><polyline points="500,210 560,160 620,180 680,120 740,145 830,95" fill="none" stroke="#2563eb" stroke-width="4"/><rect x="500" y="105" width="110" height="36" rx="6" fill="#dcfce7"/><rect x="640" y="170" width="95" height="36" rx="6" fill="#dcfce7"/><rect x="765" y="145" width="95" height="36" rx="6" fill="#dcfce7"/></svg>`,
+          feature: `<svg viewBox="0 0 980 310" role="img" aria-label="feature mart pipeline"><defs><marker id="arrow-f" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs><rect x="55" y="52" width="170" height="72" rx="8" fill="#fff" stroke="#2563eb" stroke-width="3"/><text x="140" y="94" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">daily_agg</text><rect x="55" y="185" width="170" height="72" rx="8" fill="#fff" stroke="#2563eb" stroke-width="3"/><text x="140" y="227" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">metadata</text><rect x="330" y="55" width="250" height="200" rx="10" fill="#faf5ff" stroke="#7c3aed" stroke-width="3"/><text x="455" y="95" text-anchor="middle" font-size="20" font-weight="900" fill="#7c3aed">Feature Marts</text><text x="455" y="130" text-anchor="middle" font-size="13" fill="#64748b">interaction / profile / repo / split</text><rect x="370" y="158" width="170" height="28" rx="5" fill="#ede9fe"/><rect x="370" y="198" width="170" height="28" rx="5" fill="#ede9fe"/><rect x="700" y="70" width="210" height="70" rx="8" fill="#fff" stroke="#0f766e" stroke-width="3"/><text x="805" y="112" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">Training</text><rect x="700" y="180" width="210" height="70" rx="8" fill="#fff" stroke="#0f766e" stroke-width="3"/><text x="805" y="222" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">Evaluation</text><path d="M225 88 H315" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-f)"/><path d="M225 221 H315" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-f)"/><path d="M580 135 H685" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-f)"/><path d="M580 190 H685" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-f)"/></svg>`,
+          alert: `<svg viewBox="0 0 980 310" role="img" aria-label="slack alert flow"><defs><marker id="arrow-a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs><rect x="70" y="75" width="220" height="72" rx="8" fill="#fff" stroke="#b91c1c" stroke-width="3"/><text x="180" y="118" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Task Failure</text><rect x="70" y="185" width="220" height="72" rx="8" fill="#fff" stroke="#b45309" stroke-width="3"/><text x="180" y="228" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Drift Warn</text><path d="M310 111 H430" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-a)"/><path d="M310 221 H430" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-a)"/><rect x="455" y="70" width="220" height="80" rx="8" fill="#fff" stroke="#7c3aed" stroke-width="3"/><text x="565" y="106" text-anchor="middle" font-size="18" font-weight="900" fill="#172033">notify_failure</text><text x="565" y="130" text-anchor="middle" font-size="12" fill="#64748b">DAG / Task / Log URL</text><rect x="455" y="180" width="220" height="80" rx="8" fill="#fff" stroke="#7c3aed" stroke-width="3"/><text x="565" y="216" text-anchor="middle" font-size="18" font-weight="900" fill="#172033">notify_drift</text><text x="565" y="240" text-anchor="middle" font-size="12" fill="#64748b">PSI / warn / alert</text><path d="M675 111 H775" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-a)"/><path d="M675 221 H775" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-a)"/><rect x="800" y="125" width="110" height="100" rx="18" fill="#4a154b"/><text x="855" y="182" text-anchor="middle" font-size="24" font-weight="900" fill="#fff">Slack</text></svg>`
+        };
+        wrap.appendChild(el("p", "visual-title", titles[type]));
+        wrap.insertAdjacentHTML("beforeend", svgs[type]);
+        parent.appendChild(wrap);
+      }
+
+      function renderSlide(slide, index) {
+        const article = el("article", `slide ${slide.layout || ""}`);
+        article.id = `slide-${index + 1}`;
+
+        const main = el("div");
+        main.appendChild(el("p", "eyebrow", `${String(index + 1).padStart(2, "0")} · ${slide.section}`));
+        main.appendChild(el(index === 0 ? "h1" : "h2", "", slide.title));
+        if (slide.subtitle) main.appendChild(el("p", "subtitle", slide.subtitle));
+        addBullets(main, slide.bullets);
+        addVisual(main, slide.visual);
+        addMap(main, slide.map);
+        addTable(main, slide.table);
+        addCards(main, slide.cards);
+        if (slide.code) main.appendChild(el("pre", "codebox", slide.code));
+        if (slide.path) main.appendChild(el("div", "path", slide.path));
+        if (slide.note) main.appendChild(el("p", "note", slide.note));
+        article.appendChild(main);
+
+        if (slide.layout === "title") {
+          const side = el("div");
+          side.appendChild(el("div", "number", String(slides.length)));
+          side.appendChild(el("p", "subtitle", "slides"));
+          side.appendChild(el("div", "tagline", "회사에서 왜 필요한가를 먼저 보고, 그 필요가 기술 선택으로 이어지게 설명함."));
+          article.appendChild(side);
+        }
+        return article;
+      }
+
+      slides.forEach((slide, index) => root.appendChild(renderSlide(slide, index)));
+      counter.textContent = `1 / ${slides.length}`;
+
+      function currentIndex() {
+        const positions = slides.map((_, index) => {
+          const node = document.getElementById(`slide-${index + 1}`);
+          return Math.abs(node.getBoundingClientRect().top - 82);
+        });
+        return positions.indexOf(Math.min(...positions));
+      }
+
+      function go(delta) {
+        const next = Math.max(0, Math.min(slides.length - 1, currentIndex() + delta));
+        document.getElementById(`slide-${next + 1}`).scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      document.getElementById("prev").addEventListener("click", () => go(-1));
+      document.getElementById("next").addEventListener("click", () => go(1));
+      window.addEventListener("scroll", () => {
+        counter.textContent = `${currentIndex() + 1} / ${slides.length}`;
+      }, { passive: true });
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowRight" || event.key === "PageDown") go(1);
+        if (event.key === "ArrowLeft" || event.key === "PageUp") go(-1);
+      });
+    </script>
+  </body>
+</html>

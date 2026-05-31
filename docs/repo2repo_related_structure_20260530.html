@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Repo-to-Repo Related Recommendation Structure</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5f6f89;
+      --line: #cbd5e1;
+      --soft-line: #e2e8f0;
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --history: #0f766e;
+      --rank: #6d28d9;
+      --test: #c2410c;
+      --rule: #2563eb;
+      --ml: #059669;
+      --als: #d97706;
+      --svd: #be185d;
+      --off: #475569;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.5;
+    }
+    main {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 34px 24px 58px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+      line-height: 1.16;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 34px 0 14px;
+      font-size: 21px;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+    p { margin: 0; color: var(--muted); }
+    code {
+      background: #eef2f7;
+      border: 1px solid #d8e0ec;
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-size: .92em;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      padding: 7px 11px;
+      font-size: 13px;
+      color: #334155;
+      white-space: nowrap;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 16px;
+    }
+    .grid.two { grid-template-columns: repeat(2, 1fr); }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      min-width: 0;
+    }
+    .panel.compact { padding: 14px; }
+    .metric {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      padding: 7px 0;
+      border-top: 1px solid var(--soft-line);
+      font-size: 14px;
+    }
+    .metric:first-of-type { border-top: 0; }
+    .value {
+      font-variant-numeric: tabular-nums;
+      font-weight: 750;
+      color: #111827;
+    }
+    .timeline {
+      display: grid;
+      grid-template-columns: 42fr 7fr 7fr;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .segment {
+      min-height: 92px;
+      border-radius: 8px;
+      color: white;
+      padding: 13px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 0;
+    }
+    .segment strong { font-size: 15px; }
+    .segment span { font-size: 13px; opacity: .94; }
+    .history { background: var(--history); }
+    .rank { background: var(--rank); }
+    .test { background: var(--test); }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+      align-items: stretch;
+    }
+    .node {
+      border: 1px solid var(--line);
+      border-left-width: 5px;
+      border-radius: 8px;
+      background: #fff;
+      padding: 12px 13px;
+      min-height: 108px;
+    }
+    .node strong {
+      display: block;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+    .node span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .node.off { border-left-color: var(--off); }
+    .node.rule { border-left-color: var(--rule); }
+    .node.ml { border-left-color: var(--ml); }
+    .node.als { border-left-color: var(--als); }
+    .node.svd { border-left-color: var(--svd); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid var(--line);
+      font-size: 14px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--soft-line);
+      text-align: right;
+      vertical-align: top;
+      font-variant-numeric: tabular-nums;
+    }
+    th:first-child, td:first-child { text-align: left; }
+    .text td, .text th { text-align: left; font-variant-numeric: normal; }
+    th {
+      background: #f1f5f9;
+      font-weight: 750;
+      color: #334155;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .best { color: #0f766e; font-weight: 800; }
+    .warn { color: #9a3412; font-weight: 750; }
+    .note {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-left: 4px solid #0f766e;
+      background: #ecfdf5;
+      border-radius: 6px;
+      color: #134e4a;
+      font-size: 14px;
+    }
+    .formula {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px solid var(--soft-line);
+      color: #334155;
+      font-size: 13px;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 190px 1fr 78px;
+      gap: 12px;
+      align-items: center;
+      margin: 9px 0;
+      font-size: 14px;
+    }
+    .bar {
+      height: 14px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: var(--rule);
+    }
+    .bar.cooc > span { background: var(--ml); }
+    .bar.als > span { background: var(--als); }
+    .bar.svd > span { background: var(--svd); }
+    .bar.off > span { background: var(--off); }
+    .small { font-size: 13px; color: var(--muted); }
+    .example {
+      margin-top: 12px;
+      display: grid;
+      gap: 8px;
+    }
+    .example-step {
+      border: 1px solid var(--soft-line);
+      border-radius: 8px;
+      background: #fbfdff;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .example-step strong {
+      display: inline-block;
+      min-width: 82px;
+      color: #334155;
+    }
+    @media (max-width: 960px) {
+      main { padding: 28px 16px 42px; }
+      h1 { font-size: 27px; }
+      .grid, .grid.two, .flow { grid-template-columns: 1fr; }
+      .timeline { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 1fr; gap: 5px; }
+      table { font-size: 13px; }
+      th, td { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>연관 추천 구조: repo2repo 후보가 개인화 랭킹에 들어가는 방식</h1>
+    <p>5/30 기준 실험은 related 후보 생성기를 바꿔가며 같은 ALS base, 같은 user sample, 같은 LGBM LambdaRank 조건에서 비교했다.</p>
+    <div class="meta">
+      <span class="pill">기준일: 2026-05-30</span>
+      <span class="pill">최종 지표: NDCG@100</span>
+      <span class="pill">test user sample: 100k</span>
+      <span class="pill">actual eval users: 57,616</span>
+      <span class="pill">candidate_k: 300</span>
+      <span class="pill">ranker: LGBM LambdaRank</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>한 줄 결론</h2>
+    <div class="grid">
+      <div class="panel">
+        <h3>이번 승자</h3>
+        <div class="metric"><span>rule_related NDCG@100</span><span class="value best">0.007622</span></div>
+        <p class="small">단순 co-watch rule이 LGBM 개인화 랭킹까지 통과했을 때 가장 좋았다.</p>
+      </div>
+      <div class="panel">
+        <h3>ML related의 현재 상태</h3>
+        <div class="metric"><span>cooc_norm</span><span class="value">0.004981</span></div>
+        <div class="metric"><span>als_item_cosine</span><span class="value">0.004888</span></div>
+        <div class="metric"><span>item2vec_svd</span><span class="value">0.003274</span></div>
+      </div>
+      <div class="panel">
+        <h3>해석</h3>
+        <p>repo2repo 자체 평가는 cooc가 강하지만, 최종 개인화 랭커에서는 source mix, candidate rank, seen/history 피쳐와의 상호작용 때문에 rule이 더 잘 먹혔다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>성과 정의: 두 문제를 분리해서 봐야 함</h2>
+    <div class="grid two">
+      <div class="panel">
+        <h3>문제 A. 연관 추천 자체</h3>
+        <p><strong>질문:</strong> 사용자가 repo A를 봤다면, 그 다음 기간에 같이 볼 repo B를 잘 맞히는가?</p>
+        <div class="formula">입력: anchor_repo = history에서 본 repo A<br>정답: label 기간에 같은 사용자가 본 future target repo B<br>평가: repo A별 top-k related list가 B를 얼마나 위에 올리는지</div>
+        <div class="metric"><span>주요 지표</span><span class="value">NDCG@10/50, Recall@100</span></div>
+        <div class="metric"><span>여기서 co-occurrence는?</span><span class="value">성과가 아니라 후보 생성 신호</span></div>
+      </div>
+      <div class="panel">
+        <h3>문제 B. 개인화 랭킹 성과</h3>
+        <p><strong>질문:</strong> related 후보를 user별 추천 후보 풀에 넣었을 때, 최종 추천 100개가 test 정답을 더 잘 맞히는가?</p>
+        <div class="formula">입력: user history + ALS/recent/popular/related candidates<br>정답: test 기간에 사용자가 본 repo<br>평가: LGBM rerank 이후 user별 top-100 추천 품질</div>
+        <div class="metric"><span>주요 지표</span><span class="value">NDCG@100</span></div>
+        <div class="metric"><span>이번 결론</span><span class="value warn">ML related lift 증명 안 됨</span></div>
+      </div>
+    </div>
+    <div class="note">
+      정리하면 co-occurrence는 "연관 추천을 만드는 방법" 중 하나다. 성과는 co-occurrence 값 자체가 아니라, 그 값으로 정렬한 related list가 미래 행동을 맞히는지로 정의한다.
+    </div>
+  </section>
+
+  <section>
+    <h2>이번 실험에서 새로 봐야 할 용어</h2>
+    <table class="text">
+      <thead>
+        <tr>
+          <th>용어</th>
+          <th>쉬운 설명</th>
+          <th>이번 실험에서의 뜻</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>추천</strong></td>
+          <td>사용자가 다음에 볼 만한 repo를 골라서 위에 올리는 일</td>
+          <td>user별 top-100 repo 목록 만들기</td>
+        </tr>
+        <tr>
+          <td><strong>연관 추천</strong></td>
+          <td>"이 repo를 본 사람은 저 repo도 자주 봤다"를 이용하는 추천</td>
+          <td>repo A를 anchor로 두고 관련 repo B를 찾는 것</td>
+        </tr>
+        <tr>
+          <td><strong>co-occurrence</strong></td>
+          <td>두 repo가 같은 사용자에게 같이 등장한 횟수</td>
+          <td>A와 B를 함께 본 사용자가 많으면 A -> B score가 커짐</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>예시로 보는 연관 추천</h2>
+    <div class="grid two">
+      <div class="panel">
+        <h3>1. 과거 행동을 모은다</h3>
+        <div class="example">
+          <div class="example-step"><strong>사용자 1</strong>react, next.js, vite를 봄</div>
+          <div class="example-step"><strong>사용자 2</strong>react, next.js를 봄</div>
+          <div class="example-step"><strong>사용자 3</strong>react, django를 봄</div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>2. repo끼리 연결한다</h3>
+        <div class="example">
+          <div class="example-step"><strong>react -> next.js</strong>같이 등장 2번, 강한 관계</div>
+          <div class="example-step"><strong>react -> vite</strong>같이 등장 1번, 약한 관계</div>
+          <div class="example-step"><strong>react -> django</strong>같이 등장 1번, 약한 관계</div>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      여기서 중요한 점은 "같이 많이 나왔다"가 끝이 아니라는 것. 진짜 평가는 과거에 react를 본 사용자가 미래 기간에 next.js를 봤는지로 한다.
+    </div>
+  </section>
+
+  <section>
+    <h2>추천 시스템은 두 단계로 움직임</h2>
+    <div class="grid two">
+      <div class="panel">
+        <h3>1단계: 후보 많이 모으기</h3>
+        <p>사용자에게 보여줄 가능성이 있는 repo를 넓게 모은다. 이때 ALS, recent, popular, related가 각각 후보를 낸다.</p>
+        <div class="formula">목표: 정답일 가능성이 있는 repo를 최대한 후보 300개 안에 넣기</div>
+      </div>
+      <div class="panel">
+        <h3>2단계: 순서 다시 매기기</h3>
+        <p>300개 후보를 그대로 보여주지 않고, LGBM ranker가 피쳐를 보고 "무엇을 더 위에 둘지" 다시 정한다.</p>
+        <div class="formula">목표: 후보 300개 중 진짜 볼 만한 repo를 top-100 위쪽에 올리기</div>
+      </div>
+    </div>
+    <div class="note">
+      그래서 related 알고리즘이 좋아 보여도, 최종 개인화 랭커가 그 후보를 위로 안 올리면 개인화 성능은 안 좋아질 수 있다.
+    </div>
+  </section>
+
+  <section>
+    <h2>숫자는 이렇게 읽으면 됨</h2>
+    <div class="grid">
+      <div class="panel">
+        <h3>NDCG</h3>
+        <p>정답 repo가 추천 목록 위쪽에 있을수록 높은 점수. 같은 정답을 맞혀도 90등보다 3등에 올리면 더 좋게 본다.</p>
+      </div>
+      <div class="panel">
+        <h3>Recall</h3>
+        <p>사용자가 실제로 본 정답 repo 중 몇 개를 추천 목록 안에 넣었는지. 순서보다 "넣었냐"에 가깝다.</p>
+      </div>
+      <div class="panel">
+        <h3>Coverage / unique</h3>
+        <p>추천이 얼마나 다양한 repo로 퍼지는지. 높으면 다양하지만, 반드시 정확도가 높다는 뜻은 아니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>개선 해석도 둘로 쪼갬</h2>
+    <table class="text">
+      <thead>
+        <tr>
+          <th>영역</th>
+          <th>이번에 개선됐다고 볼 수 있는 것</th>
+          <th>아직 증명 안 된 것</th>
+          <th>현재 판단</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>연관 추천 자체</strong></td>
+          <td>cooc_norm은 anchor_repo -> future target repo 평가에서 강함. ALS/item2vec은 coverage를 넓힘.</td>
+          <td>embedding/hybrid가 cooc_norm보다 top-rank 품질을 이긴다는 증거</td>
+          <td>repo2repo graph 품질은 cooc_norm이 현재 제일 방어 가능</td>
+        </tr>
+        <tr>
+          <td><strong>개인화 랭킹</strong></td>
+          <td>related 후보를 넣는 것 자체는 related_off 대비 lift가 큼. 특히 rule_related가 최고.</td>
+          <td>ML related, ALS cosine, item2vec, hybrid가 rule_related보다 좋다는 증거</td>
+          <td class="warn">개인화에서는 ML 도입 성과 없음. 룰 기반 related/source 피쳐 효과로 보는 게 맞음.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>데이터와 시간 경계</h2>
+    <div class="timeline">
+      <div class="segment history">
+        <strong>history</strong>
+        <span>2026-04-05 ~ 2026-05-16<br>3,042,887 positive pairs / 1,555,195 users / 300,000 repos</span>
+      </div>
+      <div class="segment rank">
+        <strong>rank_label</strong>
+        <span>2026-05-17 ~ 2026-05-23<br>374,371 pairs / 218,294 users / 146,171 repos</span>
+      </div>
+      <div class="segment test">
+        <strong>test</strong>
+        <span>2026-05-24 ~ 2026-05-30<br>330,958 pairs / 190,564 users / 132,991 repos</span>
+      </div>
+    </div>
+    <div class="note">
+      related mart 기본 export는 train-safe 경계인 <code>history -> rank_label</code> 기준이다. final-test용 mart는 별도로 <code>--export-mart-label-split test</code>를 명시해야 한다.
+    </div>
+  </section>
+
+  <section>
+    <h2>End-to-End Pipeline</h2>
+    <div class="flow">
+      <div class="node off">
+        <strong>1. Canonical split</strong>
+        <span>watch/star/fork 등 positive interaction을 시간순으로 나누고 repo/user filter를 적용한다.</span>
+      </div>
+      <div class="node als">
+        <strong>2. ALS base retrieval</strong>
+        <span>user history 기반 ALS 후보를 먼저 만들고 head/tail slot으로 300개 후보 골격을 채운다.</span>
+      </div>
+      <div class="node rule">
+        <strong>3. Related graph</strong>
+        <span>anchor repo별 future target repo 후보를 rule, cooc, ALS cosine, hybrid, item2vec 방식으로 만든다.</span>
+      </div>
+      <div class="node ml">
+        <strong>4. Candidate merge</strong>
+        <span>user가 본 repo들의 related 후보를 펼쳐 candidate_source, source_rank, source_score를 붙인다.</span>
+      </div>
+      <div class="node svd">
+        <strong>5. LGBM rerank</strong>
+        <span>rank_label로 LambdaRank를 재학습하고 test에서 NDCG@100으로 최종 비교한다.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>알고리즘</h2>
+    <table class="text">
+      <thead>
+        <tr>
+          <th>방법</th>
+          <th>무엇을 학습/계산하나</th>
+          <th>score 의미</th>
+          <th>강점과 리스크</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>related_off</strong></td>
+          <td>related 후보를 끄고 ALS/recent/popular만 사용</td>
+          <td>없음</td>
+          <td>관련 추천의 incremental lift를 보는 baseline</td>
+        </tr>
+        <tr>
+          <td><strong>rule_related</strong></td>
+          <td>같은 사용자가 history 기간에 함께 본 repo pair를 누적</td>
+          <td>co-watch 강도와 repo popularity를 섞은 rule score</td>
+          <td>단순하지만 현재 최종 랭킹에서 가장 강함. 인기 repo 쏠림은 관리 필요</td>
+        </tr>
+        <tr>
+          <td><strong>cooc_norm</strong></td>
+          <td>anchor-target 동시 등장 횟수를 item frequency로 정규화</td>
+          <td>인기 보정된 related strength</td>
+          <td>repo2repo 자체 NDCG는 최고. 랭커 feature와 결합 시 rule보다 낮음</td>
+        </tr>
+        <tr>
+          <td><strong>als_item_cosine</strong></td>
+          <td>user-repo implicit matrix로 ALS item factor 학습 후 item cosine top-k 검색</td>
+          <td>embedding 공간의 repo 유사도</td>
+          <td>coverage가 넓고 tail 탐색에 좋음. top-rank 정밀도는 rule/cooc보다 낮음</td>
+        </tr>
+        <tr>
+          <td><strong>hybrid_rule_als</strong></td>
+          <td>cooc 계열 score와 ALS item similarity를 정규화 후 가중합</td>
+          <td><code>w * cooc + (1-w) * als</code></td>
+          <td>coverage와 precision을 절충. 현재 sweep으로 최적 weight 재검증 중</td>
+        </tr>
+        <tr>
+          <td><strong>item2vec_svd</strong></td>
+          <td>repo co-occurrence matrix를 PPMI 성격으로 만들고 SVD embedding 근사</td>
+          <td>분포적 item embedding 유사도</td>
+          <td>빠른 실험용 baseline. full item2vec이 아니어서 ALS와 차별점이 약함</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="grid two">
+      <div class="panel compact">
+        <h3>rule/cooc 계열 직관</h3>
+        <p>사용자 history 안에서 repo A와 repo B가 같이 나타나면 A -> B edge를 만든다. 많이 같이 나오면 강하지만, 너무 인기 있는 repo는 정규화로 눌러준다.</p>
+        <div class="formula">cooc_norm(A,B) ~= cooc(A,B) / sqrt(users(A) * users(B))</div>
+      </div>
+      <div class="panel compact">
+        <h3>embedding 계열 직관</h3>
+        <p>ALS/item2vec은 repo를 벡터로 바꾸고 가까운 repo를 찾는다. 직접 동시 등장하지 않은 repo도 연결할 수 있어 coverage는 좋지만, top slot 정밀도는 별도 튜닝이 필요하다.</p>
+        <div class="formula">related(A) = topK cosine(item_vector[A], item_vector[*])</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>co-occurrence는 어떻게 계산하나</h2>
+    <div class="grid two">
+      <div class="panel">
+        <h3>1. 사용자별 repo 묶음을 만든다</h3>
+        <p>history 기간에 한 사용자가 본 repo들을 하나의 묶음으로 본다. 같은 묶음 안에 같이 등장한 repo pair를 모두 만든다.</p>
+        <div class="example">
+          <div class="example-step"><strong>user1</strong>A, B, C를 봄 -> A-B, A-C, B-C pair 생성</div>
+          <div class="example-step"><strong>user2</strong>A, B를 봄 -> A-B pair 생성</div>
+          <div class="example-step"><strong>결과</strong>A-B는 2번, A-C는 1번 같이 등장</div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>2. 너무 인기 많은 repo를 보정한다</h3>
+        <p>그냥 같이 등장한 횟수만 쓰면 React, Linux처럼 원래 많이 보는 repo가 항상 이긴다. 그래서 각 repo의 전체 등장량으로 나눠서 "진짜 관련성"에 가깝게 만든다.</p>
+        <div class="formula">raw cooc(A,B) = A와 B가 같은 사용자 history에 같이 나온 횟수<br>cooc_norm(A,B) ~= raw cooc(A,B) / sqrt(users(A) * users(B))</div>
+      </div>
+    </div>
+    <div class="grid two">
+      <div class="panel">
+        <h3>cooc의 장점</h3>
+        <p>설명하기 쉽고, 실제 행동 데이터에 바로 붙어 있다. "A를 본 사람이 B도 봤다"라는 근거가 명확해서 repo2repo 자체 평가에서는 강하게 나온다.</p>
+      </div>
+      <div class="panel">
+        <h3>cooc의 약점</h3>
+        <p>같이 등장한 기록이 적은 새 repo나 tail repo에는 약하다. 또 "같이 봤다"는 사실만으로 왜 관련 있는지는 알 수 없다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>item2vec은 무엇이 다른가</h2>
+    <div class="grid two">
+      <div class="panel">
+        <h3>직관</h3>
+        <p>item2vec은 word2vec의 아이디어를 repo에 적용한 것이다. 문장에서 주변 단어가 비슷하면 단어 의미가 비슷하다고 보는 것처럼, 사용자 history 안에서 주변 repo가 비슷하면 repo 성격이 비슷하다고 본다.</p>
+        <div class="formula">word2vec: "나는 커피를 마셨다" 안에서 단어 관계 학습<br>item2vec: "user가 A, B, C repo를 봤다" 안에서 repo 관계 학습</div>
+      </div>
+      <div class="panel">
+        <h3>이번 구현</h3>
+        <p>이번에는 full word2vec 학습을 돌린 게 아니라, item co-occurrence 행렬을 만들고 SVD로 embedding을 근사했다. 그래서 엄밀히 말하면 "item2vec"이라기보다 co-occurrence matrix factorization baseline에 가깝다.</p>
+        <div class="formula">user history -> repo co-occurrence matrix -> PPMI 성격의 보정 -> SVD -> repo embedding -> cosine top-k</div>
+      </div>
+    </div>
+    <div class="grid two">
+      <div class="panel">
+        <h3>왜 쓸 만한가</h3>
+        <p>cooc는 직접 같이 등장한 pair에 강한 반면, item2vec은 비슷한 문맥을 통해 간접 관계도 잡을 수 있다. 예를 들어 A와 D가 직접 같이 많이 안 나와도, 둘 다 B/C와 자주 같이 나오면 가까운 repo로 볼 수 있다.</p>
+        <div class="example">
+          <div class="example-step"><strong>A</strong>B, C와 자주 같이 등장</div>
+          <div class="example-step"><strong>D</strong>B, C와 자주 같이 등장</div>
+          <div class="example-step"><strong>해석</strong>A와 D가 직접 같이 적게 나와도 비슷한 위치의 repo일 수 있음</div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>이번 결과가 낮은 이유</h3>
+        <p>이번 item2vec_svd는 빠른 검증용이라 user cap이 작고, full SGNS 방식이 아니었다. 더 중요한 점은 SVD로 co-occurrence 행렬을 줄이는 방식이면 ALS와 문제 설정이 많이 겹친다는 것이다. 이 조건에서는 굳이 item2vec_svd를 별도 주력 알고리즘으로 볼 이유가 약하고, ALS가 더 안정적인 선택이다.</p>
+        <div class="formula">이번 결과: item2vec_svd NDCG@100 = 0.003274<br>rule_related NDCG@100 = 0.007622</div>
+      </div>
+    </div>
+    <div class="note">
+      정리하면 이번 item2vec_svd는 "새로운 강한 알고리즘"이라기보다, item embedding 계열을 빠르게 찍어본 실험이다. 현재 결과 기준으로는 ALS가 더 낫고, item2vec을 계속 보려면 negative sampling 기반 SGNS로 다시 구현해야 의미가 있다.
+    </div>
+  </section>
+
+  <section>
+    <h2>후보 구성</h2>
+    <div class="grid">
+      <div class="panel">
+        <h3>slot 구조</h3>
+        <div class="metric"><span>ALS head</span><span class="value">80</span></div>
+        <div class="metric"><span>related</span><span class="value">~80</span></div>
+        <div class="metric"><span>recent</span><span class="value">20</span></div>
+        <div class="metric"><span>popular</span><span class="value">20</span></div>
+        <div class="metric"><span>ALS tail fill</span><span class="value">to 300</span></div>
+      </div>
+      <div class="panel">
+        <h3>related source rows</h3>
+        <div class="metric"><span>rule_related</span><span class="value">535,128</span></div>
+        <div class="metric"><span>cooc_norm</span><span class="value">499,607</span></div>
+        <div class="metric"><span>als_item_cosine</span><span class="value">614,867</span></div>
+        <div class="metric"><span>hybrid_rule_als</span><span class="value">588,037</span></div>
+        <div class="metric"><span>item2vec_svd</span><span class="value">538,801</span></div>
+      </div>
+      <div class="panel">
+        <h3>학습 데이터</h3>
+        <div class="metric"><span>rerank rows</span><span class="value">1,455,853</span></div>
+        <div class="metric"><span>positives</span><span class="value">100,000</span></div>
+        <div class="metric"><span>negatives</span><span class="value">1,355,853</span></div>
+        <div class="metric"><span>groups</span><span class="value">41,589</span></div>
+        <div class="metric"><span>positive rate</span><span class="value">0.0687</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>랭커 피쳐</h2>
+    <table class="text">
+      <thead>
+        <tr>
+          <th>피쳐 그룹</th>
+          <th>컬럼</th>
+          <th>의미</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>retrieval signal</strong></td>
+          <td><code>retrieval_score</code>, <code>candidate_rank</code>, <code>candidate_source_code</code></td>
+          <td>ALS/related/recent/popular 중 어디서 왔고, 원 후보 순위와 점수가 어떤지</td>
+        </tr>
+        <tr>
+          <td><strong>source detail</strong></td>
+          <td><code>source_rank</code>, <code>source_score</code></td>
+          <td>related mart 안에서 anchor repo -> target repo 순위와 score</td>
+        </tr>
+        <tr>
+          <td><strong>user history</strong></td>
+          <td><code>log_user_history_score</code>, <code>log_user_history_repos</code></td>
+          <td>사용자가 history 기간에 얼마나 강하게/다양하게 활동했는지</td>
+        </tr>
+        <tr>
+          <td><strong>item history</strong></td>
+          <td><code>log_item_history_score</code>, <code>log_item_history_users</code></td>
+          <td>후보 repo의 과거 popularity와 activity 규모</td>
+        </tr>
+        <tr>
+          <td><strong>seen/share</strong></td>
+          <td><code>user_item_history_seen</code>, <code>user_history_score_share</code></td>
+          <td>이미 본 repo 여부와 사용자의 전체 history에서 해당 repo가 차지하는 비중</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note">
+      이번 수정에서 ML/hybrid export의 score도 downstream의 <code>cooc_score</code> 컬럼에 실리도록 맞췄다. 이름은 mart 호환 때문에 cooc_score지만, 선택한 run의 실제 related score가 들어간다.
+    </div>
+  </section>
+
+  <section>
+    <h2>지표</h2>
+    <div class="grid two">
+      <div class="panel">
+        <h3>repo2repo 자체 평가</h3>
+        <p>anchor repo를 기준으로 future target repo를 얼마나 잘 맞히는지 본다. 여기서는 related graph 자체의 품질을 본다.</p>
+        <div class="metric"><span>NDCG@10 / NDCG@50</span><span class="value">상위 순서 품질</span></div>
+        <div class="metric"><span>Recall@50 / Recall@100</span><span class="value">정답 회수율</span></div>
+        <div class="metric"><span>MAP@50</span><span class="value">평균 정밀 순위</span></div>
+        <div class="metric"><span>HitRate@10</span><span class="value">상위 10개 안 hit 여부</span></div>
+        <div class="metric"><span>unique@100</span><span class="value">coverage/diversity</span></div>
+      </div>
+      <div class="panel">
+        <h3>개인화 최종 평가</h3>
+        <p>related 후보가 실제 사용자별 300개 후보 풀에 섞인 뒤, LGBM ranker가 test positive를 얼마나 위로 올리는지 본다.</p>
+        <div class="metric"><span>NDCG@100</span><span class="value best">주 지표</span></div>
+        <div class="metric"><span>Recall@100</span><span class="value">맞힌 정답 비율</span></div>
+        <div class="metric"><span>Precision@100</span><span class="value">추천 100개 중 정답 비율</span></div>
+        <div class="metric"><span>unique@100</span><span class="value">추천 repo 다양성</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>개인화 랭킹 결과</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>condition</th>
+          <th>NDCG@100</th>
+          <th>Recall@100</th>
+          <th>Precision@100</th>
+          <th>unique@100</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>related_off</td>
+          <td>0.002638</td>
+          <td>0.008480</td>
+          <td>0.000145</td>
+          <td>6,349</td>
+        </tr>
+        <tr>
+          <td>rule_related</td>
+          <td class="best">0.007622</td>
+          <td>0.016114</td>
+          <td class="best">0.000312</td>
+          <td>63,449</td>
+        </tr>
+        <tr>
+          <td>cooc_norm_related</td>
+          <td>0.004981</td>
+          <td class="best">0.016366</td>
+          <td>0.000311</td>
+          <td>61,379</td>
+        </tr>
+        <tr>
+          <td>als_item_cosine_related</td>
+          <td>0.004888</td>
+          <td>0.012874</td>
+          <td>0.000253</td>
+          <td class="best">90,798</td>
+        </tr>
+        <tr>
+          <td>hybrid_rule_als_related</td>
+          <td>0.004559</td>
+          <td>0.014666</td>
+          <td>0.000285</td>
+          <td>88,178</td>
+        </tr>
+        <tr>
+          <td>item2vec_svd_related</td>
+          <td>0.003274</td>
+          <td>0.009909</td>
+          <td>0.000183</td>
+          <td>40,386</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="panel" style="margin-top: 14px;">
+      <h3>NDCG@100 relative bar</h3>
+      <div class="bar-row"><span>rule_related</span><div class="bar"><span style="width:100%"></span></div><span>0.007622</span></div>
+      <div class="bar-row"><span>cooc_norm</span><div class="bar cooc"><span style="width:65.4%"></span></div><span>0.004981</span></div>
+      <div class="bar-row"><span>als_item_cosine</span><div class="bar als"><span style="width:64.1%"></span></div><span>0.004888</span></div>
+      <div class="bar-row"><span>hybrid_rule_als</span><div class="bar als"><span style="width:59.8%"></span></div><span>0.004559</span></div>
+      <div class="bar-row"><span>item2vec_svd</span><div class="bar svd"><span style="width:42.9%"></span></div><span>0.003274</span></div>
+      <div class="bar-row"><span>related_off</span><div class="bar off"><span style="width:34.6%"></span></div><span>0.002638</span></div>
+    </div>
+    <div class="grid two">
+      <div class="panel">
+        <h3>좋아진 부분</h3>
+        <p>related_off는 연관 추천을 끈 상태다. 여기서 rule_related를 켜면 NDCG@100이 0.002638에서 0.007622로 오른다. 즉 "연관 후보를 넣는 것" 자체는 효과가 있다.</p>
+        <div class="formula">related 후보 없음 -> 0.002638<br>rule related 후보 있음 -> 0.007622</div>
+      </div>
+      <div class="panel">
+        <h3>좋아졌다고 말하면 안 되는 부분</h3>
+        <p>ML 방식인 cooc_norm, ALS cosine, hybrid, item2vec이 rule_related를 이기지 못했다. 그래서 "ML related를 도입해서 개인화가 좋아졌다"는 결론은 아직 아니다.</p>
+        <div class="formula">현재 결론: ML 알고리즘 성과 X<br>더 정확한 결론: rule 기반 related 후보와 피쳐 추가 효과 O</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>repo2repo 자체 결과</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>run</th>
+          <th>NDCG@10</th>
+          <th>NDCG@50</th>
+          <th>Recall@100</th>
+          <th>HitRate@10</th>
+          <th>unique@100</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>cooc_norm</td>
+          <td class="best">0.475454</td>
+          <td class="best">0.490549</td>
+          <td class="best">0.590454</td>
+          <td class="best">0.679735</td>
+          <td>104,891</td>
+        </tr>
+        <tr>
+          <td>als_item_cosine</td>
+          <td>0.239089</td>
+          <td>0.256274</td>
+          <td>0.346168</td>
+          <td>0.399141</td>
+          <td class="best">244,517</td>
+        </tr>
+        <tr>
+          <td>hybrid_rule_als</td>
+          <td>0.406666</td>
+          <td>0.416087</td>
+          <td>0.476871</td>
+          <td>0.600967</td>
+          <td>244,473</td>
+        </tr>
+        <tr>
+          <td>item2vec_svd</td>
+          <td>0.201642</td>
+          <td>0.224912</td>
+          <td>0.358485</td>
+          <td>0.369313</td>
+          <td>57,572</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note">
+      item2vec_svd는 빠른 검증을 위해 user cap 200k로 돌린 결과라, 500k cap 조건의 cooc/ALS/hybrid와 완전히 동일 조건은 아니다.
+    </div>
+  </section>
+
+  <section>
+    <h2>왜 rule이 ML을 이겼나</h2>
+    <div class="grid">
+      <div class="panel">
+        <h3>1. 최종 목적은 graph 품질이 아님</h3>
+        <p>repo2repo NDCG가 높아도, 사용자별 후보 풀 안에서 LGBM이 score를 어떻게 해석하느냐가 최종 성능을 결정한다.</p>
+      </div>
+      <div class="panel">
+        <h3>2. slot/source 효과</h3>
+        <p>candidate_source_code, candidate_rank, source_rank가 강한 피쳐라서 같은 related라도 source distribution이 달라지면 랭킹 결과가 크게 바뀐다.</p>
+      </div>
+      <div class="panel">
+        <h3>3. embedding은 넓고 얕음</h3>
+        <p>ALS cosine은 unique@100이 가장 높다. 하지만 NDCG는 상위권 정답을 빨리 올려야 하므로 coverage만으로는 부족하다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>발표용 결론 문장</h2>
+    <div class="panel">
+      <p><strong>쉬운 버전:</strong> 이번 실험에서는 "이 repo를 본 사람은 저 repo도 봤다"는 단순한 연관 규칙을 추천 후보에 추가했을 때 개인화 추천 성능이 가장 좋아졌다. 반면 ALS, hybrid, item2vec 같은 ML 기반 연관 추천은 아직 룰 기반 방식을 넘지 못했다.</p>
+      <div class="formula">따라서 이번 성과는 "ML 연관 추천 도입 성공"이라기보다 "룰 기반 연관 후보와 관련 피쳐를 개인화 랭커에 넣은 효과"로 보는 것이 맞다.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>다음 실험 포인트</h2>
+    <table class="text">
+      <thead>
+        <tr>
+          <th>실험</th>
+          <th>목적</th>
+          <th>판정 기준</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>hybrid weight sweep</td>
+          <td>cooc 정밀도와 ALS coverage의 최적 가중치 찾기</td>
+          <td>NDCG@100, Recall@100, unique@100 동시 확인</td>
+        </tr>
+        <tr>
+          <td>full item2vec SGNS</td>
+          <td>SVD 근사가 아니라 negative sampling 기반 item embedding 검증</td>
+          <td>ALS cosine 대비 top-rank lift가 있는지</td>
+        </tr>
+        <tr>
+          <td>related 전용 피쳐 추가</td>
+          <td>score 이름 호환을 넘어서 algorithm id, normalized score, anchor count를 명시</td>
+          <td>ranker feature importance와 ablation</td>
+        </tr>
+        <tr>
+          <td>source quota tuning</td>
+          <td>related slot 80이 최적인지, ALS head/tail 비중과 trade-off 확인</td>
+          <td>rule 승리가 quota 때문인지 분리</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

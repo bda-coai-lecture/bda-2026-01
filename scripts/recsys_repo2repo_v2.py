@@ -25,6 +25,11 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import normalize
 
 try:
+    import faiss
+except Exception:  # pragma: no cover - exercised only in minimal envs.
+    faiss = None
+
+try:
     from implicit.als import AlternatingLeastSquares
 except Exception:  # pragma: no cover - exercised only in minimal envs.
     AlternatingLeastSquares = None
@@ -36,7 +41,7 @@ DEFAULT_CANONICAL = FEATURE_DIR / "canonical_retrieval_rerank_v2_week7_full_2026
 
 
 def parse_methods(value: str) -> list[str]:
-    allowed = {"cooc_norm", "als_item_cosine", "hybrid_rule_als"}
+    allowed = {"cooc_norm", "als_item_cosine", "hybrid_rule_als", "item2vec_svd"}
     methods = [part.strip() for part in value.split(",") if part.strip()]
     unknown = sorted(set(methods) - allowed)
     if unknown:
@@ -379,6 +384,40 @@ def top_cosine_rows(
 ) -> pd.DataFrame:
     item2idx = {int(rid): i for i, rid in enumerate(item_ids)}
     rows = []
+    if faiss is not None:
+        emb32 = np.ascontiguousarray(emb.astype("float32", copy=False))
+        index = faiss.IndexFlatIP(emb32.shape[1])
+        index.add(emb32)
+        for label_split, anchors in label_anchors.items():
+            valid = [anchor for anchor in sorted(anchors) if anchor in item2idx]
+            for start in range(0, len(valid), batch_size):
+                chunk = valid[start : start + batch_size]
+                idxs = np.array([item2idx[a] for a in chunk], dtype=np.int64)
+                scores, indices = index.search(emb32[idxs], min(top_k + 1, len(item_ids)))
+                for row_idx, anchor in enumerate(chunk):
+                    anchor_idx = item2idx[anchor]
+                    rank = 0
+                    for target_idx, score in zip(indices[row_idx], scores[row_idx], strict=False):
+                        if int(target_idx) < 0 or int(target_idx) == anchor_idx:
+                            continue
+                        rank += 1
+                        target = int(item_ids[int(target_idx)])
+                        rows.append(
+                            candidate_row(
+                                label_split,
+                                method,
+                                anchor,
+                                target,
+                                rank,
+                                float(score),
+                                np.nan,
+                                float(score),
+                            )
+                        )
+                        if rank >= top_k:
+                            break
+        return normalize_candidates(pd.DataFrame(rows))
+
     for label_split, anchors in label_anchors.items():
         valid = [anchor for anchor in sorted(anchors) if anchor in item2idx]
         for start in range(0, len(valid), batch_size):
@@ -402,6 +441,51 @@ def top_cosine_rows(
                     if rank >= top_k:
                         break
     return normalize_candidates(pd.DataFrame(rows))
+
+
+def item_embeddings_from_item2vec_svd(
+    context: pd.DataFrame,
+    factors: int,
+    max_items_per_user: int,
+    seed: int,
+) -> tuple[np.ndarray, np.ndarray, str]:
+    user_items = top_items_by_user(context, max_items_per_user)
+    item_ids = context["repo_id"].drop_duplicates().astype("int64").to_numpy()
+    item2idx = {int(iid): i for i, iid in enumerate(item_ids)}
+    unigram = np.zeros(len(item_ids), dtype=np.float32)
+    pair_counts: defaultdict[tuple[int, int], float] = defaultdict(float)
+    total_pairs = 0.0
+    for items_raw in user_items.values():
+        items = [item2idx[int(rid)] for rid in items_raw if int(rid) in item2idx]
+        if len(items) < 2:
+            continue
+        for idx in items:
+            unigram[idx] += 1.0
+        weight = 1.0 / max(1.0, len(items) - 1.0)
+        for i, left in enumerate(items):
+            for right in items[i + 1 :]:
+                if left == right:
+                    continue
+                pair_counts[(left, right)] += weight
+                pair_counts[(right, left)] += weight
+                total_pairs += 2.0 * weight
+    if not pair_counts:
+        raise RuntimeError("item2vec_svd needs at least one co-occurring item pair")
+
+    rows = np.fromiter((key[0] for key in pair_counts), dtype=np.int32)
+    cols = np.fromiter((key[1] for key in pair_counts), dtype=np.int32)
+    values = np.fromiter(pair_counts.values(), dtype=np.float32)
+    denom = np.maximum(unigram[rows] * unigram[cols], 1.0)
+    ppmi = np.log((values * max(total_pairs, 1.0)) / denom)
+    ppmi = np.maximum(ppmi, 0.0).astype(np.float32, copy=False)
+    keep = ppmi > 0
+    matrix = sparse.csr_matrix(
+        (ppmi[keep], (rows[keep], cols[keep])),
+        shape=(len(item_ids), len(item_ids)),
+    )
+    n_factors = max(2, min(factors, matrix.shape[0] - 1, matrix.shape[1] - 1))
+    emb = TruncatedSVD(n_components=n_factors, random_state=seed).fit_transform(matrix)
+    return item_ids, normalize(emb.astype(np.float32, copy=False)), "item2vec_ppmi_svd"
 
 
 def candidate_row(
@@ -676,7 +760,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--export-mart-path", type=Path, default=None)
     parser.add_argument(
         "--export-mart-run",
-        choices=("hybrid_rule_als", "cooc_norm", "als_item_cosine"),
+        choices=("hybrid_rule_als", "cooc_norm", "als_item_cosine", "item2vec_svd"),
         default="hybrid_rule_als",
     )
     parser.add_argument(
@@ -787,6 +871,34 @@ def main() -> None:
 
     if "hybrid_rule_als" in args.methods:
         candidates_by_run.append(build_hybrid(cooc, als, args.top_k, args.hybrid_cooc_weight))
+
+    if "item2vec_svd" in args.methods:
+        item2vec_parts = []
+        for split, anchors in label_anchors.items():
+            if not anchors:
+                continue
+            item_ids, emb, backend = item_embeddings_from_item2vec_svd(
+                contexts[split],
+                factors=args.als_factors,
+                max_items_per_user=args.max_cooc_items_per_user,
+                seed=args.random_seed,
+            )
+            embedding_backend[f"item2vec_svd_{split}"] = backend
+            item2vec_parts.append(
+                top_cosine_rows(
+                    item_ids,
+                    emb,
+                    {split: anchors},
+                    method="item2vec_svd",
+                    top_k=args.top_k,
+                    batch_size=args.cosine_batch_size,
+                )
+            )
+        candidates_by_run.append(
+            normalize_candidates(
+                pd.concat(item2vec_parts, ignore_index=True) if item2vec_parts else pd.DataFrame()
+            )
+        )
 
     candidates = normalize_candidates(pd.concat(candidates_by_run, ignore_index=True))
     candidate_paths = write_candidate_files(candidates, args.suffix)
