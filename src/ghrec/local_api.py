@@ -132,20 +132,25 @@ def _metadata_by_repo_id() -> dict[int, dict[str, Any]]:
     try:
         rows = conn.execute(
             """
-            SELECT repo_id, repo_name, description, language, stargazers, forks, topics
+            SELECT repo_id, repo_name, description, language, stargazers, forks, topics, fetched_at, http_status
             FROM repo_metadata
-            WHERE http_status = 200
             """
         ).fetchall()
         return {
             int(row["repo_id"]): {
                 "repo_id": int(row["repo_id"]),
                 "full_name": row["repo_name"],
-                "description": row["description"],
-                "language": row["language"],
-                "stars": row["stargazers"],
-                "forks": row["forks"],
-                "topics": _parse_topics(row["topics"]),
+                "description": row["description"] if int(row["http_status"] or 0) == 200 else None,
+                "language": row["language"] if int(row["http_status"] or 0) == 200 else None,
+                "stars": row["stargazers"] if int(row["http_status"] or 0) == 200 else None,
+                "forks": row["forks"] if int(row["http_status"] or 0) == 200 else None,
+                "topics": _parse_topics(row["topics"]) if int(row["http_status"] or 0) == 200 else [],
+                "cache": {
+                    "source": "repo_metadata.sqlite",
+                    "status": "cached" if int(row["http_status"] or 0) == 200 else "unavailable",
+                    "fetched_at": row["fetched_at"],
+                    "http_status": row["http_status"],
+                },
             }
             for row in rows
         }
@@ -199,6 +204,13 @@ def _repo_meta(repo_id: int) -> dict[str, Any]:
             "stars": meta.get("stars"),
             "forks": meta.get("forks"),
             "topics": meta.get("topics") or [],
+            "cache": meta.get("cache")
+            or {
+                "source": "repo_metadata.sqlite",
+                "status": "missing",
+                "fetched_at": None,
+                "http_status": None,
+            },
         }
     )
     return meta

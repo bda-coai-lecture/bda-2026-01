@@ -29,6 +29,12 @@ type RepoItem = {
   candidate_source?: string | null;
   growth_ratio?: number | null;
   cooc_users?: number | null;
+  cache?: {
+    source?: string | null;
+    status?: string | null;
+    fetched_at?: string | null;
+    http_status?: number | null;
+  };
 };
 
 type ApiPayload = {
@@ -61,6 +67,18 @@ function formatScore(value?: number | null) {
   if (value === null || value === undefined) return "-";
   if (Math.abs(value) >= 100) return value.toFixed(1);
   return value.toFixed(4);
+}
+
+function formatCacheTime(value?: string | null) {
+  if (!value) return "not cached";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 async function fetchJson(path: string): Promise<ApiPayload> {
@@ -109,6 +127,7 @@ function RepoTable({ items, mode }: { items: RepoItem[]; mode: Tab }) {
             <th>Repository</th>
             <th>Language</th>
             <th>Stars</th>
+            <th>Cache</th>
             <th>
               <span className="thWithInfo">
                 Score
@@ -144,6 +163,23 @@ function RepoTable({ items, mode }: { items: RepoItem[]; mode: Tab }) {
                   <Star size={14} aria-hidden />
                   {compactNumber(item.stars)}
                 </span>
+              </td>
+              <td>
+                <div className="cacheCell">
+                  <span
+                    className={[
+                      "cacheBadge",
+                      item.cache?.status === "cached" ? "cached" : "",
+                      item.cache?.status === "unavailable" ? "unavailable" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {item.cache?.status || "missing"}
+                  </span>
+                  <span>{formatCacheTime(item.cache?.fetched_at)}</span>
+                  {item.cache?.http_status ? <span>HTTP {item.cache.http_status}</span> : null}
+                </div>
               </td>
               <td className="score">
                 <span className="scoreValue">

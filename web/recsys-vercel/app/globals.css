@@ -260,7 +260,7 @@ label:nth-last-of-type(1) input {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 980px;
 }
 
 th,
@@ -340,6 +340,38 @@ tbody tr:last-child td {
 .score {
   font-variant-numeric: tabular-nums;
   font-weight: 720;
+}
+
+.cacheCell {
+  display: grid;
+  gap: 4px;
+  min-width: 118px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.cacheBadge {
+  width: fit-content;
+  border: 1px solid #d5d8ce;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #f7f7f4;
+  color: var(--muted);
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.cacheBadge.cached {
+  border-color: #a7c7b0;
+  background: var(--soft);
+  color: var(--accent-dark);
+}
+
+.cacheBadge.unavailable {
+  border-color: #e5c58f;
+  background: #fff4df;
+  color: var(--warn);
 }
 
 .thWithInfo,

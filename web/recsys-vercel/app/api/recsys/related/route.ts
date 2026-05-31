@@ -26,8 +26,8 @@ export async function GET(request: Request) {
   }
   return proxyJson(upstream, undefined, {
     cacheKey: `related:${owner.toLowerCase()}/${repo.toLowerCase()}:${limit}`,
-    cacheControl: "public, s-maxage=3600, stale-while-revalidate=604800",
-    freshTtlMs: 60 * 60 * 1000,
+    cacheControl: "public, s-maxage=300, stale-while-revalidate=86400",
+    freshTtlMs: 5 * 60 * 1000,
     staleTtlMs: 7 * 24 * 60 * 60 * 1000,
   });
 }

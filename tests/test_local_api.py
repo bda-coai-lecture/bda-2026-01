@@ -104,6 +104,7 @@ def test_user_recommendations_enrich_repo_metadata(monkeypatch: pytest.MonkeyPat
     assert payload["metadata"]["cold_start"] is False
     assert payload["items"][0]["full_name"] == "owner/repo"
     assert payload["items"][0]["candidate_source"] == "related_source"
+    assert payload["items"][0]["cache"]["status"] == "missing"
 
 
 def test_related_by_owner_repo_uses_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -135,3 +136,29 @@ def test_related_by_owner_repo_uses_lookup(monkeypatch: pytest.MonkeyPatch) -> N
     assert payload["anchor"]["full_name"] == "owner/anchor"
     assert payload["items"][0]["full_name"] == "owner/related"
     assert payload["items"][0]["source"] == "repo2repo_cooccurrence"
+
+
+def test_repo_meta_marks_non_200_cache_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        local_api,
+        "_metadata_by_repo_id",
+        lambda: {
+            1: {
+                "repo_id": 1,
+                "full_name": "owner/deleted",
+                "cache": {
+                    "source": "repo_metadata.sqlite",
+                    "status": "unavailable",
+                    "fetched_at": "2026-05-31T00:00:00+00:00",
+                    "http_status": 404,
+                },
+            }
+        },
+    )
+    monkeypatch.setattr(local_api, "_name_lookup_by_repo_id", lambda: {})
+
+    item = local_api._repo_meta(1)
+
+    assert item["full_name"] == "owner/deleted"
+    assert item["cache"]["status"] == "unavailable"
+    assert item["cache"]["http_status"] == 404

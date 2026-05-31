@@ -7,7 +7,7 @@
 - Source directory: `web/recsys-vercel`
 - Local API app: `ghrec.local_api:app`
 - Local API port: `127.0.0.1:8001`
-- Temporary API tunnel at time of setup: `https://heat-pamela-snake-fighter.trycloudflare.com`
+- Temporary API tunnel at time of latest recovery: `https://boulder-explicit-draws-revised.trycloudflare.com`
 
 The tunnel URL is a Cloudflare quick tunnel URL. It changes when the tunnel process is restarted.
 
@@ -59,6 +59,17 @@ cloudflared tunnel --url http://127.0.0.1:8001
 ```
 
 Copy the generated `https://*.trycloudflare.com` URL. Keep this process running; if it exits, Vercel still loads but recommendation calls fail.
+
+For a session-independent local recovery, use the LaunchAgents created on this Mac:
+
+```bash
+launchctl print gui/$(id -u)/com.kakao.ghrec-local-api
+launchctl print gui/$(id -u)/com.kakao.ghrec-cloudflared
+tail -f /Users/kakao/bda-2/logs/recsys-local-api.log
+tail -f /Users/kakao/bda-2/logs/recsys-cloudflared.err.log
+```
+
+The plist files live under `~/Library/LaunchAgents/`. The cloudflared quick tunnel URL is still temporary; if the tunnel restarts and emits a new URL, update `NEXT_PUBLIC_RECSYS_API_BASE_URL` in Vercel and redeploy.
 
 ## Vercel Deploy
 
