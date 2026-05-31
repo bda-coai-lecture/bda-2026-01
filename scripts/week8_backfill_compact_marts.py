@@ -109,16 +109,29 @@ def iter_dates(start: date, end: date) -> list[date]:
 
 def load_dataframe_table(client: bigquery.Client, table_id: str, df: pd.DataFrame) -> None:
     temp_table_id = f"{table_id}__load_{uuid.uuid4().hex}"
+    table_name = table_id.rsplit(".", 1)[-1]
     job_config = bigquery.LoadJobConfig(
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
     )
-    client.load_table_from_dataframe(df, temp_table_id, job_config=job_config).result()
+    load_job = client.load_table_from_dataframe(
+        df,
+        temp_table_id,
+        job_config=job_config,
+        job_id_prefix=f"{table_name}_load_{uuid.uuid4().hex}_",
+    )
+    load_job.result()
     try:
         client.delete_table(table_id, not_found_ok=True)
         copy_config = bigquery.CopyJobConfig(
             write_disposition=bigquery.WriteDisposition.WRITE_EMPTY,
         )
-        client.copy_table(temp_table_id, table_id, job_config=copy_config).result()
+        copy_job = client.copy_table(
+            temp_table_id,
+            table_id,
+            job_config=copy_config,
+            job_id_prefix=f"{table_name}_copy_{uuid.uuid4().hex}_",
+        )
+        copy_job.result()
     finally:
         client.delete_table(temp_table_id, not_found_ok=True)
 

@@ -225,18 +225,16 @@ uv run --with dbt-bigquery dbt build \
 ## 스크립트
 
 ```bash
-# 최근 35일 parquet에서 aggregate metric만 BigQuery에 업로드
+# BigQuery public GitHub Archive에서 rolling fact를 mart dataset에 적재
 GCP_KEY_PATH=/path/to/gcp-key.json \
 uv run python scripts/sync_bq_metrics.py \
   --project bda-coai \
   --dataset mart \
-  --parquet-dir data/daily_agg \
-  --start 2026-04-12 \
-  --end 2026-05-16 \
-  --max-days 35 \
-  --mode replace-all \
-  --skip-fact \
-  --build-metrics
+  --source bigquery \
+  --start 2026-03-02 \
+  --end 2026-05-30 \
+  --max-days 90 \
+  --mode replace-days
 
 # repo metadata cache 갱신
 uv run python scripts/refresh_repo_metadata.py \
@@ -265,17 +263,21 @@ uv run python scripts/week6_neural_rankers.py \
 OMP_NUM_THREADS=1 uv run python scripts/train_two_tower_week6_full_v2.py
 ```
 
+Vercel 프론트 + 로컬 추천 API 운영 메모: [`docs/recsys_vercel_local_backend.md`](docs/recsys_vercel_local_backend.md)
+
 ## 데이터
 
 | 파일 | 설명 |
 |---|---|
-| `data/daily_agg/*.parquet` | BigQuery 일별 집계 (20260101~20260516, 136일) |
-| `data/repo_metadata.db` | GitHub 메타데이터 SQLite 캐시 |
-| `data/models/als_twostage.pkl` | ALS 모델 (64 factors) |
-| `data/models/lgbm_ranker.txt` | LGBM LambdaRank re-rank model |
-| `data/models/two_tower.pt` | Two-Tower PyTorch 모델 |
-| `data/models/index_mappings.pkl` | user/item index 매핑 |
-| `data/models/repo_name_map.pkl` | repo_id → repo_name (11.8M) |
+| `bda-coai.mart.fact_user_repo_activity` | BigQuery rolling fact (현재 2025-05-01~2026-05-30) |
+| `bda-coai.mart.metrics_*` | Metabase/dbt dashboard용 BigQuery mart |
+| `data/marts/week6/*.parquet` | 추천 실험 고정 split/feature mart |
+| `data/features/week6/ranker_features_airflow_20260516*` | Airflow 추천 feature drift 기준 산출물 |
+| `data/features/recsys_v2/*` | V2 추천 후보/학습 feature 산출물 |
+| `data/models/recsys_v2/*` | V2 promoted bundle 모델 |
+| `data/models/week6/trendy_repos_latest.parquet` | 로컬 추천 API trending 응답 |
+| `data/models/week6/item2item_related_latest.parquet` | 로컬 추천 API related 응답 |
+| `data/repo_metadata.db`, `data/repo_name_lookup.db` | 로컬 추천 API 메타데이터 캐시 |
 
 ## 주요 의존성
 

@@ -14,6 +14,7 @@ import os
 import pickle
 import sqlite3
 import tempfile
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -647,7 +648,13 @@ def upload_sqlite_metadata_to_bq(
         schema=schema,
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
     )
-    client.load_table_from_dataframe(df, metadata_table_id, job_config=job_config).result()
+    job = client.load_table_from_dataframe(
+        df,
+        metadata_table_id,
+        job_config=job_config,
+        job_id_prefix=f"repo_metadata_load_{uuid.uuid4().hex}_",
+    )
+    job.result()
     table = client.get_table(metadata_table_id)
     table.expires = None
     try:

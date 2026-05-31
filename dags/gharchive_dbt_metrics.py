@@ -8,15 +8,17 @@ from zoneinfo import ZoneInfo
 from airflow import DAG
 from airflow.providers.standard.operators.bash import BashOperator
 
+from utils.slack_alert import notify_failure
+
 PROJECT_DIR = os.environ.get("BDA_PROJECT_DIR", "/opt/airflow/project")
 if not Path(PROJECT_DIR).exists():
     PROJECT_DIR = str(Path(__file__).resolve().parents[1])
 LOCAL_TZ = ZoneInfo("Asia/Seoul")
 
-# The 00:30 KST run is 15:30 UTC on the previous calendar day.  GitHub Archive
-# daily tables are usually ready through UTC yesterday at that point.
-WINDOW_START = "$(date -u -d '90 days ago' +%F)"
-WINDOW_END = "$(date -u -d 'yesterday' +%F)"
+# Evaluate the rolling window in KST. At 00:30 KST, `date -u ... yesterday`
+# would point two local calendar days back, leaving the newest ready shard out.
+WINDOW_START = "$(TZ=Asia/Seoul date -d '90 days ago' +%F)"
+WINDOW_END = "$(TZ=Asia/Seoul date -d 'yesterday' +%F)"
 MAX_DAYS = 90
 
 UV_BASE = (
@@ -45,9 +47,29 @@ PLAN_FACT_COMMAND = (
 SYNC_FACT_COMMAND = PLAN_FACT_COMMAND.removesuffix(" --plan-only") + " --no-summary"
 
 DBT_BUILD_COMMAND = (
+    "RAW_START_DATE=\""
+    + WINDOW_START
+    + "\" RAW_END_DATE=\""
+    + WINDOW_END
+    + "\" "
     "dbt build "
     "--project-dir dbt/gharchive_metrics "
-    "--profiles-dir dbt/profiles"
+    "--profiles-dir dbt/profiles "
+    "--vars \"{raw_start_date: '$RAW_START_DATE', raw_end_date: '$RAW_END_DATE'}\""
+)
+
+# Warn-only input-drift check on the latest BigQuery fact partition. Always exits
+# 0; a breach posts a Slack warning but does not fail the task.
+DRIFT_DETECT_COMMAND = (
+    "uv run --no-project "
+    "--with pandas --with pyarrow --with numpy "
+    "--with google-cloud-bigquery --with db-dtypes "
+    "python scripts/drift_detect_platform.py "
+    "--source bigquery "
+    "--project bda-coai "
+    "--dataset mart "
+    "--fact-table fact_user_repo_activity "
+    "--slack"
 )
 
 default_env = {
@@ -65,6 +87,7 @@ default_env = {
 default_args = {
     "retries": 1,
     "retry_delay": timedelta(minutes=5),
+    "on_failure_callback": notify_failure,
 }
 
 fact_task_defaults = {
@@ -93,7 +116,7 @@ with DAG(
     sync_fact = BashOperator(
         task_id="sync_fact",
         bash_command=SYNC_FACT_COMMAND,
-        execution_timeout=timedelta(minutes=45),
+        execution_timeout=timedelta(hours=3),
         **fact_task_defaults,
     )
 
@@ -104,4 +127,11 @@ with DAG(
         **fact_task_defaults,
     )
 
-    plan_fact_sync >> sync_fact >> build_dbt_metrics
+    detect_metric_drift = BashOperator(
+        task_id="detect_metric_drift",
+        bash_command=DRIFT_DETECT_COMMAND,
+        execution_timeout=timedelta(minutes=15),
+        **fact_task_defaults,
+    )
+
+    plan_fact_sync >> sync_fact >> build_dbt_metrics >> detect_metric_drift

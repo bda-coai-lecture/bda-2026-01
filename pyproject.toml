@@ -28,6 +28,9 @@ dependencies = [
     "uvicorn>=0.46.0",
 ]
 
+[project.scripts]
+ghrec-local-api = "ghrec.local_api:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -6,15 +6,17 @@ from zoneinfo import ZoneInfo
 from airflow import DAG
 from airflow.providers.standard.operators.bash import BashOperator
 
+from utils.slack_alert import notify_failure
+
 PROJECT_DIR = "/opt/airflow/project"
 LOCAL_TZ = ZoneInfo("Asia/Seoul")
 BDA_PYTHON = "/home/airflow/bda_venv/bin/python"
 
-# The 01:30 KST run is 16:30 UTC on the previous calendar day.  GitHub Archive
-# daily tables are usually ready through UTC yesterday at that point.
+# Evaluate the rolling window in KST. These DAGs are scheduled in KST, and UTC
+# `yesterday` is one local day too old around the early-morning runs.
 BACKFILL_START = "2025-09-01"
-WINDOW_START = "$(date -u -d '90 days ago' +%F)"
-WINDOW_END = "$(date -u -d 'yesterday' +%F)"
+WINDOW_START = "$(TZ=Asia/Seoul date -d '90 days ago' +%F)"
+WINDOW_END = "$(TZ=Asia/Seoul date -d 'yesterday' +%F)"
 MAX_DAYS = 90
 METADATA_WINDOW_START = WINDOW_START
 METADATA_WINDOW_END = WINDOW_END
@@ -73,13 +75,14 @@ default_env = {
 default_args = {
     "retries": 1,
     "retry_delay": timedelta(minutes=5),
+    "on_failure_callback": notify_failure,
 }
 
 metadata_task_defaults = {
     "cwd": PROJECT_DIR,
     "env": default_env,
     "append_env": True,
-    "execution_timeout": timedelta(minutes=30),
+    "execution_timeout": timedelta(hours=1),
 }
 
 metrics_task_defaults = {
@@ -124,7 +127,7 @@ with DAG(
     sync_metrics = BashOperator(
         task_id="sync_metrics",
         bash_command=SYNC_METRICS_COMMAND,
-        execution_timeout=timedelta(minutes=45),
+        execution_timeout=timedelta(hours=2),
         **metrics_task_defaults,
     )
 

@@ -8,6 +8,8 @@ from zoneinfo import ZoneInfo
 from airflow import DAG
 from airflow.providers.standard.operators.bash import BashOperator
 
+from utils.slack_alert import notify_failure
+
 
 PROJECT_DIR = os.environ.get("BDA_PROJECT_DIR", "/opt/airflow/project")
 if not Path(PROJECT_DIR).exists():
@@ -111,6 +113,17 @@ BUILD_FEATURES_COMMAND = (
     "--parquet-batch-rows 50000"
 )
 
+# Warn-only train/serve feature-skew check: score the freshly built ranker
+# feature parquet against the blessed reference vintage. Thresholds are a
+# bootstrap noise floor (scripts/drift_calibrate_recsys.py). Always exits 0.
+DETECT_DRIFT_COMMAND = (
+    "uv run --no-project "
+    "--with pandas --with pyarrow --with numpy "
+    "python scripts/drift_detect_recsys.py --slack "
+    f"--parquet {FEATURE_PARQUET} "
+    f"--summary {FEATURE_SUMMARY}"
+)
+
 default_env = {
     "PATH": "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin",
     "PYTHONPATH": "/opt/airflow/project/src:/opt/airflow/project/scripts",
@@ -122,6 +135,7 @@ default_env = {
 default_args = {
     "retries": 1,
     "retry_delay": timedelta(minutes=5),
+    "on_failure_callback": notify_failure,
 }
 
 task_defaults = {
@@ -161,4 +175,11 @@ with DAG(
         **task_defaults,
     )
 
-    build_recsys_marts >> check_recsys_marts >> build_ranker_features
+    detect_feature_drift = BashOperator(
+        task_id="detect_feature_drift",
+        bash_command=DETECT_DRIFT_COMMAND,
+        execution_timeout=timedelta(minutes=15),
+        **task_defaults,
+    )
+
+    build_recsys_marts >> check_recsys_marts >> build_ranker_features >> detect_feature_drift

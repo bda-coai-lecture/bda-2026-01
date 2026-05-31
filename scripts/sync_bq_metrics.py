@@ -14,6 +14,7 @@ import json
 import os
 import re
 import sqlite3
+import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -245,7 +246,13 @@ def load_one_day(
         ],
         write_disposition=write_disposition or bigquery.WriteDisposition.WRITE_APPEND,
     )
-    client.load_table_from_dataframe(df, names.fact_id, job_config=load_config).result()
+    job = client.load_table_from_dataframe(
+        df,
+        names.fact_id,
+        job_config=load_config,
+        job_id_prefix=f"{names.fact}_local_load_{activity_date:%Y%m%d}_{uuid.uuid4().hex}_",
+    )
+    job.result()
     print(f"LOADED {activity_date} rows={len(df):,}")
     return len(df)
 
@@ -1044,7 +1051,14 @@ def load_dataframe_table(client: bigquery.Client, table_id: str, df: pd.DataFram
     job_config = bigquery.LoadJobConfig(
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
     )
-    client.load_table_from_dataframe(df, table_id, job_config=job_config).result()
+    table_name = table_id.rsplit(".", 1)[-1]
+    job = client.load_table_from_dataframe(
+        df,
+        table_id,
+        job_config=job_config,
+        job_id_prefix=f"{table_name}_replace_{uuid.uuid4().hex}_",
+    )
+    job.result()
 
 
 def duckdb_parquet_source(files: list[Path]) -> str:
