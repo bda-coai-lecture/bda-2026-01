@@ -77,3 +77,21 @@ def notify_drift(layer: str, report: dict) -> None:
             f"≥ {f['status']}=`{thr:.4f}`"
         )
     _post("\n".join(lines))
+
+
+def notify_cost_guard(report: dict) -> None:
+    mention = f"<@{MENTION_USER}> " if MENTION_USER else ""
+    lines = [
+        f":money_with_wings: {mention}*BigQuery 비용 가드 초과*",
+        f"*Project*: `{report.get('project', '?')}`",
+        f"*Window*: last `{report.get('lookback_hours', '?')}` hours",
+        f"*Estimated*: `${report.get('estimated_usd', 0):.2f}` "
+        f"> limit `${report.get('max_usd', 0):.2f}`",
+        f"*Jobs*: `{report.get('jobs', 0)}`",
+    ]
+    for item in report.get("top_sources", [])[:5]:
+        lines.append(
+            f"• `{item.get('source_guess', '?')}` "
+            f"${item.get('estimated_usd', 0):.2f} / jobs={item.get('jobs', 0)}"
+        )
+    _post("\n".join(lines))
