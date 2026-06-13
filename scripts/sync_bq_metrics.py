@@ -172,6 +172,12 @@ def ensure_fact_table(client: bigquery.Client, names: TableNames) -> None:
     table.clustering_fields = ["action", "repo_id"]
     client.create_table(table, exists_ok=True)
     table = client.get_table(names.fact_id)
+    partition_field = table.time_partitioning.field if table.time_partitioning else None
+    if partition_field != "activity_date":
+        raise RuntimeError(
+            f"{names.fact_id} must be partitioned by activity_date before incremental sync. "
+            "Run replace-all or backfill_fact_user_repo_activity_bq.py during a maintenance window."
+        )
     table.expires = None
     try:
         client.update_table(table, ["expires"])
@@ -200,6 +206,7 @@ def load_one_day(
     names: TableNames,
     path: Path,
     mode: str,
+    max_delete_bytes_billed: int,
     write_disposition: str | None = None,
 ) -> int:
     activity_date = parse_day(path)
@@ -230,6 +237,7 @@ def load_one_day(
     if mode == "replace-days":
         delete_sql = f"DELETE FROM `{names.fact_id}` WHERE activity_date = @activity_date"
         job_config = bigquery.QueryJobConfig(
+            maximum_bytes_billed=max_delete_bytes_billed,
             query_parameters=[
                 bigquery.ScalarQueryParameter("activity_date", "DATE", activity_date)
             ]
@@ -262,6 +270,7 @@ def load_one_day_from_public_bigquery(
     names: TableNames,
     activity_date: date,
     mode: str,
+    max_delete_bytes_billed: int,
 ) -> int:
     if mode == "skip-existing" and partition_exists(client, names, activity_date):
         print(f"SKIP {activity_date} already exists")
@@ -270,6 +279,7 @@ def load_one_day_from_public_bigquery(
     if mode == "replace-days":
         delete_sql = f"DELETE FROM `{names.fact_id}` WHERE activity_date = @activity_date"
         job_config = bigquery.QueryJobConfig(
+            maximum_bytes_billed=max_delete_bytes_billed,
             query_parameters=[
                 bigquery.ScalarQueryParameter("activity_date", "DATE", activity_date)
             ]
@@ -1615,6 +1625,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-summary", action="store_false", dest="summary")
     parser.add_argument("--plan-only", action="store_true")
     parser.add_argument("--max-days", type=int, default=DEFAULT_MAX_DAYS)
+    parser.add_argument(
+        "--max-delete-bytes-billed-gib",
+        type=float,
+        default=1.0,
+        help="Safety cap for each replace-days DELETE. Partitioned deletes should stay below this.",
+    )
     parser.add_argument("--allow-full-history", action="store_true")
     return parser.parse_args()
 
@@ -1648,6 +1664,7 @@ def main() -> None:
         return
 
     client = make_client(args.project, args.key_path)
+    max_delete_bytes_billed = int(args.max_delete_bytes_billed_gib * 1024**3)
 
     ensure_dataset(client, names, args.location)
     if args.skip_fact:
@@ -1670,7 +1687,14 @@ def main() -> None:
                         if index == 0
                         else bigquery.WriteDisposition.WRITE_APPEND
                     )
-                total_rows += load_one_day(client, names, path, load_mode, write_disposition)
+                total_rows += load_one_day(
+                    client,
+                    names,
+                    path,
+                    load_mode,
+                    max_delete_bytes_billed,
+                    write_disposition,
+                )
         else:
             load_mode = "append" if args.mode == "replace-all" else args.mode
             for activity_date in days:
@@ -1679,6 +1703,7 @@ def main() -> None:
                     names,
                     activity_date,
                     load_mode,
+                    max_delete_bytes_billed,
                 )
         print(f"SYNCED rows={total_rows:,}")
 

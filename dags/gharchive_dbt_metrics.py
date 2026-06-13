@@ -17,9 +17,11 @@ LOCAL_TZ = ZoneInfo("Asia/Seoul")
 
 # Evaluate the rolling window in KST. At 00:30 KST, `date -u ... yesterday`
 # would point two local calendar days back, leaving the newest ready shard out.
-WINDOW_START = "$(TZ=Asia/Seoul date -d '90 days ago' +%F)"
+# Refresh only the newest partitions daily. Wider historical backfills should be
+# explicit maintenance jobs because BigQuery public table scans are billed.
+WINDOW_START = "$(TZ=Asia/Seoul date -d '3 days ago' +%F)"
 WINDOW_END = "$(TZ=Asia/Seoul date -d 'yesterday' +%F)"
-MAX_DAYS = 90
+MAX_DAYS = 7
 
 UV_BASE = (
     "uv run --no-project "
@@ -47,15 +49,8 @@ PLAN_FACT_COMMAND = (
 SYNC_FACT_COMMAND = PLAN_FACT_COMMAND.removesuffix(" --plan-only") + " --no-summary"
 
 DBT_BUILD_COMMAND = (
-    "RAW_START_DATE=\""
-    + WINDOW_START
-    + "\" RAW_END_DATE=\""
-    + WINDOW_END
-    + "\" "
-    "dbt build "
-    "--project-dir dbt/gharchive_metrics "
-    "--profiles-dir dbt/profiles "
-    "--vars \"{raw_start_date: '$RAW_START_DATE', raw_end_date: '$RAW_END_DATE'}\""
+    "echo 'Skipping daily dbt mart rebuild to control BigQuery scan cost. "
+    "Run dbt build manually when lecture/demo marts need a refresh.'"
 )
 
 # Warn-only input-drift check on the latest BigQuery fact partition. Always exits
@@ -69,6 +64,17 @@ DRIFT_DETECT_COMMAND = (
     "--project bda-coai "
     "--dataset mart "
     "--fact-table fact_user_repo_activity "
+    "--slack"
+)
+
+COST_GUARD_COMMAND = (
+    "uv run --no-project "
+    "--with google-cloud-bigquery "
+    "python scripts/check_bigquery_cost_guard.py "
+    "--project bda-coai "
+    "--location US "
+    "--lookback-hours 2 "
+    "--max-usd 1 "
     "--slack"
 )
 
@@ -134,4 +140,11 @@ with DAG(
         **fact_task_defaults,
     )
 
-    plan_fact_sync >> sync_fact >> build_dbt_metrics >> detect_metric_drift
+    check_bigquery_cost = BashOperator(
+        task_id="check_bigquery_cost",
+        bash_command=COST_GUARD_COMMAND,
+        execution_timeout=timedelta(minutes=5),
+        **fact_task_defaults,
+    )
+
+    plan_fact_sync >> sync_fact >> build_dbt_metrics >> detect_metric_drift >> check_bigquery_cost
