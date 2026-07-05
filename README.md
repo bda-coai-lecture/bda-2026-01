@@ -127,7 +127,7 @@ bda-2/
 | 06 | embedding_exploration | ALS/BPR 임베딩 탐색, 케이스 스터디 | 유사 repo, t-SNE |
 | **07** | **two_stage** | **ALS retrieval + LGBM re-rank** | **NDCG@10 +28% vs ALS** |
 | **08** | **faiss_benchmark** | **FAISS ANN 벤치마크** | **54ms → 3ms (17x)** |
-| **09** | **two_tower** | **Two-Tower (PyTorch) vs ALS** | **NDCG@50 2.7x vs ALS** |
+| **09** | **two_tower** | **Two-Tower (PyTorch) vs ALS** | **정확도는 ALS 우세, 다양성은 Two-Tower 우세** |
 
 ## Two-Stage 추천 구조
 
@@ -147,12 +147,14 @@ bda-2/
 | ALS | 0.00117 | 0.00164 | 0.00178 |
 | **Two-Stage** | **0.00150** | **0.00206** | **0.00220** |
 
-### Retrieval 모델 비교 (5% sample)
+### Retrieval 모델 비교 (2026-05-16 mart, warm users)
 
-| Model | K=50 NDCG | 특징 |
-|---|---|---|
-| ALS | 0.00013 | interaction only |
-| **Two-Tower** | **0.00035** | + language, stars, forks |
+| Model | K=10 NDCG | K=50 NDCG | K=100 NDCG | Unique@100 | 특징 |
+|---|---:|---:|---:|---:|---|
+| ALS | 0.009135 | 0.011912 | 0.013327 | 7,136 | interaction-only collaborative baseline |
+| Two-Tower | 0.003513 | 0.005231 | 0.006745 | 70,537 | user/repo side feature 기반 다양성 보강 |
+
+Two-Tower는 현재 ALS 대체재라기보다 candidate source를 넓히는 retrieval 보강재로 해석한다.
 
 ### FAISS 서빙 속도
 

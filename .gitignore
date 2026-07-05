@@ -21,6 +21,8 @@ mlruns/
 mlartifacts/
 mlflow.db
 .env
+metabase.db*
+metabase-h2-backup-*/
 
 # dbt artifacts
 dbt/**/target/
