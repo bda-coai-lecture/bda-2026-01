@@ -1,0 +1,873 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>중간복습</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef2f5;
+        --paper: #ffffff;
+        --ink: #172033;
+        --muted: #64748b;
+        --line: #d6dee8;
+        --soft: #f4f7fa;
+        --raw: #475569;
+        --bq: #2563eb;
+        --model: #0f766e;
+        --quality: #b45309;
+        --auto: #6d28d9;
+        --bi: #15803d;
+        --ops: #b91c1c;
+      }
+
+      * {
+        box-sizing: border-box;
+        min-width: 0;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+        letter-spacing: 0;
+      }
+
+      .deck {
+        width: min(1440px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 22px 0 72px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 12px 0;
+        background: linear-gradient(var(--bg) 72%, rgb(238 242 245 / 0));
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        background: var(--model);
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      button {
+        display: inline-grid;
+        place-items: center;
+        width: 38px;
+        height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #fff;
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: var(--model);
+      }
+
+      .counter {
+        min-width: 96px;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+
+      .slide {
+        display: grid;
+        min-height: 760px;
+        margin: 18px 0 34px;
+        padding: 48px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        box-shadow: 0 18px 42px rgb(15 23 42 / 0.08);
+        scroll-margin-top: 74px;
+      }
+
+      .slide.title {
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        gap: 34px;
+        align-items: center;
+      }
+
+      .slide.split {
+        grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+        gap: 34px;
+      }
+
+      .slide.center {
+        place-items: center;
+        text-align: center;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--model);
+        font-size: 13px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        line-height: 1.05;
+        font-weight: 900;
+      }
+
+      h1 {
+        font-size: clamp(52px, 7vw, 96px);
+      }
+
+      h2 {
+        font-size: clamp(36px, 4.6vw, 68px);
+      }
+
+      .subtitle {
+        max-width: 900px;
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 23px;
+        line-height: 1.45;
+      }
+
+      .number {
+        color: var(--model);
+        font-size: clamp(88px, 13vw, 170px);
+        line-height: 0.9;
+        font-weight: 950;
+      }
+
+      .tagline {
+        margin-top: 24px;
+        padding: 18px 20px;
+        border-left: 5px solid var(--model);
+        border-radius: 8px;
+        background: #f0fdfa;
+        font-size: 22px;
+        font-weight: 800;
+      }
+
+      .bullets {
+        display: grid;
+        gap: 15px;
+        margin: 28px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .bullets li {
+        position: relative;
+        padding-left: 28px;
+        color: var(--ink);
+        font-size: 24px;
+        line-height: 1.42;
+      }
+
+      .bullets li::before {
+        content: "";
+        position: absolute;
+        top: 0.76em;
+        left: 0;
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        background: var(--model);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .card {
+        min-height: 136px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+      }
+
+      .card strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 19px;
+      }
+
+      .card span {
+        color: var(--muted);
+        font-size: 16px;
+      }
+
+      .map {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .map-step {
+        min-height: 126px;
+        padding: 17px;
+        border: 2px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .map-step b {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 19px;
+      }
+
+      .map-step span {
+        color: var(--muted);
+        font-size: 16px;
+      }
+
+      .raw { border-color: var(--raw); }
+      .bq { border-color: var(--bq); }
+      .model { border-color: var(--model); }
+      .quality { border-color: var(--quality); }
+      .auto { border-color: var(--auto); }
+      .bi { border-color: var(--bi); }
+      .ops { border-color: var(--ops); }
+
+      .matrix {
+        width: 100%;
+        margin-top: 28px;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 18px;
+      }
+
+      .matrix th,
+      .matrix td {
+        padding: 13px 15px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .matrix th {
+        background: var(--soft);
+        font-weight: 850;
+      }
+
+      .matrix tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .codebox {
+        margin: 26px 0 0;
+        padding: 18px 20px;
+        border-radius: 8px;
+        background: #111827;
+        color: #f9fafb;
+        font-size: 18px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .path {
+        margin-top: 22px;
+        padding: 14px 16px;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 16px;
+        overflow-wrap: anywhere;
+      }
+
+      .note {
+        margin: 24px 0 0;
+        padding: 15px 18px;
+        border-left: 5px solid var(--quality);
+        border-radius: 8px;
+        background: #fffbeb;
+        color: #78350f;
+        font-size: 18px;
+        font-weight: 650;
+      }
+
+      .visual-panel {
+        margin-top: 28px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f8fafc;
+      }
+
+      .visual-title {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .visual-panel svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      @media (max-width: 900px) {
+        .slide,
+        .slide.title,
+        .slide.split {
+          grid-template-columns: 1fr;
+          min-height: auto;
+          padding: 28px;
+        }
+
+        .cards,
+        .map {
+          grid-template-columns: 1fr;
+        }
+
+        .bullets li {
+          font-size: 20px;
+        }
+      }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .topbar {
+          display: none;
+        }
+
+        .deck {
+          width: 100%;
+          padding: 0;
+        }
+
+        .slide {
+          min-height: 100vh;
+          margin: 0;
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+          break-after: page;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <div class="topbar">
+        <div class="brand"><span class="dot"></span><span>BDA 2기 데이터 핸들링</span></div>
+        <div class="controls">
+          <button type="button" id="prev" aria-label="이전 슬라이드">‹</button>
+          <div class="counter" id="counter">1 / 1</div>
+          <button type="button" id="next" aria-label="다음 슬라이드">›</button>
+        </div>
+      </div>
+      <div id="slides"></div>
+    </main>
+
+    <script>
+      const slides = [
+        {
+          layout: "title",
+          section: "중간복습",
+          title: "중간복습",
+          subtitle: "GitHub Archive 로그를 다루면서 생긴 데이터 핸들링 흐름과 현재 플랫폼 아키텍처를 정리함.",
+          note: "이 복습은 모델링 파트가 아니라 데이터 수집, 저장, 지표화, 품질, 운영 구조를 다시 잡는 시간.",
+          cards: [
+            ["목표", "지금까지 생긴 데이터 흐름을 한 장의 아키텍처로 말할 수 있게 됨."],
+            ["다음 단계", "소규모, 중간 규모, 대기업 데이터 플랫폼 케이스 스터디로 넘어감."]
+          ]
+        },
+        {
+          section: "오늘의 범위",
+          title: "복습에서 볼 것과 안 볼 것",
+          bullets: [
+            "볼 것: BigQuery 원천 로그, Parquet 추출, DAU/WAU/retention, dbt mart, Airflow, Metabase.",
+            "볼 것: 현재 repo 안에 남아 있는 운영 구조와 문서/코드 위치.",
+            "안 볼 것: 이번 복습 범위를 벗어나는 모델 성능 비교와 알고리즘 실험."
+          ]
+        },
+        {
+          section: "Why",
+          title: "왜 데이터 플랫폼이 필요할까?",
+          bullets: [
+            "처음에는 노트북 하나로 충분함. 데이터가 작고 질문도 한두 개라서 사람이 직접 실행해도 버틸 수 있음.",
+            "질문이 반복되면 문제가 생김. 같은 DAU도 기간, 필터, event 기준이 조금씩 달라짐.",
+            "같은 계산을 매번 사람이 실행하면 누락, 순서 실수, 로컬 환경 차이가 생김.",
+            "그래서 비용 절감만이 아니라 자동화, 일관성, 재현성, 품질 확인, 권한 분리가 필요해짐."
+          ]
+        },
+        {
+          section: "Why",
+          title: "플랫폼이 생기면 달라지는 것",
+          map: [
+            ["auto", "자동화", "사람이 매번 실행하지 않아도 정해진 시간에 갱신됨"],
+            ["model", "일관성", "같은 지표는 같은 fact와 mart에서 계산됨"],
+            ["quality", "검증", "null, 중복, accounting 오류가 test로 잡힘"],
+            ["ops", "관측 가능성", "실패 task, 로그, Slack 알림, 비용 상태가 남음"],
+            ["bi", "소비 표면", "분석가가 raw 대신 dashboard와 mart를 봄"],
+            ["raw", "비용 제어", "큰 원천 로그를 필요한 범위만 읽게 됨"]
+          ]
+        },
+        {
+          section: "출발점",
+          title: "원천 데이터는 GitHub Archive 로그",
+          bullets: [
+            "원천은 BigQuery public table의 `githubarchive.day.YYYYMMDD` daily shard.",
+            "각 row는 GitHub에서 발생한 event이고, actor, repo, type, created_at 같은 필드를 가짐.",
+            "서비스 로그로 비유하면 actor는 user, repo는 product/content, type은 user action에 가까움."
+          ],
+          path: "notebooks/gharchive/00_setup.ipynb"
+        },
+        {
+          section: "문제",
+          title: "Raw event를 바로 보면 생기는 문제",
+          map: [
+            ["raw", "크다", "일자별 shard라도 직접 스캔하면 비용과 시간이 커짐"],
+            ["raw", "복잡하다", "payload와 event type이 다양해서 매번 해석이 달라질 수 있음"],
+            ["raw", "반복이 어렵다", "노트북마다 필터와 기간이 달라지면 숫자가 흔들림"],
+            ["quality", "품질 확인 필요", "row count, null, 날짜 범위, 중복을 계속 확인해야 함"],
+            ["ops", "운영 부담", "매번 사람이 쿼리 실행과 결과 복사를 기억해야 함"],
+            ["bi", "BI에 부적합", "dashboard가 raw를 직접 읽으면 느리고 비싸짐"]
+          ]
+        },
+        {
+          section: "2단계",
+          title: "로컬 분석용 저장 포맷을 비교함",
+          bullets: [
+            "CSV는 사람이 열어보기 쉽지만 타입 정보가 약하고 파일이 커지기 쉬움.",
+            "JSON은 중첩 구조를 표현하기 좋지만 분석용 table scan에는 무거워짐.",
+            "Parquet는 columnar format이라 필요한 컬럼만 읽기 쉬움.",
+            "Parquet는 dtype 보존과 압축에 유리해서 반복 분석, feature 생성, mart 저장에 잘 맞음.",
+            "결국 파일 포맷 선택도 분석 속도, 저장 비용, 재현성에 영향을 줌."
+          ],
+          path: "notebooks/gharchive/02_storage_formats.ipynb"
+        },
+        {
+          section: "3단계",
+          title: "기초 제품 지표가 생김",
+          table: [
+            ["지표", "의미", "왜 필요한가"],
+            ["DAU", "하루 동안 활동한 고유 actor 수", "활동 규모와 추세 확인"],
+            ["Active repos", "하루 동안 이벤트가 발생한 고유 repo 수", "콘텐츠/프로젝트 활동 범위 확인"],
+            ["Total events", "하루 이벤트 수", "전체 로그량과 activity intensity 확인"],
+            ["Event mix", "Push, Watch, Fork 등 이벤트 비중", "활동의 성격이 무엇인지 확인"]
+          ],
+          path: "notebooks/gharchive/03_dau.ipynb"
+        },
+        {
+          section: "4단계",
+          title: "Retention과 활동성으로 유저 행동을 봄",
+          bullets: [
+            "retention은 한 번 활동한 유저가 이후에도 다시 돌아오는지 보는 지표.",
+            "단순 DAU 추이만으로는 신규 유입 증가인지, 기존 유저 유지인지 구분이 어려움.",
+            "cohort 기준 retention과 주차별 활동 패턴이 계산됨.",
+            "활동일수나 event count를 기준으로 user segment가 나뉨."
+          ],
+          path: "notebooks/gharchive/05_retention_activity.ipynb · notebooks/gharchive/06_activity_deep_dive.ipynb"
+        },
+        {
+          section: "Retention",
+          title: "Retention 정의는 하나가 아님",
+          table: [
+            ["정의", "질문", "해석"],
+            ["First-seen cohort retention", "처음 활동한 유저가 N주 뒤에도 활동하는가", "신규 유저가 남는지 보기 좋음"],
+            ["Period-over-period retention", "지난주 active user가 이번 주에도 active인가", "현재 서비스의 유지/이탈 흐름 보기 좋음"],
+            ["Rolling retention", "특정 시점 이후 한 번이라도 돌아왔는가", "장기 재방문 여부 보기 좋음"],
+            ["Activity retention", "같은 행동을 다시 했는가", "단순 접속보다 핵심 행동 유지에 가까움"]
+          ]
+        },
+        {
+          section: "Retention",
+          title: "우리가 쓰는 retention 정의",
+          bullets: [
+            "GitHub Archive에서는 actor가 특정 주에 한 번 이상 event를 만들면 active user로 봄.",
+            "cohort retention은 선택 기간 안에서 처음 관측된 주를 cohort_week로 잡음.",
+            "W1 retention은 cohort_week의 active user 중 다음 주에도 한 번 이상 활동한 비율.",
+            "lifecycle mart는 전주 active user가 이번 주에도 남았는지, 빠졌는지, 다시 돌아왔는지를 봄.",
+            "최신 cohort는 아직 미래 주차가 없어서 W1/W2가 비어 있거나 낮게 보일 수 있음."
+          ],
+          path: "dbt/gharchive_metrics/models/marts/platform/metrics_retention_summary.sql · metrics_user_lifecycle_weekly.sql"
+        },
+        {
+          section: "5단계",
+          title: "데이터 품질이 별도 주제로 분리됨",
+          bullets: [
+            "분석 결과는 입력 데이터가 정상이라는 전제 위에 있음.",
+            "row count, null, duplicate, 날짜 범위, event type 분포가 확인됨.",
+            "이후 dbt test와 drift check로 넘어가기 위한 전 단계가 됨."
+          ],
+          path: "notebooks/gharchive/07_data_quality.ipynb"
+        },
+        {
+          section: "현재 구조",
+          title: "현재 데이터 플랫폼 아키텍처",
+          visual: "architecture",
+          note: "핵심은 raw event를 매번 직접 보지 않고, fact와 mart를 거쳐 소비하게 만든다는 점."
+        },
+        {
+          section: "Slack",
+          title: "Slack 연동은 운영 표면임",
+          bullets: [
+            "Airflow UI를 계속 보고 있는 사람은 거의 없음.",
+            "실패, drift, 비용 초과 같은 운영 신호가 Slack으로 들어와야 팀 업무 흐름에 붙음.",
+            "현재 repo에는 Airflow failure callback, drift alert, cost guard alert가 Slack으로 연결됨.",
+            "알림에는 DAG, task, run id, error, log URL처럼 바로 판단할 수 있는 정보가 들어감."
+          ],
+          path: "dags/utils/slack_alert.py"
+        },
+        {
+          section: "Warehouse",
+          title: "BigQuery에는 fact와 mart가 남는다",
+          table: [
+            ["테이블", "역할"],
+            ["mart.fact_user_repo_activity", "일별 user_id, repo_id, action grain의 핵심 fact"],
+            ["mart.metrics_daily", "DAU, active repo, total events, 주요 action count"],
+            ["mart.metrics_event_type_daily", "event type별 일별 사용자/repo/event"],
+            ["mart.metrics_weekly", "WAU, weekly active repo, weekly event"],
+            ["mart.metrics_user_segments", "활동일수 기반 user segment"],
+            ["mart.metrics_retention_*", "cohort retention과 summary"],
+            ["mart.metrics_user_lifecycle_*", "전 기간 대비 유지/복귀/이탈 구조"]
+          ]
+        },
+        {
+          section: "Grain",
+          title: "중심 grain은 user-repo-action-day",
+          subtitle: "`activity_date, user_id, repo_id, action` 한 조합이 하루의 유저-repo 활동을 의미함.",
+          bullets: [
+            "grain이 고정되어야 DAU, WAU, retention, event mix가 같은 기반에서 출발함.",
+            "raw event를 직접 세는 것이 아니라 분석 가능한 fact에서 지표가 만들어짐.",
+            "dashboard와 batch 분석이 같은 fact를 바라보게 되는 것이 중요함."
+          ]
+        },
+        {
+          section: "dbt",
+          title: "dbt 프로젝트는 layer를 나눈다",
+          visual: "layers",
+          bullets: [
+            "raw/source: 외부 원천 또는 BigQuery fact의 출발점.",
+            "staging: 이름, 타입, 날짜 컬럼을 분석하기 쉽게 정리.",
+            "marts: dashboard와 분석이 바로 쓰는 지표 테이블.",
+            "semantic: metric 이름과 집계 방식을 YAML로 고정."
+          ],
+          path: "dbt/gharchive_metrics"
+        },
+        {
+          section: "dbt",
+          title: "현재 dbt mart의 역할",
+          table: [
+            ["모델", "역할"],
+            ["stg_user_repo_activity", "fact를 분석하기 쉬운 view로 정리"],
+            ["metrics_daily / weekly", "일간/주간 핵심 활동 지표"],
+            ["metrics_event_type_daily", "event type별 활동량"],
+            ["metrics_retention_summary", "cohort별 W0~W3 retention 요약"],
+            ["metrics_cohort_retention_*_heatmap", "retention heatmap용 wide mart"],
+            ["metrics_user_lifecycle_*", "전 기간 대비 유지/이탈 accounting"]
+          ]
+        },
+        {
+          section: "Semantic Layer",
+          title: "지표 이름도 계약임",
+          bullets: [
+            "`active_users`, `active_repos`, `total_events` 같은 metric 이름과 계산 방식을 한곳에 둠.",
+            "BI, 문서, 자동 분석이 같은 지표명을 쓰면 계산식이 덜 흔들림.",
+            "semantic layer는 dashboard SQL을 예쁘게 만드는 기능이 아니라 지표 계약에 가까움."
+          ],
+          path: "dbt/gharchive_metrics/models/semantic/platform_activity.yml"
+        },
+        {
+          section: "Quality",
+          title: "품질 검사는 schema test와 custom test로 감",
+          table: [
+            ["Test", "대상", "확인 내용"],
+            ["not_null", "activity_date, week_start, active_users 등", "지표 기준 날짜와 핵심 metric이 비지 않는지 확인"],
+            ["unique", "metrics_daily.activity_date, metrics_weekly.week_start", "하루/한 주 grain이 중복되지 않는지 확인"],
+            ["accepted relationship", "cohort retention heatmap", "heatmap active_users가 WAU/MAU와 맞는지 확인"],
+            ["retention rate range", "w1~w12, monthly retention", "retention rate가 0~1 범위를 벗어나지 않는지 확인"],
+            ["lifecycle accounting", "active, existing, returning, churned", "전 기간 active user와 유지/복귀/이탈 수식이 맞는지 확인"],
+            ["drift check", "events_per_repo, events_per_user 등", "파이프라인은 성공했지만 분포가 이상한지 Slack 경고"]
+          ],
+          path: "dbt/gharchive_metrics/tests/*.sql · dbt/gharchive_metrics/models/marts/platform/schema.yml"
+        },
+        {
+          section: "Quality",
+          title: "현재 custom test 예시",
+          table: [
+            ["파일", "검사 내용"],
+            ["assert_user_lifecycle_weekly_balances.sql", "주간 active, previous_active, existing, returning, churned 관계 확인"],
+            ["assert_user_lifecycle_monthly_balances.sql", "월간 lifecycle accounting 관계 확인"],
+            ["metrics_user_retention_weekly_accounting.sql", "주간 retention mart의 previous/current user 수 정합성 확인"],
+            ["metrics_user_retention_monthly_accounting.sql", "월간 retention mart의 accounting 정합성 확인"],
+            ["metrics_cohort_retention_weekly_heatmap_active_users_match_wau.sql", "weekly heatmap의 active_users가 WAU와 맞는지 확인"],
+            ["metrics_cohort_retention_weekly_heatmap_rates.sql", "weekly heatmap retention rate 범위 확인"]
+          ]
+        },
+        {
+          section: "Airflow",
+          title: "Airflow는 수동 실행을 운영 흐름으로 바꿈",
+          visual: "dag",
+          bullets: [
+            "`gharchive_dbt_metrics`: 최근 partition fact sync 후 dbt mart 갱신.",
+            "`gharchive_platform_metrics`: compact platform mart와 trend mart 주간 재생성.",
+            "`gharchive_repo_metadata_refresh`: repo metadata cache 갱신.",
+            "각 task에는 retry, timeout, failure callback이 생김."
+          ]
+        },
+        {
+          section: "Airflow",
+          title: "현재 핵심 DAG: gharchive_dbt_metrics",
+          table: [
+            ["Task", "역할"],
+            ["plan_fact_sync", "처리 범위와 max-days guardrail 확인"],
+            ["sync_fact", "최근 3일 window를 BigQuery fact로 replace-days 적재"],
+            ["build_dbt_metrics", "Metabase dashboard가 읽는 dbt mart 갱신"],
+            ["detect_metric_drift", "입력 drift를 warn-only로 감지하고 Slack 경고"],
+            ["check_bigquery_cost", "최근 BigQuery job 비용을 guardrail로 확인"]
+          ],
+          path: "dags/gharchive_dbt_metrics.py"
+        },
+        {
+          section: "BI",
+          title: "Metabase는 raw가 아니라 mart를 봄",
+          bullets: [
+            "dashboard가 raw event를 직접 집계하면 비용, 속도, 정의 불일치 문제가 생김.",
+            "Metabase는 `bda-coai.mart.metrics_*` 테이블을 조회하도록 구성.",
+            "DAU, WAU, event type, retention, user segment가 dashboard에서 확인됨."
+          ],
+          path: "docs/data_platform_local.md · scripts/setup_metabase_dashboard.py"
+        },
+        {
+          section: "Metadata",
+          title: "repo metadata cache도 데이터 플랫폼의 일부",
+          bullets: [
+            "GitHub REST API 결과를 SQLite와 BigQuery table로 캐싱.",
+            "name, description, topics, stars, forks 같은 설명 정보를 dashboard에 붙임.",
+            "외부 API를 매번 직접 호출하지 않고, 캐시 갱신 DAG로 운영."
+          ],
+          path: "data/repo_metadata.db · scripts/refresh_repo_metadata.py"
+        },
+        {
+          section: "Operations",
+          title: "운영에서 중요한 방어선",
+          map: [
+            ["ops", "window", "최근 3일 또는 90일처럼 처리 범위를 제한"],
+            ["ops", "max-days", "실수로 전체 이력을 스캔하지 않게 막음"],
+            ["ops", "retry", "일시적 BigQuery/API 실패를 자동 재시도"],
+            ["ops", "timeout", "멈춘 task를 장애로 판단"],
+            ["ops", "cost guard", "최근 job 비용이 기준을 넘으면 Slack 경고"],
+            ["ops", "failure callback", "DAG, task, run, log URL을 알림으로 보냄"]
+          ]
+        },
+        {
+          section: "현재 상태",
+          title: "지금 repo에 남아 있는 핵심 산출물",
+          table: [
+            ["영역", "위치"],
+            ["데이터 핸들링 노트북", "notebooks/gharchive/00_setup.ipynb ~ 07_data_quality.ipynb"],
+            ["로컬 플랫폼 문서", "docs/data_platform_local.md"],
+            ["dbt 프로젝트", "dbt/gharchive_metrics"],
+            ["Airflow DAG", "dags/gharchive_dbt_metrics.py, dags/gharchive_platform_metrics.py"],
+            ["Metabase 자동 구성", "scripts/setup_metabase_dashboard.py"],
+            ["Slack/운영 알림", "dags/utils/slack_alert.py"],
+            ["비용 guard", "scripts/check_bigquery_cost_guard.py"]
+          ]
+        },
+        {
+          section: "주의점",
+          title: "현재 구조를 말할 때 조심할 점",
+          bullets: [
+            "문서에는 Cosmos 표현이 남아 있지만, 현재 DAG에는 BashOperator로 dbt CLI를 직접 호출하는 형태가 섞여 있음.",
+            "일부 mart는 비용 절감을 위해 매일 전체 rebuild가 아니라 제한된 model/window 중심으로 운영.",
+            "BigQuery 비용과 public table scan 위험 때문에 backfill은 별도 작업으로 봐야 함."
+          ],
+          note: "수업에서는 '완벽한 제품'이 아니라, 실제 운영하면서 생긴 타협과 흔적까지 보는 것이 포인트."
+        },
+        {
+          section: "다음 파트",
+          title: "이제 세 가지 케이스 스터디로 넘어감",
+          cards: [
+            ["소규모 스타트업", "찰나: 사람이 적고 빠르게 의사결정해야 하는 데이터 플랫폼"],
+            ["중간 규모 기업", "GitHub 로그 기반: MAU가 아주 크지는 않지만 지표와 운영 구조가 필요한 플랫폼"],
+            ["대기업", "카카오 경험: 역할이 완전히 분업화되고 중간 layer를 직접 보기 어려운 환경"],
+            ["공통 질문", "규모가 달라지면 source, mart, orchestration, BI, 권한, 책임이 어떻게 달라지는가"]
+          ]
+        },
+        {
+          layout: "center",
+          section: "정리",
+          title: "중간복습의 결론",
+          subtitle: "지금까지 한 일은 로그 분석이 아니라, raw event를 믿고 반복해서 볼 수 있는 fact, mart, dashboard, 운영 흐름으로 바꾸는 과정임."
+        }
+      ];
+
+      const root = document.getElementById("slides");
+      const counter = document.getElementById("counter");
+
+      function el(name, className, text) {
+        const node = document.createElement(name);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      function addBullets(parent, bullets) {
+        if (!bullets) return;
+        const ul = el("ul", "bullets");
+        bullets.forEach((item) => ul.appendChild(el("li", "", item)));
+        parent.appendChild(ul);
+      }
+
+      function addCards(parent, cards) {
+        if (!cards) return;
+        const wrap = el("div", "cards");
+        cards.forEach(([title, body]) => {
+          const card = el("div", "card");
+          card.appendChild(el("strong", "", title));
+          card.appendChild(el("span", "", body));
+          wrap.appendChild(card);
+        });
+        parent.appendChild(wrap);
+      }
+
+      function addMap(parent, items) {
+        if (!items) return;
+        const wrap = el("div", "map");
+        items.forEach(([kind, title, body]) => {
+          const step = el("div", `map-step ${kind}`);
+          step.appendChild(el("b", "", title));
+          step.appendChild(el("span", "", body));
+          wrap.appendChild(step);
+        });
+        parent.appendChild(wrap);
+      }
+
+      function addTable(parent, rows) {
+        if (!rows) return;
+        const table = el("table", "matrix");
+        const [head, ...bodyRows] = rows;
+        const thead = document.createElement("thead");
+        const trh = document.createElement("tr");
+        head.forEach((cell) => trh.appendChild(el("th", "", cell)));
+        thead.appendChild(trh);
+        table.appendChild(thead);
+        const tbody = document.createElement("tbody");
+        bodyRows.forEach((row) => {
+          const tr = document.createElement("tr");
+          row.forEach((cell) => tr.appendChild(el("td", "", cell)));
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        parent.appendChild(table);
+      }
+
+      function addVisual(parent, type) {
+        if (!type) return;
+        const wrap = el("div", "visual-panel");
+        const titles = {
+          architecture: "Current data platform architecture",
+          layers: "dbt model layers",
+          dag: "Airflow operational flow"
+        };
+        const svgs = {
+          architecture: `<svg viewBox="0 0 1120 540" role="img" aria-label="current data platform architecture"><defs><marker id="arrow-a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#475569"/></marker><filter id="shadow-a" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.12"/></filter></defs><rect x="20" y="20" width="1080" height="500" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="560" y="62" text-anchor="middle" font-size="28" font-weight="900" fill="#172033">GitHub Archive Data Platform</text><text x="560" y="92" text-anchor="middle" font-size="15" fill="#64748b">raw event를 fact, mart, dashboard, 운영 알림으로 연결</text><g filter="url(#shadow-a)"><rect x="70" y="155" width="180" height="92" rx="12" fill="#fff" stroke="#475569" stroke-width="3"/><text x="160" y="190" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Raw</text><text x="160" y="218" text-anchor="middle" font-size="13" fill="#64748b">githubarchive.day</text></g><g filter="url(#shadow-a)"><rect x="315" y="155" width="190" height="92" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/><text x="410" y="190" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Sync</text><text x="410" y="218" text-anchor="middle" font-size="13" fill="#64748b">sync_bq_metrics.py</text></g><g filter="url(#shadow-a)"><rect x="570" y="155" width="200" height="92" rx="12" fill="#ecfdf5" stroke="#0f766e" stroke-width="3"/><text x="670" y="190" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Fact</text><text x="670" y="218" text-anchor="middle" font-size="13" fill="#64748b">user-repo-action-day</text></g><g filter="url(#shadow-a)"><rect x="835" y="155" width="190" height="92" rx="12" fill="#fffbeb" stroke="#b45309" stroke-width="3"/><text x="930" y="190" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">dbt Marts</text><text x="930" y="218" text-anchor="middle" font-size="13" fill="#64748b">metrics_*</text></g><path d="M250 201 H305" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/><path d="M505 201 H560" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/><path d="M770 201 H825" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/><path d="M930 247 V310" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/><g filter="url(#shadow-a)"><rect x="800" y="325" width="245" height="82" rx="12" fill="#f0fdf4" stroke="#15803d" stroke-width="3"/><text x="922" y="360" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Metabase</text><text x="922" y="386" text-anchor="middle" font-size="13" fill="#64748b">dashboard consumption</text></g><g filter="url(#shadow-a)"><rect x="500" y="325" width="245" height="82" rx="12" fill="#f5f3ff" stroke="#6d28d9" stroke-width="3"/><text x="622" y="360" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Airflow</text><text x="622" y="386" text-anchor="middle" font-size="13" fill="#64748b">schedule · retry · logs</text></g><g filter="url(#shadow-a)"><rect x="200" y="325" width="245" height="82" rx="12" fill="#fef2f2" stroke="#b91c1c" stroke-width="3"/><text x="322" y="360" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Ops</text><text x="322" y="386" text-anchor="middle" font-size="13" fill="#64748b">Slack · cost guard · drift</text></g><path d="M800 366 H755" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/><path d="M500 366 H455" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/></svg>`,
+          layers: `<svg viewBox="0 0 980 360" role="img" aria-label="dbt model layers"><rect x="70" y="55" width="840" height="250" rx="14" fill="#f8fafc" stroke="#d6dee8"/><text x="490" y="95" text-anchor="middle" font-size="26" font-weight="900" fill="#172033">dbt/gharchive_metrics</text><rect x="145" y="130" width="690" height="42" rx="8" fill="#e2e8f0" stroke="#475569"/><text x="490" y="158" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">raw/source: GitHub Archive or BigQuery fact</text><rect x="185" y="185" width="610" height="42" rx="8" fill="#dcfce7" stroke="#0f766e"/><text x="490" y="213" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">staging: stg_user_repo_activity</text><rect x="225" y="240" width="530" height="42" rx="8" fill="#fef3c7" stroke="#b45309"/><text x="490" y="268" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">marts: metrics_daily, weekly, retention, lifecycle</text><text x="490" y="330" text-anchor="middle" font-size="15" fill="#64748b">semantic layer는 metric 이름과 집계 방식을 YAML로 고정</text></svg>`,
+          dag: `<svg viewBox="0 0 980 310" role="img" aria-label="airflow operational flow"><defs><marker id="arrow-d" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs><g transform="translate(45,105)"><rect width="150" height="82" rx="10" fill="#fff" stroke="#6d28d9" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">plan</text><text x="75" y="60" text-anchor="middle" font-size="12" fill="#64748b">range guard</text></g><path d="M200 146 H250" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-d)"/><g transform="translate(260,105)"><rect width="150" height="82" rx="10" fill="#fff" stroke="#2563eb" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">sync fact</text><text x="75" y="60" text-anchor="middle" font-size="12" fill="#64748b">replace-days</text></g><path d="M415 146 H465" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-d)"/><g transform="translate(475,105)"><rect width="150" height="82" rx="10" fill="#fff" stroke="#0f766e" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">dbt marts</text><text x="75" y="60" text-anchor="middle" font-size="12" fill="#64748b">metrics_*</text></g><path d="M630 146 H680" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-d)"/><g transform="translate(690,105)"><rect width="150" height="82" rx="10" fill="#fff" stroke="#b45309" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">drift</text><text x="75" y="60" text-anchor="middle" font-size="12" fill="#64748b">warn-only</text></g><path d="M845 146 H890" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-d)"/><g transform="translate(900,105)"><rect width="55" height="82" rx="10" fill="#fff" stroke="#b91c1c" stroke-width="3"/><text x="28" y="38" text-anchor="middle" font-size="15" font-weight="900" fill="#172033">cost</text><text x="28" y="60" text-anchor="middle" font-size="11" fill="#64748b">guard</text></g><text x="490" y="248" text-anchor="middle" font-size="16" fill="#64748b">운영은 순서, 범위, 실패 처리, 비용 방어선까지 포함한다</text></svg>`
+        };
+        wrap.appendChild(el("p", "visual-title", titles[type]));
+        wrap.insertAdjacentHTML("beforeend", svgs[type]);
+        parent.appendChild(wrap);
+      }
+
+      function renderSlide(slide, index) {
+        const article = el("article", `slide ${slide.layout || ""}`);
+        article.id = `slide-${index + 1}`;
+
+        const main = el("div");
+        main.appendChild(el("p", "eyebrow", `${String(index + 1).padStart(2, "0")} · ${slide.section}`));
+        main.appendChild(el(index === 0 ? "h1" : "h2", "", slide.title));
+        if (slide.subtitle) main.appendChild(el("p", "subtitle", slide.subtitle));
+        addBullets(main, slide.bullets);
+        addVisual(main, slide.visual);
+        addMap(main, slide.map);
+        addTable(main, slide.table);
+        addCards(main, slide.cards);
+        if (slide.code) main.appendChild(el("pre", "codebox", slide.code));
+        if (slide.path) main.appendChild(el("div", "path", slide.path));
+        if (slide.note) main.appendChild(el("p", "note", slide.note));
+        article.appendChild(main);
+
+        if (slide.layout === "title") {
+          const side = el("div");
+          side.appendChild(el("div", "number", String(slides.length)));
+          side.appendChild(el("p", "subtitle", "slides"));
+          side.appendChild(el("div", "tagline", "복습의 기준은 현재 repo에 남아 있는 데이터 플랫폼 구조다."));
+          article.appendChild(side);
+        }
+        return article;
+      }
+
+      slides.forEach((slide, index) => root.appendChild(renderSlide(slide, index)));
+      counter.textContent = `1 / ${slides.length}`;
+
+      function currentIndex() {
+        const positions = slides.map((_, index) => {
+          const node = document.getElementById(`slide-${index + 1}`);
+          return Math.abs(node.getBoundingClientRect().top - 82);
+        });
+        return positions.indexOf(Math.min(...positions));
+      }
+
+      function go(delta) {
+        const next = Math.max(0, Math.min(slides.length - 1, currentIndex() + delta));
+        document.getElementById(`slide-${next + 1}`).scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      document.getElementById("prev").addEventListener("click", () => go(-1));
+      document.getElementById("next").addEventListener("click", () => go(1));
+      window.addEventListener("scroll", () => {
+        counter.textContent = `${currentIndex() + 1} / ${slides.length}`;
+      }, { passive: true });
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowRight" || event.key === "PageDown") go(1);
+        if (event.key === "ArrowLeft" || event.key === "PageUp") go(-1);
+      });
+    </script>
+  </body>
+</html>
