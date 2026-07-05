@@ -1,0 +1,1318 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Week 10 Recsys Final Review</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef2f5;
+        --paper: #ffffff;
+        --ink: #172033;
+        --muted: #64748b;
+        --line: #d6dee8;
+        --soft: #f5f7fa;
+        --als: #2563eb;
+        --tower: #0f766e;
+        --rank: #7c3aed;
+        --warn: #b45309;
+        --bad: #b91c1c;
+        --good: #15803d;
+      }
+
+      * { box-sizing: border-box; min-width: 0; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+        letter-spacing: 0;
+      }
+
+      .deck {
+        width: min(1440px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 22px 0 72px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 12px 0;
+        background: linear-gradient(var(--bg) 72%, rgb(238 242 245 / 0));
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        background: var(--tower);
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      button {
+        display: inline-grid;
+        place-items: center;
+        width: 38px;
+        height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #fff;
+        color: var(--ink);
+        cursor: pointer;
+        font-size: 18px;
+      }
+
+      button:hover { border-color: var(--tower); }
+
+      .counter {
+        min-width: 96px;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+
+      .slide {
+        position: relative;
+        display: grid;
+        align-content: start;
+        min-height: 760px;
+        margin: 18px 0 34px;
+        padding: 48px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        box-shadow: 0 18px 42px rgb(15 23 42 / 0.08);
+        scroll-margin-top: 74px;
+      }
+
+      .slide.title {
+        grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+        gap: 34px;
+        align-items: center;
+        align-content: center;
+      }
+
+      .slide.split {
+        grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+        gap: 34px;
+      }
+
+      .slide.center {
+        place-items: center;
+        align-content: center;
+        text-align: center;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--tower);
+        font-size: 13px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      h1, h2 {
+        margin: 0;
+        line-height: 1.05;
+        font-weight: 900;
+      }
+
+      h1 { font-size: clamp(48px, 6vw, 84px); }
+      h2 { font-size: clamp(36px, 4.4vw, 64px); }
+
+      h3 {
+        margin: 0 0 10px;
+        font-size: 22px;
+        line-height: 1.25;
+      }
+
+      .subtitle {
+        max-width: 880px;
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 23px;
+        line-height: 1.45;
+      }
+
+      .section-label {
+        display: inline-flex;
+        align-items: center;
+        justify-self: start;
+        align-self: start;
+        width: auto;
+        max-width: 100%;
+        margin: 0 0 14px;
+        padding: 6px 11px;
+        border-radius: 999px;
+        background: #e7f6f2;
+        color: var(--tower);
+        font-size: 13px;
+        font-weight: 850;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+      }
+
+      .tagline {
+        margin-top: 24px;
+        padding: 18px 20px;
+        border-left: 5px solid var(--tower);
+        border-radius: 8px;
+        background: #f0fdfa;
+        font-size: 22px;
+        font-weight: 800;
+      }
+
+      .note {
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 17px;
+      }
+
+      .bullets {
+        display: grid;
+        gap: 15px;
+        margin: 30px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .bullets li {
+        position: relative;
+        padding-left: 30px;
+        color: #334155;
+        font-size: 24px;
+      }
+
+      .bullets li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 14px;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--tower);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .cards.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+      .card {
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+      }
+
+      .card strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 18px;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 16px;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 26px;
+      }
+
+      .metric {
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .metric .label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .metric .value {
+        margin-top: 6px;
+        font-size: 30px;
+        line-height: 1.05;
+        font-weight: 900;
+      }
+
+      .flow {
+        display: grid;
+        gap: 14px;
+        margin-top: 26px;
+      }
+
+      .flow-row {
+        display: grid;
+        grid-template-columns: 140px minmax(0, 1fr) 110px;
+        align-items: stretch;
+        gap: 12px;
+      }
+
+      .flow-tag, .flow-out {
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        color: #fff;
+        font-weight: 850;
+        text-align: center;
+      }
+
+      .flow-tag.als { background: var(--als); }
+      .flow-tag.tower { background: var(--tower); }
+      .flow-tag.pop { background: var(--warn); }
+      .flow-tag.rank { background: var(--rank); }
+      .flow-out { background: #334155; }
+
+      .flow-box {
+        padding: 17px 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .flow-box strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 18px;
+      }
+
+      .flow-box span {
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      table {
+        width: 100%;
+        margin-top: 28px;
+        border-collapse: collapse;
+        font-size: 17px;
+      }
+
+      th, td {
+        padding: 13px 14px;
+        border: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--soft);
+        font-weight: 850;
+      }
+
+      td.num, th.num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .winner {
+        color: var(--good);
+        font-weight: 900;
+      }
+
+      .tradeoff {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 30px;
+      }
+
+      .panel {
+        padding: 24px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+      }
+
+      .panel.als { background: #eff6ff; border-color: #bfdbfe; }
+      .panel.tower { background: #ecfdf5; border-color: #bbf7d0; }
+      .panel.warn { background: #fffbeb; border-color: #fde68a; }
+
+      .panel h3 { margin-bottom: 14px; }
+
+      .kicker {
+        color: var(--muted);
+        font-size: 15px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .big-number {
+        margin: 6px 0 8px;
+        font-size: clamp(42px, 5vw, 76px);
+        line-height: 1;
+        font-weight: 950;
+      }
+
+      .diagram {
+        width: 100%;
+        min-height: 360px;
+        margin-top: 28px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: linear-gradient(180deg, #fff, #f8fafc);
+      }
+
+      .axis-label {
+        fill: var(--muted);
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .bar-label {
+        fill: var(--ink);
+        font-size: 16px;
+        font-weight: 850;
+      }
+
+      .callout {
+        margin-top: 26px;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #fde68a;
+        background: #fffbeb;
+        color: #78350f;
+        font-size: 21px;
+        font-weight: 800;
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 5px;
+        background: #e2e8f0;
+        color: #0f172a;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 0.9em;
+      }
+
+      pre {
+        overflow: auto;
+        margin: 26px 0 0;
+        padding: 20px;
+        border-radius: 8px;
+        background: #111827;
+        color: #e5e7eb;
+        font-size: 15px;
+        line-height: 1.5;
+      }
+
+      @media (max-width: 900px) {
+        .slide, .slide.title, .slide.split {
+          display: block;
+          min-height: auto;
+          padding: 30px;
+        }
+
+        .cards, .cards.three, .metric-grid, .tradeoff {
+          grid-template-columns: 1fr;
+        }
+
+        .flow-row {
+          grid-template-columns: 1fr;
+        }
+
+        h1 { font-size: 44px; }
+        h2 { font-size: 34px; }
+        .bullets li { font-size: 20px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="deck">
+      <div class="topbar">
+        <div class="brand"><span class="dot"></span><span>BDA 2기 · Week 10 추천시스템 최종 복습</span></div>
+        <div class="controls">
+          <button type="button" id="prev" aria-label="previous slide">‹</button>
+          <div class="counter"><span id="current">1</span> / <span id="total">44</span></div>
+          <button type="button" id="next" aria-label="next slide">›</button>
+        </div>
+      </div>
+
+      <section class="slide title" id="s1">
+        <div>
+          <p class="eyebrow">Week 10 Final Review</p>
+          <h1>추천시스템 최종 복습</h1>
+          <p class="subtitle">2기 추천시스템 전체 흐름을 하나로 닫는다. Feedback Data → Sparsity → Matrix Factorization → Embedding Search → Two-stage → API/시뮬레이터까지 연결한다.</p>
+          <div class="tagline">오늘의 목표: "추천은 고객이 고를 것을 미리 맞추는 문제"에서 출발해, 실제로 동작하는 추천 서비스 구조까지 설명하기.</div>
+        </div>
+        <div class="flow">
+          <div class="flow-row">
+            <div class="flow-tag pop">Data</div>
+            <div class="flow-box"><strong>Feedback Data</strong><span>유저가 repo에 남긴 행동 로그를 user x repo sparse matrix로 바꾼다.</span></div>
+            <div class="flow-out">입력</div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-tag als">Model</div>
+            <div class="flow-box"><strong>Matrix Factorization</strong><span>희소 행렬을 낮은 차원의 숨은 취향 벡터로 압축한다.</span></div>
+            <div class="flow-out">표현</div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-tag rank">Product</div>
+            <div class="flow-box"><strong>Candidate Generation + Re-ranking</strong><span>빠르게 후보를 찾고, feature 기반으로 다시 정렬한다.</span></div>
+            <div class="flow-out">품질</div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-tag tower">운영</div>
+            <div class="flow-box"><strong>FAISS / API / Fallback</strong><span>offline 모델을 온라인 추천 경험으로 연결한다.</span></div>
+            <div class="flow-out">운영</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" id="s2">
+        <p class="section-label">최종 복습 로드맵</p>
+          <h2>개념, 모델, 운영을 한 번에 닫는다</h2>
+        <div class="cards three">
+          <div class="card"><strong>1. Feedback Data</strong><p>GitHub event log, implicit feedback, sparsity, split</p></div>
+          <div class="card"><strong>2. Matrix Factorization</strong><p>R ≈ P × Q, 숨은 취향 차원, ALS/BPR</p></div>
+          <div class="card"><strong>3. Embedding Search</strong><p>가까운 이웃 찾기, FAISS, Two-Tower</p></div>
+          <div class="card"><strong>4. Two-stage</strong><p>Candidate Generation, Re-ranking, nDCG@K</p></div>
+          <div class="card"><strong>5. 운영 연결</strong><p>데이터 마트, 모델 산출물, FastAPI, Streamlit 시뮬레이터</p></div>
+          <div class="card"><strong>6. 최종 점검</strong><p>Cold Start, fallback, monitoring, 실험 해석</p></div>
+        </div>
+      </section>
+
+      <section class="slide split" id="s3">
+        <div>
+          <p class="section-label">추천 문제 정의</p>
+          <h2>추천이란, 다음 행동을 미리 맞추는 문제다</h2>
+          <ul class="bullets">
+            <li>기존 슬라이드 표현: 고객이 고를 것을 미리 맞추는 문제</li>
+            <li>GitHub에서는 고객이 <code>actor_id</code>, 제품이 <code>repo_id</code>다.</li>
+            <li>정답은 클릭/구매 대신 Watch, Fork, PR, Issue, Star 같은 다음 행동이다.</li>
+            <li>목표는 미래 test 기간에 interaction할 repo를 Top-K 안에 올리는 것이다.</li>
+          </ul>
+        </div>
+        <div class="panel als">
+          <div class="kicker">Grain</div>
+          <div class="big-number">user × repo</div>
+          <p>추천 모델은 raw event log를 직접 먹지 않는다. 먼저 유저-레포 단위의 Feedback Data로 압축한다.</p>
+          <div class="callout">추천은 "누가 무엇을 좋아할까"를 행렬 문제로 바꾸는 작업에서 시작한다.</div>
+        </div>
+      </section>
+
+      <section class="slide" id="s4">
+        <p class="section-label">Feedback Data</p>
+        <h2>Explicit은 적지만 명확하고, Implicit은 많지만 noisy하다</h2>
+        <table>
+          <thead><tr><th>Event</th><th>해석</th><th class="num">예시 가중치</th></tr></thead>
+          <tbody>
+            <tr><td>PullRequestEvent</td><td>강한 기여 의도</td><td class="num">3.0</td></tr>
+            <tr><td>ForkEvent</td><td>재사용/확장 의도</td><td class="num">2.0</td></tr>
+            <tr><td>WatchEvent</td><td>관심 표현</td><td class="num">1.0</td></tr>
+            <tr><td>IssuesEvent</td><td>문제 제기/관여</td><td class="num">0.5</td></tr>
+            <tr><td>PushEvent</td><td>빈번하지만 노이즈도 큰 활동</td><td class="num">0.2</td></tr>
+          </tbody>
+        </table>
+        <div class="callout">실무는 대개 Implicit Feedback으로 출발한다. 많지만 noisy하기 때문에 event weight와 평가 설계가 중요하다.</div>
+      </section>
+
+      <section class="slide split" id="s5">
+        <div>
+          <p class="section-label">Sparsity</p>
+          <h2>대부분의 칸은 비어 있다</h2>
+          <ul class="bullets">
+            <li>가능한 user-repo 조합은 너무 많다.</li>
+            <li>실제로 관측된 interaction은 극히 일부다.</li>
+            <li>빈 칸은 "싫다"가 아니라 "모른다"에 가깝다.</li>
+          </ul>
+        </div>
+        <div class="panel warn">
+          <div class="kicker">Mental model</div>
+          <div class="big-number">mostly empty</div>
+          <p>유저 x 아이템 후보 공간은 폭발적으로 커지지만 실제 관측은 극히 일부다. 추천은 이 빈칸을 채우는 문제다.</p>
+        </div>
+      </section>
+
+      <section class="slide" id="s6">
+        <p class="section-label">Sparse matrix</p>
+        <h2>추천에서는 Sparse matrix가 기본이다</h2>
+        <svg class="diagram" viewBox="0 0 980 390" role="img" aria-label="sparse user item matrix">
+          <text x="60" y="48" class="axis-label">Users</text>
+          <text x="230" y="48" class="axis-label">Repos</text>
+          <g transform="translate(170 70)">
+            <rect x="0" y="0" width="420" height="260" rx="8" fill="#fff" stroke="#d6dee8"></rect>
+            <g fill="#dbeafe">
+              <rect x="18" y="18" width="34" height="34" rx="4"></rect><rect x="104" y="18" width="34" height="34" rx="4"></rect><rect x="319" y="18" width="34" height="34" rx="4"></rect>
+              <rect x="61" y="61" width="34" height="34" rx="4"></rect><rect x="276" y="61" width="34" height="34" rx="4"></rect>
+              <rect x="147" y="104" width="34" height="34" rx="4"></rect><rect x="362" y="104" width="34" height="34" rx="4"></rect>
+              <rect x="18" y="147" width="34" height="34" rx="4"></rect><rect x="233" y="147" width="34" height="34" rx="4"></rect>
+              <rect x="104" y="190" width="34" height="34" rx="4"></rect><rect x="319" y="190" width="34" height="34" rx="4"></rect>
+            </g>
+            <g fill="#2563eb">
+              <circle cx="35" cy="35" r="10"></circle><circle cx="121" cy="35" r="10"></circle><circle cx="293" cy="78" r="10"></circle><circle cx="164" cy="121" r="10"></circle><circle cx="35" cy="164" r="10"></circle><circle cx="336" cy="207" r="10"></circle>
+            </g>
+          </g>
+          <text x="650" y="130" class="bar-label">관측값: interaction</text>
+          <text x="650" y="175" class="bar-label">빈 칸: unknown</text>
+          <text x="650" y="220" class="bar-label">목표: 빈 칸 중 가능성 높은 repo 찾기</text>
+          <text x="650" y="265" class="bar-label">구현: 비어 있는 칸은 저장하지 않는 sparse matrix</text>
+        </svg>
+        <div class="callout">기존 표현 그대로: 추천에서는 dense table이 아니라 sparse matrix가 일반적이다. 비어 있는 칸을 전부 저장하지 않는다는 뜻으로 이해하면 충분하다.</div>
+      </section>
+
+      <section class="slide" id="s7">
+        <p class="section-label">최종 복습의 기준</p>
+        <h2>데이터를 나누는 이유는 미래를 숨기기 위해서다</h2>
+        <div class="flow">
+          <div class="flow-row"><div class="flow-tag pop">History</div><div class="flow-box"><strong>모델이 볼 수 있는 과거</strong><span>유저 활동, repo 활동, feature를 만드는 기준 기간</span></div><div class="flow-out">Input</div></div>
+          <div class="flow-row"><div class="flow-tag rank">Future</div><div class="flow-box"><strong>모델이 맞혀야 하는 미래</strong><span>학습/평가에서 정답 확인에 쓰는 다음 행동</span></div><div class="flow-out">Label</div></div>
+          <div class="flow-row"><div class="flow-tag tower">Rule</div><div class="flow-box"><strong>미래 행동은 feature에 넣지 않는다</strong><span>미래를 섞으면 추천 모델이 아니라 답안지를 본 모델이 된다.</span></div><div class="flow-out">No leak</div></div>
+        </div>
+        <div class="callout">Two-stage의 두 모델이 서로 다른 데이터셋을 쓴다는 뜻이 아니다. 같은 추천 데이터 위에서 후보 생성과 정렬이 이어지고, 미래 행동은 정답 확인용으로만 분리한다.</div>
+      </section>
+
+      <section class="slide split" id="s8">
+        <div>
+          <p class="section-label">Seen filtering</p>
+          <h2>이미 본 item을 제외할지는 서비스마다 다르다</h2>
+          <ul class="bullets">
+            <li>지금 GitHub repo 추천 실험에서는 이미 본 repo를 기본적으로 제외한다.</li>
+            <li>새 repo 발견이 목표라면 반복 추천은 피로도를 만들 수 있다.</li>
+            <li>반대로 음악, 영상, 장보기처럼 재소비가 자연스러운 서비스는 다시 추천할 수 있다.</li>
+          </ul>
+        </div>
+        <div class="panel warn">
+          <h3>정책의 문제</h3>
+          <p>seen filtering은 모델 알고리즘이 아니라 제품 정책이다. 실험 결과를 볼 때는 "무엇을 추천 가능한 item으로 봤는지"를 먼저 확인해야 한다.</p>
+          <div class="callout">이번 실험의 정책: 이미 interaction한 repo는 제외하고, 아직 볼 가능성이 있는 repo를 찾는다.</div>
+        </div>
+      </section>
+
+      <section class="slide" id="s9">
+        <p class="section-label">Baseline & Fallback</p>
+        <h2>인기순/최신순은 강한 baseline이자 fallback이다</h2>
+        <div class="tradeoff">
+          <div class="panel warn"><h3>왜 필요한가</h3><ul class="bullets"><li>개인화 추천의 개선을 증명하는 기준선이다.</li><li>Cold Start와 장애 상황에서 fallback이 된다.</li><li>추천 서버가 실패해도 빈 화면을 피할 수 있다.</li></ul></div>
+          <div class="panel"><h3>무엇이 부족한가</h3><ul class="bullets"><li>개인화가 없다.</li><li>추천 다양성이 낮다.</li><li>인기 repo만 반복 노출한다.</li></ul></div>
+        </div>
+      </section>
+
+      <section class="slide center" id="s10">
+        <div>
+          <p class="section-label">Part 2</p>
+          <h2>Matrix Factorization</h2>
+          <p class="subtitle">큰 유저-아이템 행렬 R을 작은 두 행렬 P와 Q로 근사한다. 유저와 아이템을 같은 숨은 취향 공간에 놓는다는 뜻이다.</p>
+        </div>
+      </section>
+
+      <section class="slide split" id="s11">
+        <div>
+          <p class="section-label">MF intuition</p>
+          <h2>R ≈ P × Q, 숨은 취향 차원을 찾는다</h2>
+          <ul class="bullets">
+            <li>user vector는 사용자의 잠재 취향이다.</li>
+            <li>item vector는 repo의 잠재 특성이다.</li>
+            <li>두 벡터의 내적이 높으면 추천 점수가 높다.</li>
+          </ul>
+        </div>
+        <div class="panel als">
+          <div class="kicker">Score</div>
+          <div class="big-number">u · i</div>
+          <p>기존 표현: 예측 = 유저 벡터 · 아이템 벡터. 방향이 비슷할수록 내적값이 커지고 높은 예측 점수가 된다.</p>
+        </div>
+      </section>
+
+      <section class="slide" id="s12">
+        <p class="section-label">ALS / BPR</p>
+        <h2>ALS는 확신도를 두고, BPR은 순서를 맞춘다</h2>
+        <div class="flow">
+          <div class="flow-row"><div class="flow-tag als">ALS</div><div class="flow-box"><strong>P 고정 → Q 최적화, Q 고정 → P 최적화</strong><span>많이 본 아이템일수록 "선호한다고 더 믿는다"는 가중치를 둔다.</span></div><div class="flow-out">Score</div></div>
+          <div class="flow-row"><div class="flow-tag tower">BPR</div><div class="flow-box"><strong>본 것 > 안 본 것</strong><span>정확한 점수보다 본 repo가 안 본 repo보다 앞서도록 학습한다.</span></div><div class="flow-out">Order</div></div>
+          <div class="flow-row"><div class="flow-tag rank">공통점</div><div class="flow-box"><strong>둘 다 embedding을 얻는다</strong><span>학습된 user/item 벡터는 연관 추천과 빠른 검색에 활용된다.</span></div><div class="flow-out">Vector</div></div>
+        </div>
+      </section>
+
+      <section class="slide" id="s13">
+        <p class="section-label">ALS strengths</p>
+        <h2>ALS가 좋다는 말은 비교로 확인해야 한다</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th class="num">NDCG@10</th>
+              <th class="num">NDCG@100</th>
+              <th class="num">Unique@100</th>
+              <th>해석</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Popularity</td>
+              <td class="num">0.002234</td>
+              <td class="num">0.008002</td>
+              <td class="num">183</td>
+              <td>fallback 기준선. 개인화와 다양성이 약하다.</td>
+            </tr>
+            <tr>
+              <td>ALS</td>
+              <td class="num winner">0.008141</td>
+              <td class="num winner">0.011666</td>
+              <td class="num">9,970</td>
+              <td>정확도 기준 warm user에서 가장 강한 retrieval baseline.</td>
+            </tr>
+            <tr>
+              <td>Two-Tower</td>
+              <td class="num">0.003480</td>
+              <td class="num">0.007365</td>
+              <td class="num winner">99,615</td>
+              <td>정확도는 낮지만 후보 다양성을 크게 넓힌다.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">따라서 "ALS가 좋다"는 말은 정확도 기준의 이야기다. 다양성까지 보면 Two-Tower를 함께 후보 source로 섞는 해석이 더 맞다.</div>
+      </section>
+
+      <section class="slide split" id="s14">
+        <div>
+          <p class="section-label">ALS limits</p>
+          <h2>하지만 ALS만으로는 부족하다</h2>
+          <ul class="bullets">
+            <li>신규 유저와 신규 아이템에는 약하다.</li>
+            <li>language, topic, stars 같은 side feature를 직접 쓰기 어렵다.</li>
+            <li>최종 제품에는 다양성, 신선도, 정책 제약도 필요하다.</li>
+          </ul>
+        </div>
+        <div class="panel warn">
+          <h3>해석</h3>
+          <p>ALS는 강한 기준선이지만 완성된 추천 제품은 아니다. retrieval source 중 하나로 보는 편이 안전하다.</p>
+        </div>
+      </section>
+
+      <section class="slide" id="s15">
+        <p class="section-label">Embedding</p>
+        <h2>Embedding은 상품/유저에 대한 숫자의 집합이다</h2>
+        <div class="cards three">
+          <div class="card"><strong>가까운 벡터</strong><p>비슷한 repo, 비슷한 user로 해석할 수 있다.</p></div>
+          <div class="card"><strong>내적 점수</strong><p>방향이 비슷할수록 추천 점수가 커진다.</p></div>
+          <div class="card"><strong>검색 문제</strong><p>Top-K 추천은 nearest neighbor search가 된다.</p></div>
+          <div class="card"><strong>Repo2Repo</strong><p>item factor끼리 비교하면 related repo 후보를 만들 수 있다.</p></div>
+          <div class="card"><strong>BPR 관점</strong><p>절대 점수보다 본 item이 안 본 item보다 위에 오게 학습한다.</p></div>
+          <div class="card"><strong>서빙 연결</strong><p>embedding은 빠른 검색과 미리 계산한 후보 목록으로 이어진다.</p></div>
+        </div>
+        <div class="callout">추천 모델의 output은 단순 점수표가 아니라 검색 가능한 벡터 공간이다.</div>
+      </section>
+
+      <section class="slide center" id="s16">
+        <div>
+          <p class="section-label">Part 3</p>
+          <h2>Embedding Search</h2>
+          <p class="subtitle">벡터가 생기면 추천은 가까운 이웃 찾기가 된다. 정확하게 전부 비교하면 느리고, 그래서 빠른 검색 도구를 쓴다.</p>
+        </div>
+      </section>
+
+      <section class="slide split" id="s17">
+        <div>
+          <p class="section-label">가까운 이웃 찾기</p>
+          <h2>검색은 속도와 정확도의 trade-off다</h2>
+          <svg class="diagram" viewBox="0 0 620 360" role="img" aria-label="speed accuracy trade-off">
+            <line x1="78" y1="292" x2="545" y2="292" stroke="#94a3b8" stroke-width="2"></line>
+            <line x1="78" y1="292" x2="78" y2="64" stroke="#94a3b8" stroke-width="2"></line>
+            <text x="448" y="326" class="axis-label">빠름</text>
+            <text x="42" y="56" class="axis-label">정확</text>
+
+            <circle cx="126" cy="82" r="13" fill="#b45309"></circle>
+            <text x="148" y="89" class="bar-label">전부 비교</text>
+
+            <circle cx="332" cy="82" r="13" fill="#0f766e"></circle>
+            <text x="354" y="89" class="bar-label">FlatIP</text>
+
+            <circle cx="506" cy="220" r="13" fill="#b91c1c"></circle>
+            <text x="358" y="226" class="bar-label">IVFFlat 빠른 설정</text>
+
+            <path d="M126 82 C230 70, 290 78, 332 82 C430 106, 470 165, 506 220" fill="none" stroke="#cbd5e1" stroke-width="3" stroke-dasharray="8 8"></path>
+            <text x="110" y="270" class="axis-label">느림</text>
+            <text x="28" y="292" class="axis-label">낮음</text>
+          </svg>
+        </div>
+        <div>
+          <div class="metric-grid" style="grid-template-columns: 1fr;">
+            <div class="metric"><div class="label">전부 비교</div><div class="value">50.9ms</div><p class="note">Recall 100%</p></div>
+            <div class="metric"><div class="label">FlatIP</div><div class="value">2.4ms</div><p class="note">모든 벡터를 내적 점수로 빠르게 비교</p></div>
+            <div class="metric"><div class="label">IVFFlat 빠른 설정</div><div class="value">0.1ms</div><p class="note">284x, Recall 76%</p></div>
+          </div>
+          <div class="callout">5강 결론: 25만 item 규모에서는 FlatIP가 빠르면서 recall 100%라 가장 깔끔한 선택이었다.</div>
+        </div>
+      </section>
+
+      <section class="slide" id="s18">
+        <p class="section-label">빠른 벡터 검색</p>
+        <h2>FAISS는 retrieval layer의 속도 장치다</h2>
+        <table>
+          <thead><tr><th>방식</th><th>역할</th><th>강의 메시지</th></tr></thead>
+          <tbody>
+            <tr><td>FlatIP</td><td>모든 벡터를 내적 점수로 빠르게 비교</td><td>5강 벤치마크 기준 2.4ms, recall 100%라 기준으로 쓰기 좋다.</td></tr>
+            <tr><td>더 빠르게 찾기</td><td>일부 후보만 먼저 좁혀서 검색</td><td>catalog가 훨씬 커졌을 때 쓰지만, 너무 줄이면 정답을 놓칠 수 있다.</td></tr>
+            <tr><td>온라인 흐름</td><td>유저 벡터 -> FAISS -> 후보 repo</td><td>모델 품질 개선이 아니라 서빙 가능한 retrieval로 바꾸는 장치다.</td></tr>
+          </tbody>
+        </table>
+        <div class="callout">이번 복습에서는 "정확하게 찾는데도 충분히 빠른 방식"을 기준으로 잡는다. 더 어려운 인덱스 튜닝은 catalog가 훨씬 커졌을 때의 주제다.</div>
+      </section>
+
+      <section class="slide split" id="s19">
+        <div>
+          <p class="section-label">Two-Tower</p>
+          <h2>Two-Tower는 유저와 아이템을 따로 인코딩한다</h2>
+          <ul class="bullets">
+            <li>User tower: 유저 id, 활동 요약, 선호 신호</li>
+            <li>Item tower: repo id, language, stars, forks, metadata</li>
+            <li>두 tower output을 같은 embedding 공간으로 맞춘다.</li>
+          </ul>
+        </div>
+        <div class="panel tower">
+          <h3>왜 두 개로 나누나?</h3>
+          <div class="flow" style="margin-top: 14px;">
+            <div class="flow-row" style="grid-template-columns: 95px minmax(0, 1fr);">
+              <div class="flow-tag tower">미리</div>
+              <div class="flow-box"><strong>모든 repo를 벡터로 저장</strong><span>repo는 많지만 자주 바뀌지 않으므로 미리 계산해 둔다.</span></div>
+            </div>
+            <div class="flow-row" style="grid-template-columns: 95px minmax(0, 1fr);">
+              <div class="flow-tag als">요청</div>
+              <div class="flow-box"><strong>현재 유저를 벡터로 변환</strong><span>유저의 활동 요약으로 "이 유저가 좋아할 방향"을 만든다.</span></div>
+            </div>
+            <div class="flow-row" style="grid-template-columns: 95px minmax(0, 1fr);">
+              <div class="flow-tag rank">검색</div>
+              <div class="flow-box"><strong>가까운 repo 벡터를 후보로 선택</strong><span>그 다음 ranker가 후보의 최종 순서를 정한다.</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" id="s20">
+        <p class="section-label">Two-Tower result</p>
+        <h2>최신 전체 warm user 재학습 결과</h2>
+        <div class="metric-grid">
+          <div class="metric"><div class="label">Train interactions</div><div class="value">2.38M</div></div>
+          <div class="metric"><div class="label">Item catalog</div><div class="value">100K</div></div>
+          <div class="metric"><div class="label">Eval users</div><div class="value">141K</div></div>
+          <div class="metric"><div class="label">Elapsed</div><div class="value">15.35m</div></div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th class="num">NDCG@10</th>
+              <th class="num">NDCG@50</th>
+              <th class="num">NDCG@100</th>
+              <th class="num">Recall@100</th>
+              <th class="num">Unique@100</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Popularity</td>
+              <td class="num">0.002234</td>
+              <td class="num">0.005661</td>
+              <td class="num">0.008002</td>
+              <td class="num winner">0.035600</td>
+              <td class="num">183</td>
+            </tr>
+            <tr>
+              <td>ALS</td>
+              <td class="num winner">0.008141</td>
+              <td class="num winner">0.010538</td>
+              <td class="num winner">0.011666</td>
+              <td class="num">0.030740</td>
+              <td class="num">9,970</td>
+            </tr>
+            <tr>
+              <td>Two-Tower</td>
+              <td class="num">0.003480</td>
+              <td class="num">0.005865</td>
+              <td class="num">0.007365</td>
+              <td class="num">0.025077</td>
+              <td class="num winner">99,615</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide" id="s21">
+        <p class="section-label">정확도 vs 다양성</p>
+        <h2>같은 결과를 두 축으로 읽는다</h2>
+        <svg class="diagram" viewBox="0 0 980 390" role="img" aria-label="NDCG and diversity comparison">
+          <text x="60" y="50" class="axis-label">NDCG@100</text>
+          <rect x="170" y="80" width="95" height="62" rx="6" fill="#b45309" opacity="0.72"></rect>
+          <rect x="170" y="158" width="139" height="62" rx="6" fill="#2563eb" opacity="0.82"></rect>
+          <rect x="170" y="236" width="88" height="62" rx="6" fill="#0f766e" opacity="0.82"></rect>
+          <text x="60" y="120" class="bar-label">Popularity</text>
+          <text x="60" y="198" class="bar-label">ALS</text>
+          <text x="60" y="276" class="bar-label">Two-Tower</text>
+          <text x="285" y="120" class="bar-label">0.0080</text>
+          <text x="329" y="198" class="bar-label">0.0117</text>
+          <text x="278" y="276" class="bar-label">0.0074</text>
+
+          <text x="520" y="50" class="axis-label">Unique@100</text>
+          <rect x="630" y="80" width="2" height="62" rx="2" fill="#b45309" opacity="0.72"></rect>
+          <rect x="630" y="158" width="60" height="62" rx="6" fill="#2563eb" opacity="0.82"></rect>
+          <rect x="630" y="236" width="300" height="62" rx="6" fill="#0f766e" opacity="0.82"></rect>
+          <text x="520" y="120" class="bar-label">Popularity</text>
+          <text x="520" y="198" class="bar-label">ALS</text>
+          <text x="520" y="276" class="bar-label">Two-Tower</text>
+          <text x="650" y="120" class="bar-label">183</text>
+          <text x="710" y="198" class="bar-label">9,970</text>
+          <text x="800" y="276" class="bar-label">99,615</text>
+        </svg>
+        <div class="callout">ALS는 맞히는 힘이 좋고, Two-Tower는 catalog를 넓게 탐색한다. 둘은 경쟁자이면서 동시에 서로 보완재다.</div>
+      </section>
+
+      <section class="slide split" id="s22">
+        <div>
+          <p class="section-label">Production interpretation</p>
+          <h2>Two-Tower는 실패가 아니라 역할이 달랐다</h2>
+          <ul class="bullets">
+            <li>정확도만 보면 ALS가 우세하다.</li>
+            <li>Unique@100을 보면 Two-Tower가 catalog를 넓게 연다.</li>
+            <li>따라서 "대체"보다 "candidate source 추가"가 맞다.</li>
+          </ul>
+        </div>
+        <div class="panel tower">
+          <div class="kicker">Recipe</div>
+          <div class="big-number">mix</div>
+          <p>ALS, popularity, related repo, Two-Tower 후보를 섞고 source feature를 ranker에 넘긴다.</p>
+        </div>
+      </section>
+
+      <section class="slide center" id="s23">
+        <div>
+          <p class="section-label">Part 4</p>
+          <h2>Two-stage Architecture</h2>
+          <p class="subtitle">전체 아이템을 한 번에 정렬하지 않는다. Stage 1은 빠르게 후보를 넓게 찾고, Stage 2는 후보를 정교하게 다시 정렬한다.</p>
+        </div>
+      </section>
+
+      <section class="slide" id="s24">
+        <p class="section-label">Candidate Generation + Re-ranking</p>
+        <h2>Retrieval은 놓치지 않는 일, Ranking은 위로 올리는 일</h2>
+        <div class="flow">
+          <div class="flow-row"><div class="flow-tag als">Stage 1</div><div class="flow-box"><strong>Candidate Generation</strong><span>목표는 precision보다 recall이다. 후보 안에 정답이 들어오게 만든다.</span></div><div class="flow-out">Candidate</div></div>
+          <div class="flow-row"><div class="flow-tag rank">Stage 2</div><div class="flow-box"><strong>Re-ranking</strong><span>LGBM이 feature를 보고 후보의 순서를 고친다.</span></div><div class="flow-out">Top-K</div></div>
+        </div>
+        <div class="callout">두 stage는 같은 학습 기간 데이터와 같은 추론 시점 데이터 위에서 앞뒤로 이어진다. 다만 역할이 후보 찾기와 순서 고치기로 나뉜다.</div>
+      </section>
+
+      <section class="slide split" id="s25">
+        <div>
+          <p class="section-label">Candidate source를 섞는다</p>
+          <h2>후보 소스는 하나일 필요가 없다</h2>
+          <ul class="bullets">
+            <li>ALS head: 정확도 높은 collaborative 후보</li>
+            <li>ALS tail: 덜 뻔한 후보 보강</li>
+            <li>Recent/popular: fallback과 trend 대응</li>
+            <li>Related repo: repo-to-repo 탐색</li>
+            <li>Two-Tower: side feature 기반 diversity</li>
+          </ul>
+        </div>
+        <div class="panel als">
+          <h3>Ranker가 보는 것</h3>
+          <p>후보 source 자체도 중요한 feature다. 어떤 경로로 들어온 후보인지가 최종 정렬에 도움이 된다.</p>
+        </div>
+      </section>
+
+      <section class="slide" id="s26">
+        <p class="section-label">피처 조합</p>
+        <h2>Re-ranking은 피처 조합을 보는 문제다</h2>
+        <div class="cards three">
+          <div class="card"><strong>User feature</strong><p>활동량, 최근성, 선호 language/topic</p></div>
+          <div class="card"><strong>Item feature</strong><p>stars, forks, language, freshness, popularity</p></div>
+          <div class="card"><strong>Pair feature</strong><p>ALS score, repo similarity, seen distance</p></div>
+          <div class="card"><strong>Source feature</strong><p>ALS, popular, recent, related, two-tower</p></div>
+          <div class="card"><strong>Context feature</strong><p>기간, catalog, candidate rank</p></div>
+          <div class="card"><strong>Label</strong><p>미래 기간 interaction 여부</p></div>
+        </div>
+        <div class="callout">기존 슬라이드 예시처럼 시간=12시와 선호=한식은 따로 보면 약하지만, 조합하면 "점심에 한식 도시락" 같은 강한 추천 신호가 된다.</div>
+      </section>
+
+      <section class="slide" id="s27">
+        <p class="section-label">Latest re-rank</p>
+        <h2>후보를 만든 뒤에는 LGBM이 가장 안정적이었다</h2>
+        <div class="metric-grid">
+          <div class="metric"><div class="label">Rank rows</div><div class="value">163K</div></div>
+          <div class="metric"><div class="label">Positive labels</div><div class="value">877</div></div>
+          <div class="metric"><div class="label">LGBM NDCG@100</div><div class="value">0.0222</div></div>
+          <div class="metric"><div class="label">Recall@100</div><div class="value">0.0758</div></div>
+        </div>
+        <table>
+          <thead><tr><th>Re-rank 비교</th><th class="num">NDCG@10</th><th class="num">NDCG@100</th><th class="num">Recall@100</th><th>해석</th></tr></thead>
+          <tbody>
+            <tr><td>ALS/Fallback</td><td class="num">0.008321</td><td class="num">0.018460</td><td class="num">0.065736</td><td>retrieval 후보를 그대로 쓰는 기준선</td></tr>
+            <tr><td>Two-Stage/LGBM</td><td class="num winner">0.010989</td><td class="num winner">0.022160</td><td class="num winner">0.075824</td><td>적은 positive label에서도 가장 안정적</td></tr>
+            <tr><td>FM / Deep&Wide / DeepFM / DLRM</td><td class="num">0.006771</td><td class="num">0.015860</td><td class="num">0.057748</td><td>같은 값으로 수렴해 튜닝/데이터 한계로 해석</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide split" id="s28">
+        <div>
+          <p class="section-label">Deep ranker</p>
+          <h2>DeepFM, DLRM이 항상 이기지는 않는다</h2>
+          <ul class="bullets">
+            <li>positive label이 적으면 neural ranker가 안정적으로 학습하기 어렵다.</li>
+            <li>tabular feature가 강하면 tree model이 매우 강한 baseline이다.</li>
+            <li>딥러닝은 데이터량, negative sampling, calibration까지 같이 봐야 한다.</li>
+          </ul>
+        </div>
+        <div class="panel warn">
+          <h3>강의 메시지</h3>
+          <p>"복잡한 모델 = 더 좋은 모델"이 아니다. 같은 split에서 단순한 강한 baseline을 이겨야 한다.</p>
+        </div>
+      </section>
+
+      <section class="slide" id="s29">
+        <p class="section-label">CTR/CVR만으로는 부족하다</p>
+        <h2>오프라인 평가는 빠른 비교와 디버깅용이다</h2>
+        <table>
+          <thead><tr><th>Metric</th><th>묻는 질문</th><th>주의점</th></tr></thead>
+          <tbody>
+            <tr><td>nDCG@K</td><td>정답을 얼마나 위쪽에 잘 올렸나?</td><td>상단 랭킹 품질에 민감하다.</td></tr>
+            <tr><td>Recall@K</td><td>미래 interaction을 후보 안에 얼마나 담았나?</td><td>Candidate Generation 진단에 중요하다.</td></tr>
+            <tr><td>Unique@K</td><td>전체 유저에게 얼마나 다양한 아이템을 추천했나?</td><td>정확도와 trade-off가 있다.</td></tr>
+            <tr><td>Latency</td><td>서비스에서 제시간에 응답 가능한가?</td><td>offline metric만 좋으면 부족하다.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide split" id="s30">
+        <div>
+          <p class="section-label">Leakage</p>
+          <h2>성능 수치보다 먼저 leakage를 본다</h2>
+          <ul class="bullets">
+            <li>ranker train label과 eval label이 같은 기간에서 오면 안 된다.</li>
+            <li>미래 popularity나 최신 metadata를 과거 예측 feature로 쓰면 위험하다.</li>
+            <li>notebook 실험과 production script 결과를 구분해야 한다.</li>
+          </ul>
+        </div>
+        <div class="panel warn">
+          <h3>주의</h3>
+          <p>초기 <code>07_two_stage.ipynb</code>는 개념 설명용이다. 성능 결론은 최신 script/docs 기준으로 말한다.</p>
+        </div>
+      </section>
+
+      <section class="slide center" id="s31">
+        <div>
+          <p class="section-label">Part 5</p>
+          <h2>최종 시스템 연결</h2>
+          <p class="subtitle">최종 복습에서는 notebook 결과가 어디까지 이어지는지 봐야 한다. 학습 산출물은 API가 읽고, 시뮬레이터는 그 API를 호출해서 추천 결과를 보여준다.</p>
+        </div>
+      </section>
+
+      <section class="slide" id="s32">
+        <p class="section-label">Notebook에서 서비스까지</p>
+        <h2>추천 실험은 앱에서 확인될 때 완성된다</h2>
+        <div class="flow">
+          <div class="flow-row"><div class="flow-tag pop">1. Mart</div><div class="flow-box"><strong>event log를 추천 데이터로 고정</strong><span>history, rank-label, test, feature, 후보 repo를 만든다.</span></div><div class="flow-out">Data</div></div>
+          <div class="flow-row"><div class="flow-tag als">2. Model</div><div class="flow-box"><strong>ALS / LGBM / Two-Tower 학습</strong><span>성능표, 모델 파일, 피처 순서, 추천 후보를 함께 남긴다.</span></div><div class="flow-out">Artifacts</div></div>
+          <div class="flow-row"><div class="flow-tag rank">3. API</div><div class="flow-box"><strong>추천 API가 현재 쓸 산출물을 로딩</strong><span>백엔드가 호출할 수 있는 안정적인 endpoint로 만든다.</span></div><div class="flow-out">Serve</div></div>
+          <div class="flow-row"><div class="flow-tag tower">4. Backend/UI</div><div class="flow-box"><strong>백엔드가 추천 API를 가져다 쓴다</strong><span>시뮬레이터는 그 연동을 강의용으로 확인하는 작은 UI다.</span></div><div class="flow-out">Product</div></div>
+        </div>
+      </section>
+
+      <section class="slide split" id="s33">
+        <div>
+          <p class="section-label">현재 모델 선택</p>
+          <h2>API는 검증된 모델 버전을 읽는다</h2>
+          <ul class="bullets">
+            <li>노트북과 스크립트는 여러 모델 후보를 만든다.</li>
+            <li>API는 그중 검증해서 선택한 한 버전만 읽어야 한다.</li>
+            <li>이 버전에는 모델, 후보 파일, 피처 규칙, 평가 결과가 함께 묶인다.</li>
+            <li>이 묶음이 맞아야 백엔드가 호출하는 API contract도 안정적으로 유지된다.</li>
+          </ul>
+        </div>
+        <div class="panel als">
+          <h3><code>/health</code> 예시</h3>
+          <pre><code>{
+  "status": "ok",
+  "service": "recsys-api",
+  "promoted_bundle_id": "recsys_v2_..."
+}</code></pre>
+          <p>여기서 <code>promoted_bundle_id</code>는 현재 API가 쓰는 검증된 모델 묶음이다. 백엔드와 시뮬레이터는 이 버전을 기준으로 같은 입력/출력 약속을 믿고 호출한다.</p>
+        </div>
+      </section>
+
+      <section class="slide" id="s34">
+        <p class="section-label">Serving architecture</p>
+        <h2>API는 모델 파일 하나만 읽지 않는다</h2>
+        <div class="cards three">
+          <div class="card"><strong>미리 계산한 후보</strong><p>유저별 후보 repo와 점수</p></div>
+          <div class="card"><strong>Ranker 산출물</strong><p>모델, 피처 순서, 입력 규칙</p></div>
+          <div class="card"><strong>Metadata DB</strong><p>repo name, language, stars</p></div>
+          <div class="card"><strong>FAISS 검색 구조</strong><p>embedding으로 가까운 repo 찾기</p></div>
+          <div class="card"><strong>Fallback list</strong><p>cold user와 장애 대응</p></div>
+          <div class="card"><strong>Post-processing</strong><p>filtering, dedupe, source mix, 이미 본 repo 제거</p></div>
+        </div>
+      </section>
+
+      <section class="slide split" id="s35">
+        <div>
+          <p class="section-label">API contract</p>
+          <h2>API contract는 백엔드와 추천 API의 약속이다</h2>
+          <ul class="bullets">
+            <li>백엔드는 어떤 값을 보내야 하는지 알아야 한다.</li>
+            <li>API는 어떤 형태로 추천 결과를 돌려줄지 고정해야 한다.</li>
+            <li>모델이 바뀌어도 이 약속이 유지되어야 서비스 화면이 깨지지 않는다.</li>
+          </ul>
+          <div class="cards" style="grid-template-columns: 1fr; margin-top: 22px;">
+            <div class="card"><strong>요청</strong><p>actor_id, 추천 개수, 필요하면 bundle_id</p></div>
+            <div class="card"><strong>응답</strong><p>추천 repo 목록, 점수, 후보 출처, cold start 여부</p></div>
+          </div>
+        </div>
+        <div>
+          <pre><code>POST /v1/recsys/recommendations
+{
+  "actor_id": 123,
+  "limit": 10
+}</code></pre>
+          <pre><code>{
+  "actor_id": 123,
+  "cold_start": false,
+  "bundle_id": "recsys_v2_lgbm",
+  "items": [
+    {
+      "repo_id": 42,
+      "repo_name": "owner/repo",
+      "source": "als+lgbm",
+      "score": 0.81
+    }
+  ]
+}</code></pre>
+          <div class="callout">계약이 있어야 백엔드, 추천 API, 시뮬레이터, 모니터링이 같은 언어로 추천 결과를 해석한다.</div>
+        </div>
+      </section>
+
+      <section class="slide" id="s36">
+        <p class="section-label">Streamlit 시뮬레이터</p>
+        <h2>시뮬레이터로 추천 결과를 확인한다</h2>
+        <div class="cards three">
+          <div class="card"><strong>입력</strong><p>GitHub user 또는 actor 정보를 넣어 추천을 요청한다.</p></div>
+          <div class="card"><strong>API 호출</strong><p>시뮬레이터가 로컬 추천 API로 요청을 보낸다.</p></div>
+          <div class="card"><strong>추천 결과</strong><p>추천 repo, score, source, metadata를 화면에서 확인한다.</p></div>
+          <div class="card"><strong>Cold Start</strong><p>후보가 없는 유저는 안내 문구와 fallback 필요성을 보여준다.</p></div>
+          <div class="card"><strong>디버깅</strong><p>API health, 현재 모델 버전, 빈 결과 여부를 확인한다.</p></div>
+          <div class="card"><strong>최종 메시지</strong><p>노트북 결과가 API와 UI 경험으로 이어진다.</p></div>
+        </div>
+      </section>
+
+      <section class="slide center" id="s37">
+        <div>
+          <p class="section-label">Part 6</p>
+          <h2>Cold Start와 Fallback</h2>
+          <p class="subtitle">기존 5강 표현 그대로, Cold Start는 학습할 데이터가 없는 신규 유저/아이템 문제다. 그래서 Baseline & Fallback이 필요하다.</p>
+        </div>
+      </section>
+
+      <section class="slide split" id="s38">
+        <div>
+          <p class="section-label">Cold Start</p>
+          <h2>신규 유저/아이템은 행렬에 행이나 열이 없다</h2>
+          <ul class="bullets">
+            <li>cold user는 history가 없어 ALS 개인화 후보를 만들기 어렵다.</li>
+            <li>cold item은 interaction이 없어 collaborative 모델에 잘 들어오지 않는다.</li>
+            <li>fallback은 예외 처리가 아니라 제품 정책이다.</li>
+          </ul>
+        </div>
+        <div class="panel warn">
+          <h3>현재 구현 상태</h3>
+          <p>미리 계산한 후보 목록에 actor가 없으면 API는 <code>ActorNotFoundError</code>를 내고, simulator가 Cold Start 안내를 보여준다. 즉 fallback 결과를 API가 직접 반환하는 단계는 아직 아니다.</p>
+          <div class="callout">10주차 과제: unknown actor에게 무엇을 보여줄지 명시적으로 설계하기.</div>
+        </div>
+      </section>
+
+      <section class="slide" id="s39">
+        <p class="section-label">Fallback 설계</p>
+        <h2>Warm user와 Cold Start를 나눠 본다</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>상황</th>
+              <th>쓸 수 있는 신호</th>
+              <th>추천 정책</th>
+              <th>강의 메시지</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Warm user</td>
+              <td>history repo, weighted score, user profile</td>
+              <td>ALS / Two-Tower 후보 + LGBM re-rank</td>
+              <td>개인화 모델의 주 무대</td>
+            </tr>
+            <tr>
+              <td>User Cold Start</td>
+              <td>없거나 매우 적은 history</td>
+              <td>recent popular, trending, onboarding language/topic</td>
+              <td>fallback 품질이 첫 경험을 좌우</td>
+            </tr>
+            <tr>
+              <td>Item Cold Start</td>
+              <td>language, topics, owner, stars, text metadata</td>
+              <td>same topic/language, related repo, exploration slot</td>
+              <td>side feature와 탐색 정책이 필요</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide split" id="s40">
+        <div>
+          <p class="section-label">현재 vs Production</p>
+          <h2>Cold Start 응답은 404에서 끝나면 안 된다</h2>
+          <div class="flow">
+            <div class="flow-row">
+              <div class="flow-tag pop">현재</div>
+              <div class="flow-box"><strong>unknown actor → 404</strong><span>앱이 빈 결과와 안내 문구를 보여준다.</span></div>
+              <div class="flow-out">설명용</div>
+            </div>
+            <div class="flow-row">
+              <div class="flow-tag tower">Production</div>
+              <div class="flow-box"><strong>unknown actor → fallback Top-K</strong><span>인기순, 최신순, 트렌디 repo, onboarding topic을 섞고 <code>cold_start=true</code>를 내려준다.</span></div>
+              <div class="flow-out">제품용</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel warn">
+          <h3>모니터링해야 할 값</h3>
+          <ul class="bullets">
+            <li><code>cold_start_rate</code></li>
+            <li><code>empty_result_rate</code></li>
+            <li><code>fallback_source_mix</code></li>
+            <li><code>cold/warm segment quality</code></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide split" id="s41">
+        <div>
+          <p class="section-label">Item Cold Start</p>
+          <h2>신규 repo는 collaborative 모델에 바로 잡히지 않는다</h2>
+          <ul class="bullets">
+            <li>interaction이 없으므로 ALS factor가 약하거나 없다.</li>
+            <li>language, topic, owner, README, stars 같은 metadata가 필요하다.</li>
+            <li>exploration slot으로 신규 repo 노출 기회를 만든다.</li>
+          </ul>
+        </div>
+        <div class="panel tower">
+          <h3>해결 방향</h3>
+          <p>content-based retrieval, repo-to-repo related graph, topic/language fallback이 cold item 문제의 출발점이다.</p>
+        </div>
+      </section>
+
+      <section class="slide" id="s42">
+        <p class="section-label">체크리스트</p>
+        <h2>추천 실험을 볼 때 반드시 묻는 질문</h2>
+        <div class="cards">
+          <div class="card"><strong>같은 split인가?</strong><p>history, rank_label, test 기간이 다르면 수치를 직접 비교할 수 없다.</p></div>
+          <div class="card"><strong>같은 catalog인가?</strong><p>전체 repo인지 100k catalog인지에 따라 recall과 diversity가 바뀐다.</p></div>
+          <div class="card"><strong>seen filtering이 일관적인가?</strong><p>이미 본 repo를 추천하면 평가와 제품 경험이 모두 왜곡된다.</p></div>
+          <div class="card"><strong>cold-start를 어떻게 처리하는가?</strong><p>unknown actor와 신규 repo는 별도 fallback 정책이 필요하다.</p></div>
+          <div class="card"><strong>metadata leakage는 없는가?</strong><p>stars/forks/topics가 현재 snapshot이면 과거 예측 평가에서는 조심해야 한다.</p></div>
+          <div class="card"><strong>serving까지 연결되는가?</strong><p>offline 점수, 빠른 검색 구조, API 응답, UI fallback이 한 흐름이어야 한다.</p></div>
+        </div>
+        <div class="callout">주의: 초기 <code>07_two_stage.ipynb</code>는 개념 설명용이다. 성능 결론은 최신 script/docs 기준으로 말한다.</div>
+      </section>
+
+      <section class="slide" id="s43">
+        <p class="section-label">오늘의 핵심 키워드</p>
+        <h2>이 단어들로 전체 구조를 설명할 수 있어야 한다</h2>
+        <div class="cards three">
+          <div class="card"><strong>Sparsity</strong><p>대부분의 user-item 조합은 관측되지 않는다.</p></div>
+          <div class="card"><strong>Matrix Factorization</strong><p>희소 행렬을 user/item 숨은 취향 벡터로 압축한다.</p></div>
+          <div class="card"><strong>Embedding Search</strong><p>추천을 벡터 검색 문제로 바꾼다.</p></div>
+          <div class="card"><strong>Two-stage</strong><p>Candidate Generation과 Re-ranking을 분리한다.</p></div>
+          <div class="card"><strong>추천 운영</strong><p>피처, 모델, 검색 구조, API, 모니터링을 연결한다.</p></div>
+          <div class="card"><strong>Cold Start</strong><p>신호가 없을 때 fallback 정책으로 제품 경험을 만든다.</p></div>
+        </div>
+      </section>
+
+      <section class="slide center" id="s44">
+        <div>
+          <p class="section-label">정리</p>
+          <h2>Week 10 한 문장</h2>
+          <p class="subtitle">추천 ML은 모델 하나를 고르는 일이 아니라, Feedback Data를 sparse matrix로 만들고, 후보 생성과 재정렬, fallback과 API까지 이어 붙이는 일이다.</p>
+          <pre><code>Sparsity = 추천 문제의 출발점
+MF/ALS = collaborative accuracy baseline
+Two-Tower = diversity source
+LGBM = ranking quality
+운영 = offline 결과를 online 제품으로 연결
+Fallback = Cold Start product policy</code></pre>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const slides = Array.from(document.querySelectorAll(".slide"));
+      const current = document.getElementById("current");
+      const total = document.getElementById("total");
+      total.textContent = slides.length;
+      slides.forEach((slide, index) => {
+        const marker = slide.querySelector(":scope > .section-label, :scope > .eyebrow, :scope > div > .section-label, :scope > div > .eyebrow");
+        if (marker && !marker.dataset.pageMarked) {
+          marker.dataset.pageMarked = "true";
+          marker.textContent = `${String(index + 1).padStart(2, "0")} · ${marker.textContent}`;
+        }
+      });
+
+      function activeIndex() {
+        const scrollY = window.scrollY + 120;
+        let idx = 0;
+        slides.forEach((slide, i) => {
+          if (slide.offsetTop <= scrollY) idx = i;
+        });
+        return idx;
+      }
+
+      function updateCounter() {
+        current.textContent = activeIndex() + 1;
+      }
+
+      function go(delta) {
+        const next = Math.max(0, Math.min(slides.length - 1, activeIndex() + delta));
+        slides[next].scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      document.getElementById("prev").addEventListener("click", () => go(-1));
+      document.getElementById("next").addEventListener("click", () => go(1));
+      window.addEventListener("scroll", updateCounter, { passive: true });
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowRight" || event.key === "PageDown") go(1);
+        if (event.key === "ArrowLeft" || event.key === "PageUp") go(-1);
+      });
+      updateCounter();
+    </script>
+  </body>
+</html>
