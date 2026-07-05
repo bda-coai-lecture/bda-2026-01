@@ -1,0 +1,1184 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>데이터 플랫폼의 세 가지 형태</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef2f5;
+        --paper: #ffffff;
+        --ink: #172033;
+        --muted: #64748b;
+        --line: #d6dee8;
+        --soft: #f4f7fa;
+        --raw: #475569;
+        --bq: #2563eb;
+        --model: #0f766e;
+        --quality: #b45309;
+        --auto: #6d28d9;
+        --bi: #15803d;
+        --ops: #b91c1c;
+      }
+
+      * {
+        box-sizing: border-box;
+        min-width: 0;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+        letter-spacing: 0;
+      }
+
+      .deck {
+        width: min(1440px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 22px 0 72px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 12px 0;
+        background: linear-gradient(var(--bg) 72%, rgb(238 242 245 / 0));
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        background: var(--model);
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      button {
+        display: inline-grid;
+        place-items: center;
+        width: 38px;
+        height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #fff;
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: var(--model);
+      }
+
+      .counter {
+        min-width: 96px;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+
+      .slide {
+        display: grid;
+        min-height: 760px;
+        margin: 18px 0 34px;
+        padding: 48px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        box-shadow: 0 18px 42px rgb(15 23 42 / 0.08);
+        scroll-margin-top: 74px;
+      }
+
+      .slide.title {
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        gap: 34px;
+        align-items: center;
+      }
+
+      .slide.split {
+        grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+        gap: 34px;
+      }
+
+      .slide.center {
+        place-items: center;
+        text-align: center;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--model);
+        font-size: 13px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        line-height: 1.05;
+        font-weight: 900;
+      }
+
+      h1 {
+        font-size: clamp(52px, 7vw, 96px);
+      }
+
+      h2 {
+        font-size: clamp(36px, 4.6vw, 68px);
+      }
+
+      .subtitle {
+        max-width: 900px;
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 23px;
+        line-height: 1.45;
+      }
+
+      .number {
+        color: var(--model);
+        font-size: clamp(88px, 13vw, 170px);
+        line-height: 0.9;
+        font-weight: 950;
+      }
+
+      .tagline {
+        margin-top: 24px;
+        padding: 18px 20px;
+        border-left: 5px solid var(--model);
+        border-radius: 8px;
+        background: #f0fdfa;
+        font-size: 22px;
+        font-weight: 800;
+      }
+
+      .bullets {
+        display: grid;
+        gap: 15px;
+        margin: 28px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .bullets li {
+        position: relative;
+        padding-left: 28px;
+        color: var(--ink);
+        font-size: 24px;
+        line-height: 1.42;
+      }
+
+      .bullets li::before {
+        content: "";
+        position: absolute;
+        top: 0.76em;
+        left: 0;
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        background: var(--model);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .card {
+        min-height: 136px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+      }
+
+      .card strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 19px;
+      }
+
+      .card span {
+        color: var(--muted);
+        font-size: 16px;
+      }
+
+      .map {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .map-step {
+        min-height: 126px;
+        padding: 17px;
+        border: 2px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .map-step b {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 19px;
+      }
+
+      .map-step span {
+        color: var(--muted);
+        font-size: 16px;
+      }
+
+      .raw { border-color: var(--raw); }
+      .bq { border-color: var(--bq); }
+      .model { border-color: var(--model); }
+      .quality { border-color: var(--quality); }
+      .auto { border-color: var(--auto); }
+      .bi { border-color: var(--bi); }
+      .ops { border-color: var(--ops); }
+
+      .matrix {
+        width: 100%;
+        margin-top: 28px;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 18px;
+      }
+
+      .matrix th,
+      .matrix td {
+        padding: 13px 15px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .matrix th {
+        background: var(--soft);
+        font-weight: 850;
+      }
+
+      .matrix tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .codebox {
+        margin: 26px 0 0;
+        padding: 18px 20px;
+        border-radius: 8px;
+        background: #111827;
+        color: #f9fafb;
+        font-size: 18px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .path {
+        margin-top: 22px;
+        padding: 14px 16px;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 16px;
+        overflow-wrap: anywhere;
+      }
+
+      .note {
+        margin: 24px 0 0;
+        padding: 15px 18px;
+        border-left: 5px solid var(--quality);
+        border-radius: 8px;
+        background: #fffbeb;
+        color: #78350f;
+        font-size: 18px;
+        font-weight: 650;
+      }
+
+      .visual-panel {
+        margin-top: 28px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f8fafc;
+      }
+
+      .visual-title {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .visual-panel svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      @media (max-width: 900px) {
+        .slide,
+        .slide.title,
+        .slide.split {
+          grid-template-columns: 1fr;
+          min-height: auto;
+          padding: 28px;
+        }
+
+        .cards,
+        .map {
+          grid-template-columns: 1fr;
+        }
+
+        .bullets li {
+          font-size: 20px;
+        }
+      }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .topbar {
+          display: none;
+        }
+
+        .deck {
+          width: 100%;
+          padding: 0;
+        }
+
+        .slide {
+          min-height: 100vh;
+          margin: 0;
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+          break-after: page;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <div class="topbar">
+        <div class="brand"><span class="dot"></span><span>BDA 2기 데이터 플랫폼 케이스 스터디</span></div>
+        <div class="controls">
+          <button type="button" id="prev" aria-label="이전 슬라이드">‹</button>
+          <div class="counter" id="counter">1 / 1</div>
+          <button type="button" id="next" aria-label="다음 슬라이드">›</button>
+        </div>
+      </div>
+      <div id="slides"></div>
+    </main>
+
+    <script>
+      const slides = [
+        {
+          layout: "title",
+          section: "Overview",
+          title: "데이터 플랫폼의 세 가지 형태",
+          subtitle: "극초기 스타트업, 중간 규모 서비스, MAU 1000만 이상 테크 대기업은 같은 말을 써도 완전히 다른 데이터 플랫폼을 가짐.",
+          visual: "maturity",
+          note: "핵심 질문: 지금 우리에게 필요한 것은 거대한 플랫폼인가, 반복 가능한 최소 구조인가, 아니면 전문 기능인가.",
+          cards: [
+            ["1. 거의 없음", "데이터가 작고 질문이 즉흥적이면 쿼리와 시트만으로도 충분함."],
+            ["2. 중간 레이어", "raw를 직접 다루기 어려워지고 팀별 필요가 달라지면서 플랫폼이 필요해짐."],
+            ["3. 이미 있음", "대기업에서는 플랫폼과 직군이 이미 세분화되어 있고, 한 기능을 깊게 맡게 됨."]
+          ]
+        },
+        {
+          section: "오늘의 목표",
+          title: "플랫폼을 기술 목록이 아니라 상황으로 보기",
+          bullets: [
+            "데이터 플랫폼은 BigQuery, Airflow, dbt, Metabase의 조합 그 자체가 아님.",
+            "질문 수, 데이터 크기, 반복성, 책임 분리, 장애 비용이 커질수록 플랫폼의 모양이 바뀜.",
+            "오늘은 세 가지 조직 상태를 대비해서 어떤 데이터 구조가 자연스러운지 봄.",
+            "1번과 2번은 현재 Metabase에 올라간 예시를 이어서 확인함."
+          ]
+        },
+        {
+          section: "Frame",
+          title: "같은 데이터 플랫폼, 다른 문제",
+          table: [
+            ["상태", "주된 문제", "좋은 답"],
+            ["극초기", "아직 무엇을 봐야 하는지도 자주 바뀜", "빠르게 물어보고 바로 답하기"],
+            ["중간 규모", "raw가 크고 팀마다 필요한 지표가 갈라짐", "공통 fact와 mart 만들기"],
+            ["대기업", "이미 시스템이 있고 역할도 분리됨", "정해진 영역을 안정적으로 깊게 운영"]
+          ],
+          note: "좋은 플랫폼은 항상 큰 플랫폼이 아니라, 그 시점의 병목을 가장 싸게 줄이는 구조임."
+        },
+        {
+          section: "Scale",
+          title: "성숙도는 데이터 양만으로 결정되지 않음",
+          visual: "maturityFactors",
+          map: [
+            ["raw", "데이터 양", "raw를 매번 읽을 수 있는가"],
+            ["bi", "질문 반복성", "같은 지표를 계속 다시 보는가"],
+            ["model", "팀 분화", "영업, 마케팅, 제품, ML이 서로 다른 view를 원하는가"],
+            ["quality", "정확도 비용", "숫자가 틀렸을 때 의사결정 손실이 큰가"],
+            ["ops", "운영 비용", "실패와 지연을 사람이 매번 처리하는가"],
+            ["auto", "자동화 필요", "정해진 시간에 자동 갱신되어야 하는가"]
+          ]
+        },
+        {
+          section: "전체 대비",
+          title: "세 형태를 한 번에 보면",
+          table: [
+            ["구분", "극초기 스타트업", "중간 규모 서비스", "테크 대기업"],
+            ["대표 규모", "데이터 거의 없음", "MAU 10만~500만 또는 GitHub 예제급", "MAU 1000만 이상"],
+            ["주된 저장소", "운영 DB, CSV, Google Sheets", "Warehouse, Parquet, mart", "분산 warehouse, lakehouse, feature platform"],
+            ["소비 방식", "쿼리, 시트, 간단 BI", "Metabase, notebook, team mart", "사내 BI, 실험 플랫폼, ML platform"],
+            ["핵심 위험", "오버엔지니어링", "파편화와 정의 불일치", "복잡한 계약과 좁은 책임 범위"],
+            ["필요 인재", "문제 해결형 제너럴리스트", "분석+엔지니어링 연결형", "특정 기능에 강한 스페셜리스트"]
+          ]
+        },
+        {
+          section: "External References",
+          title: "최근 외부 자료도 같은 방향을 말함",
+          table: [
+            ["자료", "관찰 포인트"],
+            ["Metabase Data Stack Report 2025", "조사팀의 약 절반은 warehouse/lake 없이 analytics 데이터를 운영함"],
+            ["Xata 2026", "작은 팀은 별도 OLAP 없이 Postgres, materialized view, pg_cron으로 product analytics를 구성"],
+            ["MotherDuck 2026", "스타트업용 lean data stack은 복잡한 대형 warehouse보다 비용, 단순성, 로컬-first workflow를 강조"],
+            ["Spotify/Uber/Netflix 2024~2026", "대규모에서는 dashboard 품질, observability, 전문 data engineering 기능이 별도 제품처럼 분리"]
+          ],
+          path: "https://www.metabase.com/blog/metabase-community-data-stack-report-2025-key-analysis · https://xata.io/blog/postgres-data-warehouse · https://motherduck.com/learn/modern-data-warehouse-playbook"
+        },
+        {
+          section: "1. 극초기",
+          title: "찰나 같은 극초기 스타트업",
+          subtitle: "데이터도 거의 없고, 플랫폼이랄 것도 없음. 필요한 데이터를 그때그때 쿼리로 가져오는 단계.",
+          bullets: [
+            "대부분의 질문은 이번 주에 처음 생겼고 다음 주에는 바뀔 수 있음.",
+            "정교한 파이프라인보다 빠른 확인과 의사결정이 더 중요함.",
+            "쿼리 한 번, 시트 하나, 간단한 Metabase chart가 실제로 더 좋은 선택일 수 있음."
+          ]
+        },
+        {
+          section: "1. 극초기",
+          title: "이 단계에서는 어떻게 해도 큰일이 안 남",
+          bullets: [
+            "row 수가 작으면 raw table을 직접 읽어도 비용과 속도 문제가 거의 없음.",
+            "정의가 바뀌어도 영향받는 사람이 적고, 숫자를 보는 표면도 작음.",
+            "데이터 모델을 완성하기 전에 비즈니스 모델이 먼저 바뀔 수 있음.",
+            "따라서 완벽한 mart보다 질문에 맞는 쿼리와 설명이 우선임."
+          ],
+          note: "단, 숫자가 외부 보고나 정산으로 쓰이기 시작하면 이야기가 달라짐."
+        },
+        {
+          section: "1. 극초기",
+          title: "가능한 구성은 아주 단순함",
+          visual: "earlyStack",
+          map: [
+            ["raw", "운영 DB", "orders, users, events 같은 테이블을 바로 조회"],
+            ["bi", "Google Sheets", "CSV export, 수동 정리, 공유 문서"],
+            ["bi", "Metabase", "운영 DB 또는 read replica에 붙여 간단 chart"],
+            ["model", "SQL snippet", "자주 쓰는 조건만 저장"],
+            ["quality", "사람 검산", "이상하면 원천 row를 직접 확인"],
+            ["ops", "수동 갱신", "필요할 때 실행하고 캡처해서 공유"]
+          ]
+        },
+        {
+          section: "1. 극초기",
+          title: "비테크 기업은 더 큰 회사도 시트가 플랫폼임",
+          visual: "sheetPlatform",
+          bullets: [
+            "생각보다 많은 비테크 기업은 엑셀이나 Google Sheets를 사실상의 데이터 플랫폼처럼 씀.",
+            "대기업이어도 데이터가 핵심 제품이 아니면 자동화보다 보고 양식과 승인 흐름이 더 중요할 수 있음.",
+            "이 경우 플랫폼의 실체는 warehouse가 아니라 파일명, 담당자, 보고 주기, 수식 규칙일 때가 많음.",
+            "기술적으로 허술해 보여도 조직이 버티는 방식이면 당장 바꿀 이유가 약함."
+          ]
+        },
+        {
+          section: "1. 극초기",
+          title: "간단한 B2B BI도 이 방식으로 굴러감",
+          bullets: [
+            "고객사가 적고 계정별 사용량, 정산, 계약 상태 정도만 보면 되는 경우가 있음.",
+            "dashboard 수가 적고 지표 정의가 단순하면 복잡한 semantic layer가 필요하지 않음.",
+            "운영 DB 조회 부하만 조심하면 Metabase question 몇 개로 충분함.",
+            "이 단계의 좋은 엔지니어링은 시스템을 키우는 것이 아니라 불필요한 시스템을 만들지 않는 것임."
+          ]
+        },
+        {
+          section: "1. 극초기",
+          title: "이 단계에서 해야 할 최소한",
+          table: [
+            ["항목", "권장 수준"],
+            ["SQL 저장", "중요 쿼리는 개인 노트가 아니라 repo나 BI에 저장"],
+            ["지표 정의", "매출, 활성 고객, 전환 같은 핵심 지표만 문장으로 남김"],
+            ["스냅샷", "월말 보고처럼 다시 봐야 하는 숫자는 결과를 저장"],
+            ["권한", "운영 DB 직접 접근은 최소 인원으로 제한"],
+            ["백업", "시트가 플랫폼이면 시트 권한과 버전 기록을 관리"]
+          ]
+        },
+        {
+          section: "1. 극초기",
+          title: "하지 말아야 할 것",
+          cards: [
+            ["처음부터 복잡한 레이크", "데이터보다 인프라가 더 큰 문제가 됨."],
+            ["모든 지표의 완전한 정규화", "비즈니스 질문이 바뀌면 모델이 바로 폐기됨."],
+            ["과한 자동화", "사람이 한 달에 한 번 보는 숫자까지 DAG로 만들 필요는 없음."],
+            ["직군 세분화", "분석가, AE, DE를 나누기 전에 한 사람이 끝까지 보는 편이 빠름."]
+          ]
+        },
+        {
+          section: "Demo Bridge",
+          title: "Metabase에서 볼 1번 케이스",
+          subtitle: "찰나 예시는 '플랫폼이 거의 없는 상태에서 BI가 어떤 역할을 하는가'를 보여주기 좋음.",
+          bullets: [
+            "운영 데이터에 가까운 테이블을 바로 조회해서 지금 필요한 질문에 답함.",
+            "dashboard는 플랫폼이라기보다 공유 가능한 질문 모음에 가까움.",
+            "중요한 포인트는 기술 스택이 아니라 속도와 맥락임."
+          ],
+          note: "데모에서는 '이 정도면 굳이 더 만들 필요가 있나?'를 먼저 물어보면 좋음."
+        },
+        {
+          section: "External Case",
+          title: "외부 사례: warehouse를 안 쓰는 팀도 많음",
+          visual: "warehouseSkip",
+          bullets: [
+            "Metabase의 2025 커뮤니티 데이터 스택 리포트는 330개 이상 팀을 조사했고, 약 절반은 data warehouse나 lake 없이 analytics 데이터를 운영한다고 정리함.",
+            "이는 '초기부터 warehouse가 필수'라는 주장과 다름. 많은 팀은 transactional DB, reporting DB, BI, spreadsheet의 조합으로 꽤 오래 버팀.",
+            "수업의 1번 케이스는 특수한 예외가 아니라 실제 시장에서도 흔한 형태로 볼 수 있음."
+          ],
+          path: "Metabase Community Data Stack Report 2025 · https://www.metabase.com/blog/metabase-community-data-stack-report-2025-key-analysis"
+        },
+        {
+          section: "External Case",
+          title: "외부 사례: Postgres만으로 analytics warehouse 만들기",
+          bullets: [
+            "Xata는 2026년 글에서 작은 팀이 별도 OLAP stack 없이 vanilla Postgres 위에 product analytics warehouse를 만든 사례를 공유함.",
+            "identity, product usage, billing, PostHog event를 Postgres로 모으고 materialized view와 pg_cron으로 갱신함.",
+            "포인트는 Postgres가 항상 정답이라는 뜻이 아니라, 작은 팀에서는 운영 복잡도를 낮추는 선택이 충분히 합리적일 수 있다는 것임."
+          ],
+          path: "Xata, We skipped the OLAP stack and built our data warehouse in vanilla Postgres, 2026-03-17 · https://xata.io/blog/postgres-data-warehouse"
+        },
+        {
+          section: "External Case",
+          title: "외부 사례: 스타트업용 lean data stack",
+          visual: "leanStack",
+          bullets: [
+            "MotherDuck의 2026 startup warehouse playbook은 lean stack의 기준으로 단순성, 예측 가능한 비용, open format, 로컬-first 개발 흐름을 강조함.",
+            "SaaS API, 운영 DB, Parquet 같은 데이터 원천을 필요 이상으로 거대한 플랫폼에 올리기보다, 팀 규모와 query pattern에 맞춰 작게 시작하는 접근임.",
+            "찰나 같은 단계에서는 '데이터 플랫폼을 갖췄는가'보다 '질문에 빠르게 답하고 비용을 예측할 수 있는가'가 더 중요함."
+          ],
+          path: "MotherDuck, The Modern Data Warehouse Playbook for Startups, 2026 · https://motherduck.com/learn/modern-data-warehouse-playbook"
+        },
+        {
+          section: "2. 중간 규모",
+          title: "GitHub 데이터 같은 중간 규모",
+          subtitle: "raw를 그대로 다루기에는 리소스 문제가 생기고, 각 팀이 데이터를 다루는 목적도 달라지는 단계.",
+          bullets: [
+            "이전 재직 서비스의 MAU 10만~500만 규모도 이 범주와 비슷함.",
+            "raw event는 크고 복잡하며, 매번 직접 스캔하기 어렵거나 비쌈.",
+            "제품, 마케팅, 운영, ML이 같은 데이터를 서로 다른 방식으로 보려 함.",
+            "이때부터 데이터 플랫폼의 필요성이 진짜로 생김."
+          ]
+        },
+        {
+          section: "2. 중간 규모",
+          title: "파편화는 자연스럽게 시작됨",
+          visual: "fragmentation",
+          map: [
+            ["bi", "제품팀", "DAU, retention, funnel, cohort"],
+            ["bi", "마케팅", "campaign, attribution, LTV"],
+            ["ops", "운영팀", "정산, 이상 거래, CS 확인"],
+            ["model", "ML팀", "feature, label, training dataset"],
+            ["quality", "데이터팀", "지표 정의, 품질, lineage"],
+            ["raw", "엔지니어링", "로그 수집, schema 변경, 비용 제어"]
+          ],
+          note: "팀별 요구가 틀린 것이 아니라, 같은 raw에서 필요한 view가 달라지는 것임."
+        },
+        {
+          section: "2. 중간 규모",
+          title: "그래서 중간 가공 레이어가 생김",
+          visual: "processingLayers",
+          table: [
+            ["Layer", "역할", "왜 생기는가"],
+            ["Raw", "원천 이벤트와 운영 데이터", "최대한 그대로 보존"],
+            ["Staging", "컬럼명, 타입, 날짜, 키 정리", "분석 가능한 형태로 정돈"],
+            ["Fact", "비즈니스 grain을 고정", "반복 집계의 기준점"],
+            ["Mart", "팀과 용도별 지표 테이블", "BI와 분석 속도 개선"],
+            ["Feature", "모델 학습/서빙용 변수", "ML이 중요하면 별도 관리 필요"]
+          ]
+        },
+        {
+          section: "2. 중간 규모",
+          title: "GitHub 예제의 현재 구조",
+          visual: "architecture",
+          bullets: [
+            "BigQuery public raw event를 바로 dashboard에 붙이지 않음.",
+            "user-repo-action-day grain의 fact를 만들고, 그 위에 daily/weekly/retention mart를 둠.",
+            "Metabase는 mart를 보고, Airflow는 갱신과 guardrail을 담당함."
+          ]
+        },
+        {
+          section: "2. 중간 규모",
+          title: "중심 단위: 하루 · 유저 · Repo · 행동",
+          subtitle: "activity_date, user_id, repo_id, action 조합 하나가 분석의 기본 행이 됨.",
+          visual: "grain",
+          bullets: [
+            "기본 행의 단위가 고정되어야 DAU, WAU, 이벤트 유형별 비중, retention이 같은 기반에서 출발함.",
+            "raw event payload를 매번 다시 해석하지 않도록 fact table이 중간 계약 역할을 함.",
+            "dashboard와 notebook이 같은 fact를 보면 숫자 논쟁이 줄어듦."
+          ],
+          path: "dbt/gharchive_metrics/models/facts/fact_user_repo_activity.sql"
+        },
+        {
+          section: "2. 중간 규모",
+          title: "현재 mart는 질문별로 나뉨",
+          table: [
+            ["Mart", "답하는 질문"],
+            ["metrics_daily", "오늘 활동 유저와 repo는 얼마나 되는가"],
+            ["metrics_weekly", "주간 활동 규모는 어떻게 움직이는가"],
+            ["metrics_event_type_daily", "활동의 성격은 push, watch, fork 중 무엇인가"],
+            ["metrics_retention_summary", "처음 들어온 유저가 다음 주에도 남는가"],
+            ["metrics_user_segments", "가벼운 유저와 heavy user가 어떻게 나뉘는가"],
+            ["metrics_user_lifecycle_*", "유지, 복귀, 이탈이 어떻게 구성되는가"]
+          ],
+          path: "dbt/gharchive_metrics/models/marts/platform"
+        },
+        {
+          section: "2. 중간 규모",
+          title: "이 단계의 플랫폼은 반복성을 사는 것",
+          bullets: [
+            "매번 사람이 쿼리하는 대신 정해진 시간에 mart가 갱신됨.",
+            "지표 정의가 SQL과 dbt model로 남아서 재현 가능해짐.",
+            "품질 테스트와 drift check가 숫자의 이상을 먼저 알려줌.",
+            "BI가 raw를 직접 읽지 않으니 비용과 속도를 제어할 수 있음."
+          ],
+          path: "dags/gharchive_dbt_metrics.py · scripts/setup_metabase_dashboard.py"
+        },
+        {
+          section: "2. 중간 규모",
+          title: "직군 세분화는 회사마다 다름",
+          visual: "roleSplit",
+          table: [
+            ["데이터 중요도", "조직 모습"],
+            ["낮음", "백엔드나 PM이 필요한 쿼리를 직접 작성"],
+            ["중간", "분석가가 BI와 mart 정의를 주도하고 엔지니어가 수집/배치를 도움"],
+            ["높음", "Data Engineer, Analytics Engineer, Data Analyst가 느슨하게 분리"],
+            ["ML/AI 핵심", "DS, ML Engineer, Feature Store, Experimentation Platform까지 발달"]
+          ]
+        },
+        {
+          section: "2. 중간 규모",
+          title: "ML/AI를 적극 활용하면 별도 축이 생김",
+          bullets: [
+            "추천, 검색, 광고, 개인화가 핵심이면 분석 mart와 feature mart의 요구가 달라짐.",
+            "feature는 학습 시점과 서빙 시점의 정합성이 중요하고, label leakage 같은 문제가 생김.",
+            "모델 실험, feature registry, online/offline store, drift monitoring이 플랫폼의 일부가 됨.",
+            "반대로 ML이 중요하지 않으면 이 축은 늦게 생겨도 됨."
+          ]
+        },
+        {
+          section: "2. 중간 규모",
+          title: "중간 규모의 위험: 각자 만든 중간 레이어",
+          visual: "fragmentationRisk",
+          cards: [
+            ["분석가별 SQL", "같은 DAU가 notebook마다 다르게 계산됨."],
+            ["팀별 mart", "제품팀과 마케팅팀의 active user 정의가 어긋남."],
+            ["무거운 dashboard", "BI가 raw를 직접 읽어서 느리고 비싸짐."],
+            ["숨은 운영", "누가 언제 갱신하는지 모르는 cron과 수동 스크립트가 늘어남."]
+          ]
+        },
+        {
+          section: "Demo Bridge",
+          title: "Metabase에서 볼 2번 케이스",
+          subtitle: "GitHub 예시는 '중간 레이어가 왜 필요한가'를 눈으로 보여주기 좋음.",
+          bullets: [
+            "raw event가 아니라 mart dashboard를 보면서 질문이 빨라지는 구조를 확인함.",
+            "DAU/WAU, event mix, retention, lifecycle이 서로 다른 mart에서 나오는 이유를 연결함.",
+            "현재 dashboard는 플랫폼의 완성형이 아니라, 파편화를 막기 위한 공통 소비 표면임."
+          ],
+          note: "데모에서는 dashboard 뒤에 fact와 dbt mart가 있다는 점을 계속 연결하면 좋음."
+        },
+        {
+          section: "External Case",
+          title: "외부 사례: Airbnb Minerva는 metric consistency 문제",
+          bullets: [
+            "Airbnb의 Minerva 글은 최신 자료는 아니지만, 중간 규모 이후에 왜 metric platform이 필요한지 보여주는 대표 사례임.",
+            "Airbnb도 초기에는 한 명의 분석가와 노트북/DB 직접 쿼리에서 시작했고, 성장하면서 core data table과 metric platform으로 이동함.",
+            "Minerva의 목표는 분석, 리포팅, 실험에서 같은 지표를 쓰도록 single source of truth를 만드는 것이었음.",
+            "우리 GitHub 예제의 fact와 mart도 작은 버전의 metric consistency 장치로 볼 수 있음."
+          ],
+          path: "Airbnb Engineering, How Airbnb achieved metric consistency at scale · https://medium.com/airbnb-engineering/how-airbnb-achieved-metric-consistency-at-scale-f23cc53dea70"
+        },
+        {
+          section: "External Case",
+          title: "외부 사례: Canva는 snapshot에서 CDC로 이동",
+          visual: "cdcFlow",
+          bullets: [
+            "Canva는 2022년 글에서 5PB 이상 Snowflake 데이터를 다루며 snapshot replication이 성장에 따라 한계에 부딪혔다고 설명함.",
+            "full snapshot이 24시간 안에 끝나지 않으면 warehouse 적재가 지연되고, 비즈니스 의사결정도 늦어짐.",
+            "그래서 CDC 기반 ingestion과 service-aligned data architecture로 이동했고, source/model/expose layer를 서비스 도메인별로 나눔.",
+            "중간 규모 이후에는 단순 적재보다 소유권, 갱신 지연, service domain별 dependency가 중요해짐."
+          ],
+          path: "Canva Engineering, Service-aligned Data Platform Architecture · https://www.canva.dev/blog/engineering/service-aligned-data-platform-architecture/"
+        },
+        {
+          section: "External Case",
+          title: "외부 사례: Uber는 instrumentation 표준화가 플랫폼 문제",
+          visual: "instrumentation",
+          bullets: [
+            "Uber는 2025년 모바일 analytics 표준화 글에서 cross-platform event instrumentation, consistent metadata, sampled event coverage를 강조함.",
+            "데이터는 feature health, user journey 최적화, ML 기반 개인화에 쓰이기 때문에 event 정의가 흔들리면 downstream 전체가 흔들림.",
+            "중간 규모를 넘어서면 '어떻게 저장할까'뿐 아니라 '클라이언트에서 어떤 이벤트를 어떤 metadata로 남길까'가 플랫폼의 핵심이 됨."
+          ],
+          path: "Uber Engineering, How Uber Standardized Mobile Analytics for Cross-Platform Insights, 2025 · https://www.uber.com/us/en/blog/how-uber-standardized-mobile-analytics/"
+        },
+        {
+          section: "3. 대기업",
+          title: "MAU 1000만 이상 테크 대기업",
+          subtitle: "이 단계에서는 이미 어느 정도 데이터 플랫폼이 있고, 직군도 이미 세분화되어 있는 것이 일반적임.",
+          bullets: [
+            "데이터 수집, 저장, 분석, 실험, ML, 권한, 개인정보 처리가 이미 별도 시스템으로 존재함.",
+            "분석가도 조직별로 운영되고, 심하면 스쿼드 단위로 배치됨.",
+            "개인이 raw부터 dashboard까지 전부 만지는 경우는 줄어듦.",
+            "대신 특정 기능을 안정적으로 깊게 맡는 역할이 중요해짐."
+          ]
+        },
+        {
+          section: "3. 대기업",
+          title: "이미 있는 플랫폼 위에서 일함",
+          visual: "enterpriseStack",
+          map: [
+            ["raw", "Event Platform", "로그 schema, SDK, ingestion, privacy rule"],
+            ["bq", "Warehouse/Lake", "대규모 저장, partition, governance"],
+            ["model", "Metric Layer", "표준 지표, semantic contract, lineage"],
+            ["bi", "BI/Experiment", "dashboard, A/B test, decision workflow"],
+            ["auto", "ML Platform", "feature, training, serving, monitoring"],
+            ["ops", "Governance", "권한, 감사, 보존 기간, 개인정보 처리"]
+          ]
+        },
+        {
+          section: "3. 대기업",
+          title: "PA와 BI도 다르고, AE는 덜 흔할 수 있음",
+          visual: "specializedRoles",
+          table: [
+            ["역할", "주로 맡는 일"],
+            ["Product Analyst", "제품 조직 안에서 지표, 퍼널, 실험, 의사결정 지원"],
+            ["BI Analyst / BI Engineer", "정형 리포팅, dashboard 운영, 경영/사업 지표 제공"],
+            ["Data Engineer", "수집, warehouse, orchestration, 비용과 안정성"],
+            ["ML Engineer", "학습/서빙 파이프라인, feature, 모델 운영"],
+            ["Data Platform Engineer", "공통 플랫폼, 권한, lineage, catalog, tooling"],
+            ["Governance / Privacy", "개인정보, 접근 제어, 감사 대응"]
+          ]
+        },
+        {
+          section: "3. 대기업",
+          title: "이 경우 필요한 사람은 뾰족함",
+          bullets: [
+            "이미 플랫폼이 있으므로 '혼자 다 할 수 있음'보다 '한 영역을 깊게 책임질 수 있음'이 중요해짐.",
+            "할 일도 어느 정도 정해져 있음: 제품 실험 분석, BI dashboard 운영, feature pipeline 안정화, 비용 최적화 등.",
+            "조직 간 계약이 많아서 임의로 구조를 바꾸기 어렵고, 변경에는 리뷰와 조율이 필요함.",
+            "속도보다 안정성, 일관성, 권한, 장애 대응이 더 큰 평가 기준이 됨."
+          ]
+        },
+        {
+          section: "3. 대기업",
+          title: "대기업에서 생기는 다른 종류의 문제",
+          cards: [
+            ["발견 문제", "데이터는 많은데 어떤 테이블을 써야 하는지 찾기 어려움."],
+            ["계약 문제", "upstream schema 변경이 여러 팀 dashboard와 feature에 영향을 줌."],
+            ["권한 문제", "데이터 접근 자체가 승인, 보안, 개인정보 정책을 통과해야 함."],
+            ["조직 문제", "숫자 하나를 바꾸려면 여러 팀의 합의가 필요함."]
+          ]
+        },
+        {
+          section: "External Case",
+          title: "외부 사례: Spotify는 dashboard도 제품처럼 운영",
+          visual: "dashboardPortal",
+          bullets: [
+            "Spotify는 2024년 글에서 2023년에 4,900개 이상의 Tableau/Looker Studio dashboard가 만들어졌고 6,000명 이상이 사용했다고 밝힘.",
+            "중앙팀이 모든 dashboard를 만드는 구조가 아니라, Analytics Platform 팀이 dashboard 시장의 scaffold를 제공함.",
+            "Dashboard Quality Framework, searchable portal, owner/refresh/usage metadata를 붙여 dashboard 신뢰성과 발견성을 관리함.",
+            "대기업에서는 dashboard 하나도 사용량, 품질, 소유권, deprecation을 가진 내부 제품이 됨."
+          ],
+          path: "Spotify Engineering, Unlocking Insights with High-Quality Dashboards at Scale, 2024 · https://engineering.atspotify.com/2024/8/unlocking-insights-with-high-quality-dashboards-at-scale"
+        },
+        {
+          section: "External Case",
+          title: "외부 사례: Uber는 data lake observability도 별도 플랫폼",
+          visual: "observability",
+          bullets: [
+            "Uber는 2025년 data lake I/O observability 글에서 40만 개 이상의 Spark application과 하루 200만 개 Presto query를 관측한다고 설명함.",
+            "engineer와 end user가 DataCentral과 Grafana에서 application, owner, engine, path별 I/O와 network usage를 볼 수 있게 함.",
+            "이 규모에서는 비용과 장애를 줄이기 위해 데이터 파이프라인 자체의 관측 가능성이 별도 제품이 됨."
+          ],
+          path: "Uber Engineering, I/O Observability for Uber's Massive Petabyte-Scale Data Lake, 2025 · https://www.uber.com/us/en/blog/i-o-observability-for-ubers-massive-petabyte-scale-data-lake/"
+        },
+        {
+          section: "External Case",
+          title: "외부 사례: Netflix는 Media Data Engineering을 분리",
+          visual: "mediaData",
+          bullets: [
+            "Netflix는 2025년 글에서 기존 facts/metrics 중심 data engineering과 별도로 Media Data Engineering 전문화를 설명함.",
+            "비디오, 오디오, 자막, 스크립트, 이미지 같은 multimodal media asset은 BI table과 다른 성격의 데이터임.",
+            "대기업에서는 데이터의 종류와 downstream 소비자가 복잡해져서, 한 플랫폼 안에서도 전문 기능이 계속 분화됨."
+          ],
+          path: "Netflix TechBlog, From Facts & Metrics to Media Machine Learning, 2025 · https://netflixtechblog.com/from-facts-metrics-to-media-machine-learning-evolving-the-data-engineering-function-at-netflix-6dcc91058d8d"
+        },
+        {
+          section: "External Case",
+          title: "외부 사례: Spotify는 personalization과 experimentation stack도 분리",
+          visual: "separateStacks",
+          bullets: [
+            "Spotify는 2026년 글에서 personalization과 experimentation을 별도 stack으로 유지하는 이유를 설명함.",
+            "추천/개인화는 사용자별 최적 처치를 찾는 문제이고, 실험은 평균 효과와 의사결정 근거를 다루는 문제가 됨.",
+            "ML/AI가 핵심 제품인 회사에서는 feature, recommendation, experimentation이 서로 연결되지만 같은 시스템으로 합치기 어렵다는 점을 보여줌."
+          ],
+          path: "Spotify Engineering, Why We Use Separate Tech Stacks for Personalization and Experimentation, 2026 · https://engineering.atspotify.com/2026/1/why-we-use-separate-tech-stacks-for-personalization-and-experimentation"
+        },
+        {
+          section: "세 단계 비교",
+          title: "플랫폼 필요성의 기준",
+          visual: "decisionTree",
+          table: [
+            ["질문", "아니면", "예면"],
+            ["같은 지표를 반복해서 보는가", "쿼리/시트로 충분", "mart와 dashboard 필요"],
+            ["raw가 너무 크거나 비싼가", "직접 조회 가능", "fact, partition, materialization 필요"],
+            ["여러 팀이 같은 숫자를 쓰는가", "개별 분석 가능", "metric contract 필요"],
+            ["실패가 업무에 영향을 주는가", "수동 복구 가능", "orchestration과 alert 필요"],
+            ["모델이 제품 기능인가", "분석 mart 중심", "feature platform과 ML ops 필요"]
+          ]
+        },
+        {
+          section: "판단법",
+          title: "좋은 데이터 플랫폼의 모양은 질문에서 출발함",
+          bullets: [
+            "누가 어떤 결정을 위해 이 숫자를 보는가.",
+            "이 질문은 한 번만 필요한가, 매주 반복되는가.",
+            "숫자가 틀렸을 때 손실이 어느 정도인가.",
+            "raw를 직접 읽는 비용과 시간이 감당 가능한가.",
+            "정의와 책임을 한곳에 고정해야 할 만큼 조직이 커졌는가."
+          ]
+        },
+        {
+          section: "강의 연결",
+          title: "지금까지 만든 GitHub 플랫폼은 2번을 배우기 위한 축소판",
+          bullets: [
+            "데이터가 충분히 커서 raw를 계속 직접 보기는 불편함.",
+            "DAU, WAU, retention, lifecycle처럼 반복 지표가 생김.",
+            "dbt mart, Airflow, Metabase, quality test가 자연스럽게 등장함.",
+            "그래서 중간 규모 서비스에서 왜 플랫폼이 필요한지 설명하기 좋음."
+          ],
+          path: "docs/data_platform_local.md · dbt/gharchive_metrics · dags/gharchive_dbt_metrics.py"
+        },
+        {
+          section: "References",
+          title: "레퍼런스 목록",
+          table: [
+            ["구분", "자료"],
+            ["초기/lean", "Metabase Data Stack Report 2025, Xata Postgres warehouse 2026, MotherDuck Startup Warehouse Playbook 2026"],
+            ["중간 규모", "Airbnb Minerva, Canva service-aligned data platform, Uber mobile analytics standardization"],
+            ["대규모", "Spotify dashboard quality, Spotify data platform, Uber data lake observability, Netflix Media Data Engineering"],
+            ["AI/FDE 2026", "AWS FDE, Microsoft Frontier Company, OpenAI FDE careers, Anthropic-DXC FDE, GitHub/Stack Overflow AI coding"],
+            ["강의 예제", "GitHub Archive, dbt marts, Airflow DAG, Metabase dashboard"]
+          ],
+          path: "Metabase: https://www.metabase.com/blog/metabase-community-data-stack-report-2025-key-analysis · Xata: https://xata.io/blog/postgres-data-warehouse · MotherDuck: https://motherduck.com/learn/modern-data-warehouse-playbook · Airbnb: https://medium.com/airbnb-engineering/how-airbnb-achieved-metric-consistency-at-scale-f23cc53dea70 · Canva: https://www.canva.dev/blog/engineering/service-aligned-data-platform-architecture/ · Uber Mobile: https://www.uber.com/us/en/blog/how-uber-standardized-mobile-analytics/ · Uber Observability: https://www.uber.com/us/en/blog/i-o-observability-for-ubers-massive-petabyte-scale-data-lake/ · Spotify Dashboards: https://engineering.atspotify.com/2024/8/unlocking-insights-with-high-quality-dashboards-at-scale · Spotify Data Platform: https://engineering.atspotify.com/2024/4/data-platform-explained · Spotify Personalization: https://engineering.atspotify.com/2026/1/why-we-use-separate-tech-stacks-for-personalization-and-experimentation · Netflix: https://netflixtechblog.com/from-facts-metrics-to-media-machine-learning-evolving-the-data-engineering-function-at-netflix-6dcc91058d8d"
+        },
+        {
+          section: "AI Trend 2026",
+          title: "마지막 변수: 개발의 진입 장벽이 내려가고 있음",
+          visual: "aiBarrier",
+          bullets: [
+            "AI coding agent는 낯선 코드베이스 이해, 코드 작성, 테스트, 문서화를 빠르게 만들고 있음.",
+            "GitHub는 2026년 전망에서 AI가 신규 개발자의 진입 장벽을 크게 낮추고 첫 기여를 앞당긴다고 설명함.",
+            "Stack Overflow의 2026 pulse survey도 agent 사용이 전년 대비 크게 늘었지만, 완전 자율보다는 인간 검토가 표준이라고 봄.",
+            "즉 코드를 쓰는 능력만으로 유지되던 경계는 약해지고, 문제 정의와 검증 능력이 더 중요해짐."
+          ],
+          path: "GitHub, What to expect for open source in 2026 · https://github.blog/open-source/maintainers/what-to-expect-for-open-source-in-2026/ · Stack Overflow, Agents on a leash, 2026 · https://stackoverflow.blog/2026/05/27/agents-on-a-leash-agentic-ai-remains-mostly-monitored-at-work/"
+        },
+        {
+          section: "AI Trend 2026",
+          title: "FDE가 급부상하는 이유",
+          visual: "fdeRise",
+          bullets: [
+            "Forward Deployed Engineer는 고객/현업 안으로 들어가서 discovery, 설계, 구현, 배포까지 같이 하는 역할임.",
+            "AWS는 2026년 7월, agentic AI를 고객 환경에 배포하기 위해 $1B 규모의 FDE 조직을 발표함.",
+            "Microsoft도 2026년 7월, 6,000명의 산업·엔지니어링 전문가를 고객 안에 배치하는 Frontier Company를 발표함.",
+            "OpenAI 채용 페이지도 FDE가 전략 고객과 production deployment를 end-to-end로 리드한다고 설명함."
+          ],
+          path: "AWS FDE announcement, 2026-07 · https://www.aboutamazon.com/news/aws/aws-1-billion-forward-deployed-ai-engineers · Microsoft Frontier Company, 2026-07 · https://blogs.microsoft.com/blog/2026/07/02/microsoft-frontier-company-ai-engineering-that-amplifies-and-protects-your-intelligence/ · OpenAI FDE careers · https://openai.com/careers/forward-deployed-engineer-%28fde%29-sf-san-francisco/"
+        },
+        {
+          section: "AI Trend 2026",
+          title: "직군의 경계가 더 흐려짐",
+          visual: "roleBoundary",
+          table: [
+            ["예전 경계", "AI 이후 압력"],
+            ["분석가는 SQL과 리포트", "분석가도 prototype, notebook app, agent workflow를 만들 수 있음"],
+            ["엔지니어는 구현 담당", "현업 문제 이해와 데이터 해석 없이는 좋은 agent를 만들기 어려움"],
+            ["컨설턴트는 기획 담당", "실제 시스템과 데이터에 붙어 결과를 내는 구현력이 필요해짐"],
+            ["데이터팀은 데이터 제공자", "AI workflow 안에서 데이터 권한, 맥락, 검증까지 책임지는 쪽으로 이동"]
+          ],
+          note: "경계가 사라진다는 뜻은 모두가 같은 일을 한다는 뜻이 아니라, 옆 역할의 기본기를 모르는 사람이 점점 불리해진다는 뜻."
+        },
+        {
+          section: "AI Trend 2026",
+          title: "데이터 직군은 수혜를 직접 맞을 수도 있음",
+          visual: "dataAdvantage",
+          bullets: [
+            "데이터 직군은 이미 SQL, 지표 정의, 로그 구조, 권한, 품질 이슈를 알고 있음.",
+            "AI agent가 실제 업무에 붙으려면 사내 데이터 접근, metric context, 개인정보/권한 판단이 필요함.",
+            "따라서 데이터를 잘 다루는 사람은 agent를 이용해 dashboard, 분석 앱, 운영 자동화, 의사결정 도구를 직접 만들 수 있음.",
+            "이 경우 데이터 직군은 '요청받아 뽑아주는 사람'에서 '현업 문제를 AI로 제품화하는 사람'으로 올라갈 수 있음."
+          ],
+          path: "Anthropic-DXC alliance, 2026 · https://www.anthropic.com/news/dxc-anthropic-alliance · Microsoft Agent Factory · https://www.microsoft.com/en/ai/agent-factory"
+        },
+        {
+          section: "AI Trend 2026",
+          title: "반대로 더 잘 다루는 사람에게 밀릴 수도 있음",
+          visual: "dataRisk",
+          bullets: [
+            "단순 SQL 작성, dashboard 복붙, 정형 리포트 생산은 AI와 자동화의 직접 타깃이 됨.",
+            "데이터 접근권은 강점이지만, 문제 정의·제품화·검증·배포를 못 하면 접근권을 가진 병목으로 보일 수 있음.",
+            "현업을 이해하고, 데이터를 읽고, AI로 작은 도구를 만들고, 결과를 검증하는 사람이 데이터 직군의 일부 일을 가져갈 수 있음.",
+            "그래서 앞으로의 차이는 '데이터를 볼 수 있는가'보다 '데이터로 실제 시스템을 움직일 수 있는가'에 가까워짐."
+          ],
+          note: "결론: 데이터 직군은 AI 때문에 사라진다기보다, AI를 잘 쓰는 데이터 직군과 그렇지 않은 데이터 직군으로 갈라질 가능성이 큼."
+        },
+        {
+          section: "정리",
+          title: "세 문장으로 요약",
+          cards: [
+            ["극초기", "플랫폼을 만들기보다 빠르게 묻고 답하는 능력이 중요함."],
+            ["중간 규모", "raw와 팀별 요구 사이에 공통 fact, mart, 운영 레이어가 필요해짐."],
+            ["대기업", "이미 있는 플랫폼 위에서 특정 기능을 깊고 안정적으로 맡는 사람이 필요함."]
+          ]
+        },
+        {
+          layout: "center",
+          section: "Next",
+          title: "이제 Metabase로 확인",
+          subtitle: "1번은 단순 BI의 효용을, 2번은 중간 레이어와 mart의 필요성을 실제 dashboard로 이어서 본다."
+        }
+      ];
+
+      const root = document.getElementById("slides");
+      const counter = document.getElementById("counter");
+
+      function el(name, className, text) {
+        const node = document.createElement(name);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      function addBullets(parent, bullets) {
+        if (!bullets) return;
+        const ul = el("ul", "bullets");
+        bullets.forEach((item) => ul.appendChild(el("li", "", item)));
+        parent.appendChild(ul);
+      }
+
+      function addCards(parent, cards) {
+        if (!cards) return;
+        const wrap = el("div", "cards");
+        cards.forEach(([title, body]) => {
+          const card = el("div", "card");
+          card.appendChild(el("strong", "", title));
+          card.appendChild(el("span", "", body));
+          wrap.appendChild(card);
+        });
+        parent.appendChild(wrap);
+      }
+
+      function addMap(parent, items) {
+        if (!items) return;
+        const wrap = el("div", "map");
+        items.forEach(([kind, title, body]) => {
+          const step = el("div", `map-step ${kind}`);
+          step.appendChild(el("b", "", title));
+          step.appendChild(el("span", "", body));
+          wrap.appendChild(step);
+        });
+        parent.appendChild(wrap);
+      }
+
+      function addTable(parent, rows) {
+        if (!rows) return;
+        const table = el("table", "matrix");
+        const [head, ...bodyRows] = rows;
+        const thead = document.createElement("thead");
+        const trh = document.createElement("tr");
+        head.forEach((cell) => trh.appendChild(el("th", "", cell)));
+        thead.appendChild(trh);
+        table.appendChild(thead);
+        const tbody = document.createElement("tbody");
+        bodyRows.forEach((row) => {
+          const tr = document.createElement("tr");
+          row.forEach((cell) => tr.appendChild(el("td", "", cell)));
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        parent.appendChild(table);
+      }
+
+      function addVisual(parent, type) {
+        if (!type) return;
+        const wrap = el("div", "visual-panel");
+        const simpleFlow = (title, nodes, color = "#0f766e") => {
+          const step = 980 / nodes.length;
+          const boxes = nodes.map((node, i) => {
+            const x = 30 + i * step;
+            const w = Math.min(190, step - 28);
+            const arrow = i < nodes.length - 1 ? `<path d="M${x + w + 8} 170 H${x + step - 18}" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-g)"/>` : "";
+            return `<g><rect x="${x}" y="115" width="${w}" height="110" rx="12" fill="#fff" stroke="${node[2] || color}" stroke-width="3"/><text x="${x + w / 2}" y="153" text-anchor="middle" font-size="18" font-weight="900" fill="#172033">${node[0]}</text><text x="${x + w / 2}" y="181" text-anchor="middle" font-size="13" fill="#64748b">${node[1]}</text>${arrow}</g>`;
+          }).join("");
+          return `<svg viewBox="0 0 980 340" role="img" aria-label="${title}"><defs><marker id="arrow-g" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#64748b"/></marker></defs><rect x="20" y="35" width="940" height="270" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="490" y="82" text-anchor="middle" font-size="25" font-weight="900" fill="#172033">${title}</text>${boxes}</svg>`;
+        };
+        const memePanel = (title, left, right, accent = "#0f766e") => `<svg viewBox="0 0 980 360" role="img" aria-label="${title}"><rect x="20" y="28" width="940" height="304" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="490" y="75" text-anchor="middle" font-size="25" font-weight="900" fill="#172033">${title}</text><rect x="80" y="115" width="380" height="155" rx="14" fill="#fff" stroke="#d6dee8" stroke-width="2"/><rect x="520" y="115" width="380" height="155" rx="14" fill="#fff" stroke="${accent}" stroke-width="3"/><text x="270" y="160" text-anchor="middle" font-size="21" font-weight="900" fill="#172033">${left[0]}</text><text x="270" y="195" text-anchor="middle" font-size="15" fill="#64748b">${left[1]}</text><text x="710" y="160" text-anchor="middle" font-size="21" font-weight="900" fill="#172033">${right[0]}</text><text x="710" y="195" text-anchor="middle" font-size="15" fill="#64748b">${right[1]}</text><path d="M465 192 H510" stroke="#64748b" stroke-width="4" marker-end="url(#arrow-m)"/><defs><marker id="arrow-m" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#64748b"/></marker></defs><text x="490" y="302" text-anchor="middle" font-size="15" font-weight="800" fill="${accent}">${left[2] || ""}</text></svg>`;
+        const titles = {
+          maturity: "Three shapes of data platform",
+          maturityFactors: "Maturity is not just data volume",
+          earlyStack: "Early-stage almost-platform",
+          sheetPlatform: "Spreadsheet as a platform",
+          warehouseSkip: "Many teams skip the warehouse",
+          leanStack: "Lean startup data stack",
+          fragmentation: "Fragmentation starts naturally",
+          processingLayers: "Intermediate layers appear",
+          grain: "Fact table grain",
+          roleSplit: "Roles split as stakes rise",
+          fragmentationRisk: "The mid-size trap",
+          cdcFlow: "Snapshot to CDC",
+          instrumentation: "Instrumentation is platform work",
+          enterpriseStack: "Enterprise platform surface",
+          specializedRoles: "Specialized ownership",
+          dashboardPortal: "Dashboards become products",
+          observability: "Data lake observability",
+          mediaData: "Specialized data domains",
+          separateStacks: "Personalization vs experimentation",
+          decisionTree: "When platform work becomes necessary",
+          aiBarrier: "AI lowers development barriers",
+          fdeRise: "FDE rises",
+          roleBoundary: "Role boundaries blur",
+          dataAdvantage: "Data roles can benefit",
+          dataRisk: "Data roles can be displaced",
+          architecture: "Current data platform architecture",
+          layers: "dbt model layers",
+          dag: "Airflow operational flow"
+        };
+        const svgs = {
+          maturity: simpleFlow("세 단계 성숙도", [["쿼리와 시트", "아무거나 빨리"], ["fact와 mart", "반복과 합의"], ["전문 플랫폼", "분업과 안정성"]], "#0f766e"),
+          maturityFactors: `<svg viewBox="0 0 980 450" role="img" aria-label="platform pressure gauge"><defs><marker id="arrow-p" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#64748b"/></marker></defs><rect x="24" y="24" width="932" height="398" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="490" y="62" text-anchor="middle" font-size="25" font-weight="900" fill="#172033">플랫폼 필요성은 오른쪽으로 갈수록 커짐</text><g font-size="12" fill="#172033"><rect x="180" y="82" width="18" height="18" rx="4" fill="#e2e8f0"/><text x="205" y="96">낮음</text><rect x="280" y="82" width="18" height="18" rx="4" fill="#dcfce7"/><text x="305" y="96">관리 가능</text><rect x="405" y="82" width="18" height="18" rx="4" fill="#fde68a"/><text x="430" y="96">주의</text><rect x="500" y="82" width="18" height="18" rx="4" fill="#fca5a5"/><text x="525" y="96">플랫폼 필요</text></g><text x="210" y="125" text-anchor="middle" font-size="16" font-weight="900" fill="#15803d">쿼리·시트로 충분</text><text x="770" y="125" text-anchor="middle" font-size="16" font-weight="900" fill="#b91c1c">플랫폼 필요</text><path d="M190 146 H790" stroke="#64748b" stroke-width="4" marker-end="url(#arrow-p)"/><g font-size="14" fill="#172033"><text x="92" y="190" font-weight="900">데이터 양</text><rect x="210" y="171" width="140" height="26" rx="6" fill="#e2e8f0"/><rect x="350" y="171" width="190" height="26" rx="6" fill="#fde68a"/><rect x="540" y="171" width="230" height="26" rx="6" fill="#fca5a5"/><text x="802" y="190" fill="#64748b">raw 직접 조회가 부담</text><text x="92" y="235" font-weight="900">질문 반복</text><rect x="210" y="216" width="160" height="26" rx="6" fill="#dcfce7"/><rect x="370" y="216" width="210" height="26" rx="6" fill="#fde68a"/><rect x="580" y="216" width="190" height="26" rx="6" fill="#fca5a5"/><text x="802" y="235" fill="#64748b">매주 같은 지표를 봄</text><text x="92" y="280" font-weight="900">팀 분화</text><rect x="210" y="261" width="110" height="26" rx="6" fill="#e2e8f0"/><rect x="320" y="261" width="180" height="26" rx="6" fill="#dcfce7"/><rect x="500" y="261" width="270" height="26" rx="6" fill="#fca5a5"/><text x="802" y="280" fill="#64748b">팀마다 다른 view 필요</text><text x="92" y="325" font-weight="900">틀린 숫자 비용</text><rect x="210" y="306" width="130" height="26" rx="6" fill="#dcfce7"/><rect x="340" y="306" width="180" height="26" rx="6" fill="#fde68a"/><rect x="520" y="306" width="250" height="26" rx="6" fill="#fca5a5"/><text x="802" y="325" fill="#64748b">정산·실험·보고에 영향</text><text x="92" y="370" font-weight="900">운영 실패</text><rect x="210" y="351" width="110" height="26" rx="6" fill="#e2e8f0"/><rect x="320" y="351" width="180" height="26" rx="6" fill="#fde68a"/><rect x="500" y="351" width="270" height="26" rx="6" fill="#fca5a5"/><text x="802" y="370" fill="#64748b">알림·재시도·책임 필요</text></g></svg>`,
+          earlyStack: simpleFlow("극초기 데이터 흐름", [["운영 DB", "바로 조회"], ["SQL", "그때그때"], ["시트", "공유와 수식"], ["간단 BI", "몇 개 차트"]], "#15803d"),
+          sheetPlatform: memePanel("시트가 사실상 플랫폼인 순간", ["데이터 플랫폼", "라고 부르긴 민망함", "그래도 일은 굴러감"], ["파일명_v23_final", "담당자와 수식이 핵심 인프라"], "#b45309"),
+          warehouseSkip: memePanel("Warehouse가 항상 1번은 아님", ["초기 팀", "DB + BI + 시트"], ["필요해질 때", "warehouse와 mart"], "#2563eb"),
+          leanStack: simpleFlow("Lean stack", [["SaaS API", "작게 가져옴"], ["Postgres/DuckDB", "단순 저장"], ["Parquet", "저렴한 파일"], ["BI", "필요한 만큼"]], "#0f766e"),
+          fragmentation: `<svg viewBox="0 0 980 390" role="img" aria-label="fragmentation"><defs><marker id="arrow-f" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#64748b"/></marker></defs><rect x="24" y="24" width="932" height="332" rx="16" fill="#f8fafc" stroke="#d6dee8"/><rect x="70" y="145" width="190" height="95" rx="14" fill="#fff" stroke="#475569" stroke-width="3"/><text x="165" y="185" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">Raw Event</text><text x="165" y="212" text-anchor="middle" font-size="13" fill="#64748b">하나의 원천</text><g font-size="16" font-weight="900" fill="#172033"><rect x="500" y="65" width="160" height="62" rx="10" fill="#ecfdf5" stroke="#0f766e" stroke-width="2"/><text x="580" y="103" text-anchor="middle">제품팀</text><rect x="710" y="115" width="160" height="62" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/><text x="790" y="153" text-anchor="middle">마케팅</text><rect x="500" y="235" width="160" height="62" rx="10" fill="#fef2f2" stroke="#b91c1c" stroke-width="2"/><text x="580" y="273" text-anchor="middle">운영팀</text><rect x="710" y="275" width="160" height="62" rx="10" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"/><text x="790" y="313" text-anchor="middle">ML팀</text></g><path d="M260 190 C340 95 420 95 495 96" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow-f)"/><path d="M260 190 C430 140 520 145 705 146" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow-f)"/><path d="M260 190 C390 245 430 266 495 266" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow-f)"/><path d="M260 190 C460 250 560 305 705 306" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow-f)"/></svg>`,
+          processingLayers: simpleFlow("중간 가공 레이어", [["Raw", "있는 그대로"], ["Staging", "정리"], ["Fact", "grain 고정"], ["Mart", "질문별 소비"], ["Feature", "ML용 변수"]], "#b45309"),
+          grain: `<svg viewBox="0 0 980 360" role="img" aria-label="fact table grain"><rect x="24" y="28" width="932" height="304" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="490" y="76" text-anchor="middle" font-size="25" font-weight="900" fill="#172033">fact_user_repo_activity의 한 행</text><g transform="translate(85,125)" font-size="15" fill="#172033"><rect width="180" height="95" rx="12" fill="#fff" stroke="#475569" stroke-width="3"/><text x="90" y="38" text-anchor="middle" font-weight="900">activity_date</text><text x="90" y="64" text-anchor="middle" fill="#64748b">어느 날인가</text></g><g transform="translate(295,125)" font-size="15" fill="#172033"><rect width="150" height="95" rx="12" fill="#fff" stroke="#0f766e" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-weight="900">user_id</text><text x="75" y="64" text-anchor="middle" fill="#64748b">누가</text></g><g transform="translate(475,125)" font-size="15" fill="#172033"><rect width="150" height="95" rx="12" fill="#fff" stroke="#2563eb" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-weight="900">repo_id</text><text x="75" y="64" text-anchor="middle" fill="#64748b">어디서</text></g><g transform="translate(655,125)" font-size="15" fill="#172033"><rect width="180" height="95" rx="12" fill="#fff" stroke="#b45309" stroke-width="3"/><text x="90" y="38" text-anchor="middle" font-weight="900">action</text><text x="90" y="64" text-anchor="middle" fill="#64748b">무슨 행동</text></g><path d="M245 252 H735" stroke="#64748b" stroke-width="3"/><text x="490" y="288" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">이 조합을 기준으로 DAU, WAU, retention을 계산</text><text x="490" y="314" text-anchor="middle" font-size="14" fill="#64748b">raw payload 해석을 반복하지 않기 위한 공통 기준점</text></svg>`,
+          roleSplit: simpleFlow("직군 세분화", [["PM/BE", "직접 쿼리"], ["Analyst", "BI와 해석"], ["AE/DE", "mart와 수집"], ["ML/DS", "feature와 모델"]], "#6d28d9"),
+          fragmentationRisk: memePanel("중간 규모의 흔한 장면", ["각자 만든 SQL", "숫자가 전부 다름"], ["공통 fact/mart", "싸움의 기준점"], "#b91c1c"),
+          cdcFlow: simpleFlow("Snapshot에서 CDC로", [["Full Snapshot", "매번 크게 복사"], ["지연 증가", "24시간 안에 못 끝남"], ["CDC", "변경분 중심"], ["Service Layer", "도메인 소유"]], "#2563eb"),
+          instrumentation: simpleFlow("Instrumentation 표준화", [["Client SDK", "이벤트 발생"], ["Event Schema", "이름과 속성"], ["Validation", "누락 방지"], ["Analytics/ML", "downstream 소비"]], "#0f766e"),
+          enterpriseStack: simpleFlow("대기업 플랫폼 표면", [["Event", "수집"], ["Lake/Warehouse", "저장"], ["Metric", "정의"], ["BI/Experiment", "결정"], ["ML Platform", "개인화"]], "#2563eb"),
+          specializedRoles: `<svg viewBox="0 0 980 390" role="img" aria-label="specialized roles"><rect x="24" y="28" width="932" height="334" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="490" y="74" text-anchor="middle" font-size="25" font-weight="900" fill="#172033">대기업에서는 분석 역할도 갈라짐</text><g transform="translate(70,115)" font-size="14" fill="#172033"><rect width="150" height="100" rx="12" fill="#fff" stroke="#15803d" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-weight="900">PA</text><text x="75" y="62" text-anchor="middle" fill="#64748b">제품·실험</text><text x="75" y="82" text-anchor="middle" fill="#64748b">의사결정</text></g><g transform="translate(245,115)" font-size="14" fill="#172033"><rect width="150" height="100" rx="12" fill="#fff" stroke="#b45309" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-weight="900">BI</text><text x="75" y="62" text-anchor="middle" fill="#64748b">정형 리포트</text><text x="75" y="82" text-anchor="middle" fill="#64748b">대시보드</text></g><g transform="translate(420,115)" font-size="14" fill="#172033"><rect width="150" height="100" rx="12" fill="#fff" stroke="#2563eb" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-weight="900">DE</text><text x="75" y="62" text-anchor="middle" fill="#64748b">수집·배치</text><text x="75" y="82" text-anchor="middle" fill="#64748b">warehouse</text></g><g transform="translate(595,115)" font-size="14" fill="#172033"><rect width="150" height="100" rx="12" fill="#fff" stroke="#6d28d9" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-weight="900">MLE</text><text x="75" y="62" text-anchor="middle" fill="#64748b">feature</text><text x="75" y="82" text-anchor="middle" fill="#64748b">serving</text></g><g transform="translate(770,115)" font-size="14" fill="#172033"><rect width="150" height="100" rx="12" fill="#fff" stroke="#b91c1c" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-weight="900">Platform</text><text x="75" y="62" text-anchor="middle" fill="#64748b">권한·카탈로그</text><text x="75" y="82" text-anchor="middle" fill="#64748b">거버넌스</text></g><text x="490" y="270" text-anchor="middle" font-size="16" font-weight="800" fill="#172033">AE라는 이름보다 PA, BI, DE, Platform으로 나뉘는 경우가 많음</text><text x="490" y="302" text-anchor="middle" font-size="14" fill="#64748b">회사마다 명칭은 다르지만, 분석/리포팅/플랫폼/ML 책임이 분리되는 방향은 비슷함</text></svg>`,
+          dashboardPortal: simpleFlow("Dashboard as internal product", [["Owner", "누가 책임"], ["Usage", "누가 봄"], ["Quality", "믿을 수 있나"], ["Portal", "찾을 수 있나"], ["Deprecation", "버릴 수 있나"]], "#15803d"),
+          observability: simpleFlow("Data lake observability", [["Job", "Spark/Presto"], ["I/O", "읽고 쓰는 양"], ["Owner", "팀과 앱"], ["Cost", "비용"], ["Action", "최적화"]], "#b91c1c"),
+          mediaData: memePanel("데이터도 종류가 너무 달라짐", ["facts & metrics", "숫자 테이블 중심"], ["media data", "영상·음성·자막·이미지"], "#6d28d9"),
+          separateStacks: memePanel("추천과 실험은 닮았지만 다름", ["Personalization", "사용자별 최적 처치"], ["Experimentation", "평균 효과와 의사결정"], "#0f766e"),
+          decisionTree: simpleFlow("플랫폼 필요성 판단", [["반복 질문", "매주 봄"], ["큰 raw", "직접 조회 곤란"], ["공통 지표", "팀 간 합의"], ["실패 비용", "운영 알림"], ["플랫폼", "이제 필요"]], "#b45309"),
+          aiBarrier: `<svg viewBox="0 0 980 370" role="img" aria-label="AI lowers development barriers"><defs><marker id="arrow-ai" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#64748b"/></marker></defs><rect x="24" y="28" width="932" height="314" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="490" y="76" text-anchor="middle" font-size="25" font-weight="900" fill="#172033">개발은 더 쉬워지고, 검증은 더 중요해짐</text><rect x="80" y="120" width="250" height="125" rx="14" fill="#fff" stroke="#d6dee8" stroke-width="2"/><text x="205" y="160" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">Before</text><text x="205" y="192" text-anchor="middle" font-size="15" fill="#64748b">문법·프레임워크·보일러플레이트</text><text x="205" y="218" text-anchor="middle" font-size="15" fill="#64748b">초기 진입 장벽</text><path d="M340 182 H455" stroke="#64748b" stroke-width="4" marker-end="url(#arrow-ai)"/><rect x="465" y="120" width="430" height="125" rx="14" fill="#fff" stroke="#0f766e" stroke-width="3"/><text x="680" y="160" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">After AI agents</text><text x="680" y="192" text-anchor="middle" font-size="15" fill="#64748b">코드 작성·테스트·문서화 속도 상승</text><text x="680" y="218" text-anchor="middle" font-size="15" fill="#64748b">문제 정의·리뷰·책임이 병목</text><text x="490" y="292" text-anchor="middle" font-size="16" font-weight="800" fill="#0f766e">코드를 칠 줄 아는 사람보다, 맞는 것을 만들고 검증하는 사람이 유리해짐</text></svg>`,
+          fdeRise: simpleFlow("FDE 모델", [["현업 문제", "고객 안으로"], ["데이터와 권한", "실제 제약"], ["AI 시스템", "직접 구현"], ["배포와 운영", "성과 확인"], ["재사용 패턴", "다음 고객으로"]], "#0f766e"),
+          roleBoundary: `<svg viewBox="0 0 980 390" role="img" aria-label="role boundaries blur"><rect x="24" y="28" width="932" height="334" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="490" y="74" text-anchor="middle" font-size="25" font-weight="900" fill="#172033">경계는 흐려지고, 책임은 남음</text><g transform="translate(100,125)"><circle cx="120" cy="95" r="90" fill="#ecfdf5" stroke="#0f766e" stroke-width="3"/><text x="120" y="88" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Analyst</text><text x="120" y="114" text-anchor="middle" font-size="13" fill="#64748b">문제와 지표</text></g><g transform="translate(370,125)"><circle cx="120" cy="95" r="90" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/><text x="120" y="88" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Engineer</text><text x="120" y="114" text-anchor="middle" font-size="13" fill="#64748b">구현과 운영</text></g><g transform="translate(640,125)"><circle cx="120" cy="95" r="90" fill="#fffbeb" stroke="#b45309" stroke-width="3"/><text x="120" y="88" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Consultant</text><text x="120" y="114" text-anchor="middle" font-size="13" fill="#64748b">현업 맥락</text></g><text x="490" y="320" text-anchor="middle" font-size="16" font-weight="800" fill="#172033">AI가 구현 장벽을 낮추면, 역할 간 교집합에서 가치가 커짐</text></svg>`,
+          dataAdvantage: simpleFlow("데이터 직군의 AI 수혜 경로", [["데이터 접근", "권한과 맥락"], ["지표 이해", "정의와 품질"], ["AI 도구화", "분석 앱/agent"], ["업무 자동화", "반복 제거"], ["영향력 확대", "문제 해결자"]], "#15803d"),
+          dataRisk: memePanel("데이터 직군의 갈림길", ["접근권만 있음", "요청받아 SQL 실행"], ["AI로 제품화", "문제·데이터·구현 연결"], "#b91c1c"),
+          architecture: `<svg viewBox="0 0 1120 540" role="img" aria-label="current data platform architecture"><defs><marker id="arrow-a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#475569"/></marker><filter id="shadow-a" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.12"/></filter></defs><rect x="20" y="20" width="1080" height="500" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="560" y="62" text-anchor="middle" font-size="28" font-weight="900" fill="#172033">GitHub Archive Data Platform</text><text x="560" y="92" text-anchor="middle" font-size="15" fill="#64748b">raw event를 fact, mart, dashboard, 운영 알림으로 연결</text><g filter="url(#shadow-a)"><rect x="70" y="155" width="180" height="92" rx="12" fill="#fff" stroke="#475569" stroke-width="3"/><text x="160" y="190" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Raw</text><text x="160" y="218" text-anchor="middle" font-size="13" fill="#64748b">githubarchive.day</text></g><g filter="url(#shadow-a)"><rect x="315" y="155" width="190" height="92" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/><text x="410" y="190" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Sync</text><text x="410" y="218" text-anchor="middle" font-size="13" fill="#64748b">sync_bq_metrics.py</text></g><g filter="url(#shadow-a)"><rect x="570" y="155" width="200" height="92" rx="12" fill="#ecfdf5" stroke="#0f766e" stroke-width="3"/><text x="670" y="190" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Fact</text><text x="670" y="218" text-anchor="middle" font-size="13" fill="#64748b">user-repo-action-day</text></g><g filter="url(#shadow-a)"><rect x="835" y="155" width="190" height="92" rx="12" fill="#fffbeb" stroke="#b45309" stroke-width="3"/><text x="930" y="190" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">dbt Marts</text><text x="930" y="218" text-anchor="middle" font-size="13" fill="#64748b">metrics_*</text></g><path d="M250 201 H305" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/><path d="M505 201 H560" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/><path d="M770 201 H825" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/><path d="M930 247 V310" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/><g filter="url(#shadow-a)"><rect x="800" y="325" width="245" height="82" rx="12" fill="#f0fdf4" stroke="#15803d" stroke-width="3"/><text x="922" y="360" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Metabase</text><text x="922" y="386" text-anchor="middle" font-size="13" fill="#64748b">dashboard consumption</text></g><g filter="url(#shadow-a)"><rect x="500" y="325" width="245" height="82" rx="12" fill="#f5f3ff" stroke="#6d28d9" stroke-width="3"/><text x="622" y="360" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Airflow</text><text x="622" y="386" text-anchor="middle" font-size="13" fill="#64748b">schedule · retry · logs</text></g><g filter="url(#shadow-a)"><rect x="200" y="325" width="245" height="82" rx="12" fill="#fef2f2" stroke="#b91c1c" stroke-width="3"/><text x="322" y="360" text-anchor="middle" font-size="19" font-weight="900" fill="#172033">Ops</text><text x="322" y="386" text-anchor="middle" font-size="13" fill="#64748b">Slack · cost guard · drift</text></g><path d="M800 366 H755" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/><path d="M500 366 H455" stroke="#475569" stroke-width="3" marker-end="url(#arrow-a)"/></svg>`,
+          layers: `<svg viewBox="0 0 980 360" role="img" aria-label="dbt model layers"><rect x="70" y="55" width="840" height="250" rx="14" fill="#f8fafc" stroke="#d6dee8"/><text x="490" y="95" text-anchor="middle" font-size="26" font-weight="900" fill="#172033">dbt/gharchive_metrics</text><rect x="145" y="130" width="690" height="42" rx="8" fill="#e2e8f0" stroke="#475569"/><text x="490" y="158" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">raw/source: GitHub Archive or BigQuery fact</text><rect x="185" y="185" width="610" height="42" rx="8" fill="#dcfce7" stroke="#0f766e"/><text x="490" y="213" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">staging: stg_user_repo_activity</text><rect x="225" y="240" width="530" height="42" rx="8" fill="#fef3c7" stroke="#b45309"/><text x="490" y="268" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">marts: metrics_daily, weekly, retention, lifecycle</text><text x="490" y="330" text-anchor="middle" font-size="15" fill="#64748b">semantic layer는 metric 이름과 집계 방식을 YAML로 고정</text></svg>`,
+          dag: `<svg viewBox="0 0 980 310" role="img" aria-label="airflow operational flow"><defs><marker id="arrow-d" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs><g transform="translate(45,105)"><rect width="150" height="82" rx="10" fill="#fff" stroke="#6d28d9" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">plan</text><text x="75" y="60" text-anchor="middle" font-size="12" fill="#64748b">range guard</text></g><path d="M200 146 H250" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-d)"/><g transform="translate(260,105)"><rect width="150" height="82" rx="10" fill="#fff" stroke="#2563eb" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">sync fact</text><text x="75" y="60" text-anchor="middle" font-size="12" fill="#64748b">replace-days</text></g><path d="M415 146 H465" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-d)"/><g transform="translate(475,105)"><rect width="150" height="82" rx="10" fill="#fff" stroke="#0f766e" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">dbt marts</text><text x="75" y="60" text-anchor="middle" font-size="12" fill="#64748b">metrics_*</text></g><path d="M630 146 H680" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-d)"/><g transform="translate(690,105)"><rect width="150" height="82" rx="10" fill="#fff" stroke="#b45309" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">drift</text><text x="75" y="60" text-anchor="middle" font-size="12" fill="#64748b">warn-only</text></g><path d="M845 146 H890" stroke="#64748b" stroke-width="3" marker-end="url(#arrow-d)"/><g transform="translate(900,105)"><rect width="55" height="82" rx="10" fill="#fff" stroke="#b91c1c" stroke-width="3"/><text x="28" y="38" text-anchor="middle" font-size="15" font-weight="900" fill="#172033">cost</text><text x="28" y="60" text-anchor="middle" font-size="11" fill="#64748b">guard</text></g><text x="490" y="248" text-anchor="middle" font-size="16" fill="#64748b">운영은 순서, 범위, 실패 처리, 비용 방어선까지 포함한다</text></svg>`
+        };
+        wrap.appendChild(el("p", "visual-title", titles[type]));
+        wrap.insertAdjacentHTML("beforeend", svgs[type]);
+        parent.appendChild(wrap);
+      }
+
+      function renderSlide(slide, index) {
+        const article = el("article", `slide ${slide.layout || ""}`);
+        article.id = `slide-${index + 1}`;
+
+        const main = el("div");
+        main.appendChild(el("p", "eyebrow", `${String(index + 1).padStart(2, "0")} · ${slide.section}`));
+        main.appendChild(el(index === 0 ? "h1" : "h2", "", slide.title));
+        if (slide.subtitle) main.appendChild(el("p", "subtitle", slide.subtitle));
+        addBullets(main, slide.bullets);
+        addVisual(main, slide.visual);
+        addMap(main, slide.map);
+        addTable(main, slide.table);
+        addCards(main, slide.cards);
+        if (slide.code) main.appendChild(el("pre", "codebox", slide.code));
+        if (slide.path) main.appendChild(el("div", "path", slide.path));
+        if (slide.note) main.appendChild(el("p", "note", slide.note));
+        article.appendChild(main);
+
+        if (slide.layout === "title") {
+          const side = el("div");
+          side.appendChild(el("div", "number", String(slides.length)));
+          side.appendChild(el("p", "subtitle", "slides"));
+          side.appendChild(el("div", "tagline", "규모가 바뀌면 좋은 데이터 플랫폼의 모양도 바뀐다."));
+          article.appendChild(side);
+        }
+        return article;
+      }
+
+      slides.forEach((slide, index) => root.appendChild(renderSlide(slide, index)));
+      counter.textContent = `1 / ${slides.length}`;
+
+      function currentIndex() {
+        const positions = slides.map((_, index) => {
+          const node = document.getElementById(`slide-${index + 1}`);
+          return Math.abs(node.getBoundingClientRect().top - 82);
+        });
+        return positions.indexOf(Math.min(...positions));
+      }
+
+      function go(delta) {
+        const next = Math.max(0, Math.min(slides.length - 1, currentIndex() + delta));
+        document.getElementById(`slide-${next + 1}`).scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      document.getElementById("prev").addEventListener("click", () => go(-1));
+      document.getElementById("next").addEventListener("click", () => go(1));
+      window.addEventListener("scroll", () => {
+        counter.textContent = `${currentIndex() + 1} / ${slides.length}`;
+      }, { passive: true });
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowRight" || event.key === "PageDown") go(1);
+        if (event.key === "ArrowLeft" || event.key === "PageUp") go(-1);
+      });
+    </script>
+  </body>
+</html>
