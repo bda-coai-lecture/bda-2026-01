@@ -497,9 +497,9 @@
 
       <section class="slide" id="s2">
         <p class="section-label">최종 복습 로드맵</p>
-          <h2>개념, 모델, 운영을 한 번에 닫는다</h2>
+          <h2>비즈니스, 모델, 운영을 한 번에 닫는다</h2>
         <div class="cards three">
-          <div class="card"><strong>1. Feedback Data</strong><p>GitHub event log, implicit feedback, sparsity, split</p></div>
+          <div class="card"><strong>1. Business + Feedback</strong><p>목표, KPI, GitHub event log, implicit feedback</p></div>
           <div class="card"><strong>2. Matrix Factorization</strong><p>R ≈ P × Q, 숨은 취향 차원, ALS/BPR</p></div>
           <div class="card"><strong>3. Embedding Search</strong><p>가까운 이웃 찾기, FAISS, Two-Tower</p></div>
           <div class="card"><strong>4. Two-stage</strong><p>Candidate Generation, Re-ranking, nDCG@K</p></div>
@@ -527,7 +527,25 @@
         </div>
       </section>
 
-      <section class="slide" id="s4">
+      <section class="slide split" id="s4">
+        <div>
+          <p class="section-label">비즈니스 목표</p>
+          <h2>비즈니스 목표가 추천 문제를 정한다</h2>
+          <ul class="bullets">
+            <li>추천은 모델 점수를 높이는 일이 아니라 제품 행동을 바꾸는 일이다.</li>
+            <li>목표가 discovery인지, 재방문인지, 구매/전환인지에 따라 정답 label이 달라진다.</li>
+            <li>무엇을 추천하면 안 되는지도 중요하다. 품질, 정책, 재고, 신선도 제약이 들어간다.</li>
+            <li>그래서 추천 시스템은 ML 문제이면서 동시에 제품/비즈니스 문제다.</li>
+          </ul>
+        </div>
+        <div class="panel tower">
+          <h3>GitHub repo 추천 예시</h3>
+          <p>목표가 "새 repo 발견"이면 이미 본 repo는 제외한다. 목표가 "자주 쓰는 repo 빠른 재접근"이면 이미 본 repo를 다시 보여주는 것도 맞을 수 있다.</p>
+          <div class="callout">같은 데이터라도 비즈니스 목표가 바뀌면 filtering, label, metric, fallback이 같이 바뀐다.</div>
+        </div>
+      </section>
+
+      <section class="slide" id="s5">
         <p class="section-label">Feedback Data</p>
         <h2>Explicit은 적지만 명확하고, Implicit은 많지만 noisy하다</h2>
         <table>
@@ -543,7 +561,7 @@
         <div class="callout">실무는 대개 Implicit Feedback으로 출발한다. 많지만 noisy하기 때문에 event weight와 평가 설계가 중요하다.</div>
       </section>
 
-      <section class="slide split" id="s5">
+      <section class="slide split" id="s6">
         <div>
           <p class="section-label">Sparsity</p>
           <h2>대부분의 칸은 비어 있다</h2>
@@ -560,7 +578,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s6">
+      <section class="slide" id="s7">
         <p class="section-label">Sparse matrix</p>
         <h2>추천에서는 Sparse matrix가 기본이다</h2>
         <svg class="diagram" viewBox="0 0 980 390" role="img" aria-label="sparse user item matrix">
@@ -587,7 +605,7 @@
         <div class="callout">기존 표현 그대로: 추천에서는 dense table이 아니라 sparse matrix가 일반적이다. 비어 있는 칸을 전부 저장하지 않는다는 뜻으로 이해하면 충분하다.</div>
       </section>
 
-      <section class="slide" id="s7">
+      <section class="slide" id="s8">
         <p class="section-label">최종 복습의 기준</p>
         <h2>데이터를 나누는 이유는 미래를 숨기기 위해서다</h2>
         <div class="flow">
@@ -598,7 +616,7 @@
         <div class="callout">Two-stage의 두 모델이 서로 다른 데이터셋을 쓴다는 뜻이 아니다. 같은 추천 데이터 위에서 후보 생성과 정렬이 이어지고, 미래 행동은 정답 확인용으로만 분리한다.</div>
       </section>
 
-      <section class="slide split" id="s8">
+      <section class="slide split" id="s9">
         <div>
           <p class="section-label">Seen filtering</p>
           <h2>이미 본 item을 제외할지는 서비스마다 다르다</h2>
@@ -615,7 +633,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s9">
+      <section class="slide" id="s10">
         <p class="section-label">Baseline & Fallback</p>
         <h2>인기순/최신순은 강한 baseline이자 fallback이다</h2>
         <div class="tradeoff">
@@ -624,7 +642,7 @@
         </div>
       </section>
 
-      <section class="slide center" id="s10">
+      <section class="slide center" id="s11">
         <div>
           <p class="section-label">Part 2</p>
           <h2>Matrix Factorization</h2>
@@ -632,7 +650,7 @@
         </div>
       </section>
 
-      <section class="slide split" id="s11">
+      <section class="slide split" id="s12">
         <div>
           <p class="section-label">MF intuition</p>
           <h2>R ≈ P × Q, 숨은 취향 차원을 찾는다</h2>
@@ -649,7 +667,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s12">
+      <section class="slide" id="s13">
         <p class="section-label">ALS / BPR</p>
         <h2>ALS는 확신도를 두고, BPR은 순서를 맞춘다</h2>
         <div class="flow">
@@ -659,7 +677,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s13">
+      <section class="slide" id="s14">
         <p class="section-label">ALS strengths</p>
         <h2>ALS가 좋다는 말은 비교로 확인해야 한다</h2>
         <table>
@@ -699,7 +717,7 @@
         <div class="callout">따라서 "ALS가 좋다"는 말은 정확도 기준의 이야기다. 다양성까지 보면 Two-Tower를 함께 후보 source로 섞는 해석이 더 맞다.</div>
       </section>
 
-      <section class="slide split" id="s14">
+      <section class="slide split" id="s15">
         <div>
           <p class="section-label">ALS limits</p>
           <h2>하지만 ALS만으로는 부족하다</h2>
@@ -715,7 +733,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s15">
+      <section class="slide" id="s16">
         <p class="section-label">Embedding</p>
         <h2>Embedding은 상품/유저에 대한 숫자의 집합이다</h2>
         <div class="cards three">
@@ -729,7 +747,7 @@
         <div class="callout">추천 모델의 output은 단순 점수표가 아니라 검색 가능한 벡터 공간이다.</div>
       </section>
 
-      <section class="slide center" id="s16">
+      <section class="slide center" id="s17">
         <div>
           <p class="section-label">Part 3</p>
           <h2>Embedding Search</h2>
@@ -737,7 +755,7 @@
         </div>
       </section>
 
-      <section class="slide split" id="s17">
+      <section class="slide split" id="s18">
         <div>
           <p class="section-label">가까운 이웃 찾기</p>
           <h2>검색은 속도와 정확도의 trade-off다</h2>
@@ -771,7 +789,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s18">
+      <section class="slide" id="s19">
         <p class="section-label">빠른 벡터 검색</p>
         <h2>FAISS는 retrieval layer의 속도 장치다</h2>
         <table>
@@ -785,7 +803,7 @@
         <div class="callout">이번 복습에서는 "정확하게 찾는데도 충분히 빠른 방식"을 기준으로 잡는다. 더 어려운 인덱스 튜닝은 catalog가 훨씬 커졌을 때의 주제다.</div>
       </section>
 
-      <section class="slide split" id="s19">
+      <section class="slide split" id="s20">
         <div>
           <p class="section-label">Two-Tower</p>
           <h2>Two-Tower는 유저와 아이템을 따로 인코딩한다</h2>
@@ -814,8 +832,8 @@
         </div>
       </section>
 
-      <section class="slide" id="s20">
-        <p class="section-label">Two-Tower result</p>
+      <section class="slide" id="s21">
+        <p class="section-label">Two-Tower 결과</p>
         <h2>최신 전체 warm user 재학습 결과</h2>
         <div class="metric-grid">
           <div class="metric"><div class="label">Train interactions</div><div class="value">2.38M</div></div>
@@ -863,7 +881,7 @@
         </table>
       </section>
 
-      <section class="slide" id="s21">
+      <section class="slide" id="s22">
         <p class="section-label">정확도 vs 다양성</p>
         <h2>같은 결과를 두 축으로 읽는다</h2>
         <svg class="diagram" viewBox="0 0 980 390" role="img" aria-label="NDCG and diversity comparison">
@@ -892,9 +910,9 @@
         <div class="callout">ALS는 맞히는 힘이 좋고, Two-Tower는 catalog를 넓게 탐색한다. 둘은 경쟁자이면서 동시에 서로 보완재다.</div>
       </section>
 
-      <section class="slide split" id="s22">
+      <section class="slide split" id="s23">
         <div>
-          <p class="section-label">Production interpretation</p>
+          <p class="section-label">운영 해석</p>
           <h2>Two-Tower는 실패가 아니라 역할이 달랐다</h2>
           <ul class="bullets">
             <li>정확도만 보면 ALS가 우세하다.</li>
@@ -909,7 +927,7 @@
         </div>
       </section>
 
-      <section class="slide center" id="s23">
+      <section class="slide center" id="s24">
         <div>
           <p class="section-label">Part 4</p>
           <h2>Two-stage Architecture</h2>
@@ -917,7 +935,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s24">
+      <section class="slide" id="s25">
         <p class="section-label">Candidate Generation + Re-ranking</p>
         <h2>Retrieval은 놓치지 않는 일, Ranking은 위로 올리는 일</h2>
         <div class="flow">
@@ -927,7 +945,7 @@
         <div class="callout">두 stage는 같은 학습 기간 데이터와 같은 추론 시점 데이터 위에서 앞뒤로 이어진다. 다만 역할이 후보 찾기와 순서 고치기로 나뉜다.</div>
       </section>
 
-      <section class="slide split" id="s25">
+      <section class="slide split" id="s26">
         <div>
           <p class="section-label">Candidate source를 섞는다</p>
           <h2>후보 소스는 하나일 필요가 없다</h2>
@@ -945,7 +963,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s26">
+      <section class="slide" id="s27">
         <p class="section-label">피처 조합</p>
         <h2>Re-ranking은 피처 조합을 보는 문제다</h2>
         <div class="cards three">
@@ -959,8 +977,8 @@
         <div class="callout">기존 슬라이드 예시처럼 시간=12시와 선호=한식은 따로 보면 약하지만, 조합하면 "점심에 한식 도시락" 같은 강한 추천 신호가 된다.</div>
       </section>
 
-      <section class="slide" id="s27">
-        <p class="section-label">Latest re-rank</p>
+      <section class="slide" id="s28">
+        <p class="section-label">최신 re-rank</p>
         <h2>후보를 만든 뒤에는 LGBM이 가장 안정적이었다</h2>
         <div class="metric-grid">
           <div class="metric"><div class="label">Rank rows</div><div class="value">163K</div></div>
@@ -978,9 +996,9 @@
         </table>
       </section>
 
-      <section class="slide split" id="s28">
+      <section class="slide split" id="s29">
         <div>
-          <p class="section-label">Deep ranker</p>
+          <p class="section-label">Deep ranker 해석</p>
           <h2>DeepFM, DLRM이 항상 이기지는 않는다</h2>
           <ul class="bullets">
             <li>positive label이 적으면 neural ranker가 안정적으로 학습하기 어렵다.</li>
@@ -994,7 +1012,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s29">
+      <section class="slide" id="s30">
         <p class="section-label">CTR/CVR만으로는 부족하다</p>
         <h2>오프라인 평가는 빠른 비교와 디버깅용이다</h2>
         <table>
@@ -1008,7 +1026,36 @@
         </table>
       </section>
 
-      <section class="slide split" id="s30">
+      <section class="slide" id="s31">
+        <p class="section-label">비즈니스 해석</p>
+        <h2>지표는 비즈니스 질문으로 번역해야 한다</h2>
+        <table>
+          <thead><tr><th>모델 지표</th><th>비즈니스 질문</th><th>결정으로 이어지는 예</th></tr></thead>
+          <tbody>
+            <tr><td>nDCG@K</td><td>상단 추천이 사용자의 다음 행동과 맞는가?</td><td>첫 화면 추천 품질, 클릭 가능한 영역 우선순위</td></tr>
+            <tr><td>Recall@K</td><td>좋은 후보를 충분히 놓치지 않고 모았는가?</td><td>candidate source 추가, fallback 후보 보강</td></tr>
+            <tr><td>Unique@K</td><td>모두에게 같은 인기 item만 보여주고 있지 않은가?</td><td>롱테일 노출, 다양성 슬롯, 신규 item 탐색</td></tr>
+            <tr><td>Latency</td><td>제품 경험을 해치지 않는 시간 안에 응답하는가?</td><td>precompute 범위, FAISS 선택, API timeout 정책</td></tr>
+          </tbody>
+        </table>
+        <div class="callout">강의에서 보는 offline score는 출시 결정의 전부가 아니다. 실제로는 KPI, UX, 정책 리스크, 운영 비용까지 같이 보고 실험한다.</div>
+      </section>
+
+      <section class="slide" id="s32">
+        <p class="section-label">온라인 실험</p>
+        <h2>출시는 A/B test와 guardrail로 판단한다</h2>
+        <div class="cards three">
+          <div class="card"><strong>Primary KPI</strong><p>클릭, star/fork/watch, 재방문, 전환처럼 이번 추천이 직접 바꾸려는 행동</p></div>
+          <div class="card"><strong>Guardrail</strong><p>응답 지연, 오류율, 신고/숨김, 세션 이탈처럼 악화되면 안 되는 지표</p></div>
+          <div class="card"><strong>Segment</strong><p>warm user, cold user, heavy user, 신규 repo 노출처럼 효과가 다르게 나오는 그룹</p></div>
+          <div class="card"><strong>Exposure</strong><p>추천이 실제로 보였는지, 어느 위치에 보였는지, 사용자가 클릭 가능했는지</p></div>
+          <div class="card"><strong>Policy</strong><p>중복, 이미 본 item, 민감/저품질 item, 비즈니스 우선순위 제약</p></div>
+          <div class="card"><strong>Rollback</strong><p>모델 버전, fallback, 이전 추천 bundle로 되돌아갈 수 있는 운영 절차</p></div>
+        </div>
+        <div class="callout">좋은 offline 모델도 제품 실험에서 이기지 못할 수 있다. 그래서 추천은 모델 평가와 제품 실험을 함께 설계한다.</div>
+      </section>
+
+      <section class="slide split" id="s33">
         <div>
           <p class="section-label">Leakage</p>
           <h2>성능 수치보다 먼저 leakage를 본다</h2>
@@ -1024,7 +1071,7 @@
         </div>
       </section>
 
-      <section class="slide center" id="s31">
+      <section class="slide center" id="s34">
         <div>
           <p class="section-label">Part 5</p>
           <h2>최종 시스템 연결</h2>
@@ -1032,7 +1079,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s32">
+      <section class="slide" id="s35">
         <p class="section-label">Notebook에서 서비스까지</p>
         <h2>추천 실험은 앱에서 확인될 때 완성된다</h2>
         <div class="flow">
@@ -1043,7 +1090,7 @@
         </div>
       </section>
 
-      <section class="slide split" id="s33">
+      <section class="slide split" id="s36">
         <div>
           <p class="section-label">현재 모델 선택</p>
           <h2>API는 검증된 모델 버전을 읽는다</h2>
@@ -1065,8 +1112,8 @@
         </div>
       </section>
 
-      <section class="slide" id="s34">
-        <p class="section-label">Serving architecture</p>
+      <section class="slide" id="s37">
+        <p class="section-label">Serving 구조</p>
         <h2>API는 모델 파일 하나만 읽지 않는다</h2>
         <div class="cards three">
           <div class="card"><strong>미리 계산한 후보</strong><p>유저별 후보 repo와 점수</p></div>
@@ -1078,9 +1125,9 @@
         </div>
       </section>
 
-      <section class="slide split" id="s35">
+      <section class="slide split" id="s38">
         <div>
-          <p class="section-label">API contract</p>
+          <p class="section-label">API 계약</p>
           <h2>API contract는 백엔드와 추천 API의 약속이다</h2>
           <ul class="bullets">
             <li>백엔드는 어떤 값을 보내야 하는지 알아야 한다.</li>
@@ -1115,7 +1162,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s36">
+      <section class="slide" id="s39">
         <p class="section-label">Streamlit 시뮬레이터</p>
         <h2>시뮬레이터로 추천 결과를 확인한다</h2>
         <div class="cards three">
@@ -1128,7 +1175,7 @@
         </div>
       </section>
 
-      <section class="slide center" id="s37">
+      <section class="slide center" id="s40">
         <div>
           <p class="section-label">Part 6</p>
           <h2>Cold Start와 Fallback</h2>
@@ -1136,7 +1183,7 @@
         </div>
       </section>
 
-      <section class="slide split" id="s38">
+      <section class="slide split" id="s41">
         <div>
           <p class="section-label">Cold Start</p>
           <h2>신규 유저/아이템은 행렬에 행이나 열이 없다</h2>
@@ -1153,7 +1200,7 @@
         </div>
       </section>
 
-      <section class="slide" id="s39">
+      <section class="slide" id="s42">
         <p class="section-label">Fallback 설계</p>
         <h2>Warm user와 Cold Start를 나눠 본다</h2>
         <table>
@@ -1188,9 +1235,9 @@
         </table>
       </section>
 
-      <section class="slide split" id="s40">
+      <section class="slide split" id="s43">
         <div>
-          <p class="section-label">현재 vs Production</p>
+          <p class="section-label">현재 vs 운영</p>
           <h2>Cold Start 응답은 404에서 끝나면 안 된다</h2>
           <div class="flow">
             <div class="flow-row">
@@ -1216,7 +1263,7 @@
         </div>
       </section>
 
-      <section class="slide split" id="s41">
+      <section class="slide split" id="s44">
         <div>
           <p class="section-label">Item Cold Start</p>
           <h2>신규 repo는 collaborative 모델에 바로 잡히지 않는다</h2>
@@ -1232,12 +1279,13 @@
         </div>
       </section>
 
-      <section class="slide" id="s42">
+      <section class="slide" id="s45">
         <p class="section-label">체크리스트</p>
         <h2>추천 실험을 볼 때 반드시 묻는 질문</h2>
         <div class="cards">
           <div class="card"><strong>같은 split인가?</strong><p>history, rank_label, test 기간이 다르면 수치를 직접 비교할 수 없다.</p></div>
           <div class="card"><strong>같은 catalog인가?</strong><p>전체 repo인지 100k catalog인지에 따라 recall과 diversity가 바뀐다.</p></div>
+          <div class="card"><strong>비즈니스 목표가 무엇인가?</strong><p>discovery, 재방문, 전환 중 무엇을 최적화하는지에 따라 label과 metric이 달라진다.</p></div>
           <div class="card"><strong>seen filtering이 일관적인가?</strong><p>이미 본 repo를 추천하면 평가와 제품 경험이 모두 왜곡된다.</p></div>
           <div class="card"><strong>cold-start를 어떻게 처리하는가?</strong><p>unknown actor와 신규 repo는 별도 fallback 정책이 필요하다.</p></div>
           <div class="card"><strong>metadata leakage는 없는가?</strong><p>stars/forks/topics가 현재 snapshot이면 과거 예측 평가에서는 조심해야 한다.</p></div>
@@ -1246,10 +1294,11 @@
         <div class="callout">주의: 초기 <code>07_two_stage.ipynb</code>는 개념 설명용이다. 성능 결론은 최신 script/docs 기준으로 말한다.</div>
       </section>
 
-      <section class="slide" id="s43">
+      <section class="slide" id="s46">
         <p class="section-label">오늘의 핵심 키워드</p>
         <h2>이 단어들로 전체 구조를 설명할 수 있어야 한다</h2>
         <div class="cards three">
+          <div class="card"><strong>Business objective</strong><p>무엇을 키울지에 따라 label, metric, filtering이 달라진다.</p></div>
           <div class="card"><strong>Sparsity</strong><p>대부분의 user-item 조합은 관측되지 않는다.</p></div>
           <div class="card"><strong>Matrix Factorization</strong><p>희소 행렬을 user/item 숨은 취향 벡터로 압축한다.</p></div>
           <div class="card"><strong>Embedding Search</strong><p>추천을 벡터 검색 문제로 바꾼다.</p></div>
@@ -1259,17 +1308,64 @@
         </div>
       </section>
 
-      <section class="slide center" id="s44">
+      <section class="slide center" id="s47">
+        <div>
+          <p class="section-label">Part 7</p>
+          <h2>AI 시대의 추천시스템</h2>
+          <p class="subtitle">마지막으로, 오늘 배운 추천 기본기가 LLM/RAG 시대에는 어떻게 이어지는지 정리한다. 결론은 대체가 아니라 연결이다.</p>
+        </div>
+      </section>
+
+      <section class="slide split" id="s48">
+        <div>
+          <p class="section-label">AI 시대의 추천</p>
+          <h2>Vector search가 추천과 RAG를 다시 연결했다</h2>
+          <ul class="bullets">
+            <li>RAG 시스템은 문서 chunk를 embedding으로 바꾸고 가까운 것을 찾는다.</li>
+            <li>추천에서도 user/item embedding을 만들고 가까운 item을 찾는다.</li>
+            <li>그래서 FAISS, nearest neighbor, candidate generation은 AI 앱에서도 계속 등장한다.</li>
+            <li>다만 vector search만으로 제품 품질이 자동으로 해결되지는 않는다.</li>
+          </ul>
+        </div>
+        <div class="panel als">
+          <h3>같은 구조</h3>
+          <p><strong>RAG:</strong> query vector → document vector 검색</p>
+          <p><strong>추천:</strong> user vector → item vector 검색</p>
+          <div class="callout">둘 다 retrieval layer를 가진다. 그 다음에는 filtering, ranking, policy, latency가 따라온다.</div>
+        </div>
+      </section>
+
+      <section class="slide split" id="s49">
+        <div>
+          <p class="section-label">현재 해석</p>
+          <h2>급격한 대체보다, 검증된 기본기 위에 AI를 얹는 흐름이다</h2>
+          <ul class="bullets">
+            <li>최근 RAG도 vector-only보다 keyword, metadata, plain text 정제, index map을 함께 본다.</li>
+            <li>LLM 붐 속에서 대규모 추천 자체가 전면의 키워드로 보이는 분위기는 아직 강하지 않다.</li>
+            <li>현실적인 변화는 비정형 데이터를 추천 feature로 가공하기 쉬워진 점이다.</li>
+            <li>또 하나의 변화는 API 개발, 실험 앱, 운영 자동화의 진입장벽이 낮아진 점이다.</li>
+          </ul>
+        </div>
+        <div class="panel tower">
+          <h3>강의 결론</h3>
+          <p>추천시스템을 배운다는 것은 낡은 기술을 배우는 게 아니다. sparse data, retrieval, ranking, fallback, API contract는 AI 제품에서도 그대로 필요한 기본기다.</p>
+          <div class="callout">LLM은 추천을 없애기보다, 텍스트 이해와 시스템 제작 속도를 높이는 도구로 먼저 들어온다.</div>
+        </div>
+      </section>
+
+      <section class="slide center" id="s50">
         <div>
           <p class="section-label">정리</p>
           <h2>Week 10 한 문장</h2>
-          <p class="subtitle">추천 ML은 모델 하나를 고르는 일이 아니라, Feedback Data를 sparse matrix로 만들고, 후보 생성과 재정렬, fallback과 API까지 이어 붙이는 일이다.</p>
-          <pre><code>Sparsity = 추천 문제의 출발점
+          <p class="subtitle">추천 ML은 모델 하나를 고르는 일이 아니라, 비즈니스 목표를 데이터와 모델, fallback과 API까지 이어 붙이는 일이다. AI 시대에도 이 기본 구조는 쉽게 사라지지 않는다.</p>
+          <pre><code>Business objective = label, metric, policy의 출발점
+Sparsity = 추천 문제의 데이터 현실
 MF/ALS = collaborative accuracy baseline
 Two-Tower = diversity source
 LGBM = ranking quality
 운영 = offline 결과를 online 제품으로 연결
-Fallback = Cold Start product policy</code></pre>
+Fallback = Cold Start product policy
+AI = 비정형 데이터 활용과 개발/운영 자동화의 가속기</code></pre>
         </div>
       </section>
     </div>

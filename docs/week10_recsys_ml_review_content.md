@@ -18,6 +18,9 @@
 ## 핵심 키워드
 
 - user-item interaction
+- business objective
+- product KPI
+- discovery / retention / conversion
 - Feedback Data
 - weighted score
 - implicit feedback
@@ -56,53 +59,76 @@
 - FastAPI
 - Streamlit simulator
 - temporal leakage
+- online experiment
+- A/B test
+- guardrail metric
+- LLM / RAG
+- vector search
+- hybrid retrieval
+- unstructured data
+- API automation
 
-## 44장 구성
+## 50장 구성
 
 1. 제목: 추천시스템 최종 복습
-2. 개념, 모델, 운영을 닫는 최종 로드맵
+2. 비즈니스, 모델, 운영을 닫는 최종 로드맵
 3. 추천 문제 정의: 고객이 고를 것을 미리 맞추는 문제
-4. Feedback Data: Explicit은 적지만 명확하고, Implicit은 많지만 noisy함
-5. Sparsity: 대부분의 칸은 비어 있음
-6. sparse matrix: 비어 있는 칸은 저장하지 않기
-7. Split의 목적: 미래 행동을 feature에 섞지 않기
-8. seen filtering: 이미 본 item 제외 여부는 서비스 정책
-9. Baseline & Fallback
-10. Matrix Factorization 파트 전환
-11. Matrix Factorization: R ≈ P × Q
-12. ALS/BPR: confidence와 순위 학습
-13. ALS의 강점
-14. ALS의 한계
-15. embedding, repo2repo, BPR 관점
-16. Embedding Search 파트 전환
-17. nearest neighbor search와 brute force
-18. FAISS: 정확하게 찾기 vs 더 빠르게 찾기
-19. Two-Tower 구조
-20. 최신 Two-Tower 전체 warm user 재학습 결과
-21. 정확도 vs 다양성
-22. Two-Tower의 production 해석
-23. Two-stage Architecture 파트 전환
-24. Candidate Generation과 Re-ranking 분리
-25. Candidate source 혼합
-26. 피처 조합과 ranking feature 구조
-27. 최신 LGBM re-rank 결과
-28. deep ranker가 바로 이기지 못한 이유
-29. CTR/CVR만으로는 부족함, nDCG/Recall/Unique/Latency
-30. leakage 주의
-31. 최종 시스템 연결 파트 전환
-32. Notebook에서 백엔드가 호출하는 서비스까지
-33. API는 검증된 모델 버전을 읽음
-34. 모델 파일, mapping, metadata를 함께 읽는 serving architecture
-35. 백엔드와 추천 API 사이의 API contract
-36. Streamlit 시뮬레이터로 추천 결과 확인
-37. Cold Start와 Fallback 파트 전환
-38. 현재 Cold Start 구현 상태
-39. Warm user와 Cold Start fallback 설계
-40. 현재 404 처리 vs production fallback 응답
-41. cold item 해결 방향
-42. 추천 실험 체크리스트
-43. 핵심 키워드 정리
-44. 최종 한 문장
+4. 비즈니스 목표가 추천 문제를 정함
+5. Feedback Data: Explicit은 적지만 명확하고, Implicit은 많지만 noisy함
+6. Sparsity: 대부분의 칸은 비어 있음
+7. sparse matrix: 비어 있는 칸은 저장하지 않기
+8. Split의 목적: 미래 행동을 feature에 섞지 않기
+9. seen filtering: 이미 본 item 제외 여부는 서비스 정책
+10. Baseline & Fallback
+11. Matrix Factorization 파트 전환
+12. Matrix Factorization: R ≈ P × Q
+13. ALS/BPR: confidence와 순위 학습
+14. ALS의 강점
+15. ALS의 한계
+16. embedding, repo2repo, BPR 관점
+17. Embedding Search 파트 전환
+18. nearest neighbor search와 brute force
+19. FAISS: 정확하게 찾기 vs 더 빠르게 찾기
+20. Two-Tower 구조
+21. 최신 Two-Tower 전체 warm user 재학습 결과
+22. 정확도 vs 다양성
+23. Two-Tower의 production 해석
+24. Two-stage Architecture 파트 전환
+25. Candidate Generation과 Re-ranking 분리
+26. Candidate source 혼합
+27. 피처 조합과 ranking feature 구조
+28. 최신 LGBM re-rank 결과
+29. deep ranker가 바로 이기지 못한 이유
+30. CTR/CVR만으로는 부족함, nDCG/Recall/Unique/Latency
+31. 모델 지표를 비즈니스 질문으로 번역
+32. 온라인 실험: A/B test와 guardrail로 출시 판단
+33. leakage 주의
+34. 최종 시스템 연결 파트 전환
+35. Notebook에서 백엔드가 호출하는 서비스까지
+36. API는 검증된 모델 버전을 읽음
+37. 모델 파일, mapping, metadata를 함께 읽는 serving architecture
+38. 백엔드와 추천 API 사이의 API contract
+39. Streamlit 시뮬레이터로 추천 결과 확인
+40. Cold Start와 Fallback 파트 전환
+41. 현재 Cold Start 구현 상태
+42. Warm user와 Cold Start fallback 설계
+43. 현재 404 처리 vs production fallback 응답
+44. cold item 해결 방향
+45. 추천 실험 체크리스트
+46. 핵심 키워드 정리
+47. AI 시대의 추천시스템 파트 전환
+48. AI 시대의 추천: Vector search가 RAG와 추천을 연결
+49. 현재 해석: 급격한 대체보다 검증된 기본기 위에 AI를 얹는 흐름
+50. 최종 한 문장
+
+## AI 시대 추천시스템 메시지
+
+2025~2026년 자료를 보면 LLM 기반 추천/agent 연구는 활발하지만, 현업 관점에서는 추천의 기본 구조가 급격히 사라진다기보다 retrieval, ranking, filtering, API serving 위에 LLM과 비정형 데이터 처리가 붙는 흐름으로 설명하는 편이 안전하다.
+
+- RAG와 추천은 embedding/vector search/nearest neighbor라는 retrieval layer를 공유한다.
+- 다만 최신 RAG도 vector-only보다 keyword, metadata, plain text 정제, hybrid retrieval을 함께 본다.
+- 큰 규모의 추천 자체가 AI 시대의 중심 화두로 급격히 재부상했다기보다, 비정형 데이터를 feature로 만들고 실험/API/운영을 빠르게 만드는 변화가 더 현실적이다.
+- 따라서 수강생에게는 "검증된 추천 기본기를 잘 갖다 쓰기 + 비정형 데이터를 추천 가능한 형태로 가공하기 + API 개발과 시스템 제어를 AI로 빠르게 하기"로 정리한다.
 
 ## 최신 Two-Tower 재학습 결과
 
