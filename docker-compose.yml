@@ -15,8 +15,9 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET:-airflow_jwt_secret}
     AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
-    AIRFLOW__EXECUTION_API__JWT_EXPIRATION_TIME: "7200"
+    AIRFLOW__EXECUTION_API__JWT_EXPIRATION_TIME: "86400"
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    AIRFLOW__SCHEDULER__TASK_INSTANCE_HEARTBEAT_TIMEOUT: "14400"
     AIRFLOW_CONFIG: /opt/airflow/config/airflow.cfg
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp-key.json
     GCP_KEY_PATH: /opt/airflow/gcp-key.json

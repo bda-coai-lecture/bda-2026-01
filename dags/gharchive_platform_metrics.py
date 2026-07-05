@@ -20,6 +20,8 @@ WINDOW_END = "$(TZ=Asia/Seoul date -d 'yesterday' +%F)"
 MAX_DAYS = 90
 METADATA_WINDOW_START = WINDOW_START
 METADATA_WINDOW_END = WINDOW_END
+METADATA_REFRESH_SCHEDULE = "30 2 * * 0"
+PLATFORM_METRICS_SCHEDULE = "30 3 * * 0"
 
 UV_BASE = (
     "uv run --no-project "
@@ -64,6 +66,17 @@ PLAN_METRICS_COMMAND = (
 
 SYNC_METRICS_COMMAND = PLAN_METRICS_COMMAND
 
+COST_GUARD_COMMAND = (
+    "uv run --no-project "
+    "--with google-cloud-bigquery "
+    "python scripts/check_bigquery_cost_guard.py "
+    "--project bda-coai "
+    "--location US "
+    "--lookback-hours 3 "
+    "--max-usd 2 "
+    "--slack"
+)
+
 default_env = {
     "GCP_KEY_PATH": "/opt/airflow/gcp-key.json",
     "PATH": "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin",
@@ -83,19 +96,21 @@ metadata_task_defaults = {
     "env": default_env,
     "append_env": True,
     "execution_timeout": timedelta(hours=1),
+    "do_xcom_push": False,
 }
 
 metrics_task_defaults = {
     "cwd": PROJECT_DIR,
     "env": default_env,
     "append_env": True,
+    "do_xcom_push": False,
 }
 
 with DAG(
     dag_id="gharchive_repo_metadata_refresh",
-    description="Refresh the local GitHub repo metadata cache for trend dashboards.",
+    description="Refresh BigQuery repo metadata for weekly trend dashboards.",
     start_date=datetime(2026, 5, 1, tzinfo=LOCAL_TZ),
-    schedule=None,
+    schedule=METADATA_REFRESH_SCHEDULE,
     catchup=False,
     max_active_runs=1,
     default_args=default_args,
@@ -109,9 +124,9 @@ with DAG(
 
 with DAG(
     dag_id="gharchive_platform_metrics",
-    description="Rebuild platform metrics from the GitHub Archive fact table loaded by dbt metrics.",
+    description="Weekly rebuild of compact platform and AI-agent trend marts for Metabase.",
     start_date=datetime(2026, 5, 1, tzinfo=LOCAL_TZ),
-    schedule=None,
+    schedule=PLATFORM_METRICS_SCHEDULE,
     catchup=False,
     max_active_runs=1,
     default_args=default_args,
@@ -131,4 +146,11 @@ with DAG(
         **metrics_task_defaults,
     )
 
-    plan_metric_sync >> sync_metrics
+    check_bigquery_cost = BashOperator(
+        task_id="check_bigquery_cost",
+        bash_command=COST_GUARD_COMMAND,
+        execution_timeout=timedelta(minutes=5),
+        **metrics_task_defaults,
+    )
+
+    plan_metric_sync >> sync_metrics >> check_bigquery_cost

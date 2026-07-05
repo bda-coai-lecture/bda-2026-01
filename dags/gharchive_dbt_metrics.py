@@ -48,9 +48,33 @@ PLAN_FACT_COMMAND = (
 
 SYNC_FACT_COMMAND = PLAN_FACT_COMMAND.removesuffix(" --plan-only") + " --no-summary"
 
+# Rebuild only the mart tables that local Metabase dashboards read directly.
+# This uses mart.fact_user_repo_activity, not githubarchive.day.*, so it avoids
+# re-scanning the public GHArchive shards after the daily fact refresh.
+DBT_DASHBOARD_MODELS = " ".join(
+    [
+        "metrics_daily",
+        "metrics_weekly",
+        "metrics_event_type_daily",
+        "metrics_retention_weekly",
+        "metrics_retention_summary",
+        "metrics_cohort_retention_weekly_heatmap",
+        "metrics_cohort_retention_monthly_heatmap",
+        "metrics_user_lifecycle_weekly",
+        "metrics_user_retention_weekly",
+        "metrics_user_lifecycle_monthly",
+        "metrics_user_retention_monthly",
+    ]
+)
+
 DBT_BUILD_COMMAND = (
-    "echo 'Skipping daily dbt mart rebuild to control BigQuery scan cost. "
-    "Run dbt build manually when lecture/demo marts need a refresh.'"
+    "uv run --no-project "
+    "--with dbt-bigquery "
+    "dbt run "
+    "--project-dir dbt/gharchive_metrics "
+    "--profiles-dir dbt/profiles "
+    "--threads 2 "
+    f"--select {DBT_DASHBOARD_MODELS}"
 )
 
 # Warn-only input-drift check on the latest BigQuery fact partition. Always exits
@@ -58,7 +82,7 @@ DBT_BUILD_COMMAND = (
 DRIFT_DETECT_COMMAND = (
     "uv run --no-project "
     "--with pandas --with pyarrow --with numpy "
-    "--with google-cloud-bigquery --with db-dtypes "
+    "--with google-cloud-bigquery --with google-cloud-bigquery-storage --with db-dtypes "
     "python scripts/drift_detect_platform.py "
     "--source bigquery "
     "--project bda-coai "
@@ -74,7 +98,7 @@ COST_GUARD_COMMAND = (
     "--project bda-coai "
     "--location US "
     "--lookback-hours 2 "
-    "--max-usd 1 "
+    "--max-usd 3 "
     "--slack"
 )
 
@@ -100,6 +124,7 @@ fact_task_defaults = {
     "cwd": PROJECT_DIR,
     "env": default_env,
     "append_env": True,
+    "do_xcom_push": False,
 }
 
 with DAG(
@@ -129,7 +154,7 @@ with DAG(
     build_dbt_metrics = BashOperator(
         task_id="build_dbt_metrics",
         bash_command=DBT_BUILD_COMMAND,
-        execution_timeout=timedelta(minutes=30),
+        execution_timeout=timedelta(hours=1),
         **fact_task_defaults,
     )
 
