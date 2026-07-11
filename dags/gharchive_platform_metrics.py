@@ -20,7 +20,7 @@ WINDOW_END = "$(TZ=Asia/Seoul date -d 'yesterday' +%F)"
 MAX_DAYS = 90
 METADATA_WINDOW_START = WINDOW_START
 METADATA_WINDOW_END = WINDOW_END
-METADATA_REFRESH_SCHEDULE = "30 2 * * 0"
+METADATA_REFRESH_SCHEDULE = "15 * * * *"
 PLATFORM_METRICS_SCHEDULE = "30 3 * * 0"
 
 UV_BASE = (
@@ -49,7 +49,7 @@ REFRESH_METADATA_COMMAND = (
     "--systematic-sample "
     "--sample-seed bda-repo-metadata-v1 "
     "--cache-tier warm "
-    "--max-fetch 1000 "
+    "--max-fetch 2000 "
     "--rate-limit-pause 0.2"
 )
 
