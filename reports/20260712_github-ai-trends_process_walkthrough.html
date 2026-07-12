@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 개발은 얼마나 넓어졌나 — 분석이 진화한 과정 (강의용)</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --ink:#1c2530; --muted:#6b7683;
+    --line:#e6e9ee; --accent:#2f6df6; --accent2:#0e9f6e;
+    --warn:#e8590c; --gold:#b7791f;
+    --claude:#D97757; --codex:#10A37F; --copilot:#8957E5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo",
+    "Malgun Gothic",sans-serif;line-height:1.65;font-size:15px;}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 20px 64px}
+  header.top{background:linear-gradient(120deg,#20213a,#D97757);color:#fff;
+    border-radius:16px;padding:32px 34px;margin-bottom:26px;
+    box-shadow:0 8px 26px rgba(31,42,68,.18)}
+  header.top .kicker{font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;
+    opacity:.85;margin-bottom:8px}
+  header.top h1{margin:0 0 8px;font-size:27px;line-height:1.3}
+  header.top p{margin:6px 0 0;opacity:.92;font-size:14.5px}
+  .meta{margin-top:14px;font-size:13px;opacity:.8}
+  h2{font-size:19px;margin:34px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  .lead{color:var(--muted);font-size:14.5px;margin:-4px 0 18px}
+  .philo{background:#fdf1ec;border:1px solid #f6d8cb;border-radius:12px;
+    padding:16px 20px;margin:18px 0;font-size:14.5px}
+  .philo b{color:var(--claude)}
+  .lessons{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:12px;margin:8px 0 4px}
+  .lesson{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent2);
+    border-radius:10px;padding:13px 15px}
+  .lesson h4{margin:0 0 5px;font-size:14px}
+  .lesson p{margin:0;font-size:13px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13.5px}
+  thead th{background:#f0f3f8;text-align:left;padding:11px 13px;font-size:12.5px;
+    letter-spacing:.02em;color:#414a56;border-bottom:1px solid var(--line)}
+  tbody td{padding:12px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#fafbfd}
+  .ph{display:inline-block;min-width:26px;height:26px;line-height:26px;text-align:center;
+    background:var(--claude);color:#fff;border-radius:7px;font-weight:700;font-size:13px}
+  .who{color:var(--muted);font-size:12px;display:block;margin-top:4px}
+  .say{font-weight:600}
+  .tag{display:inline-block;background:#eef7f2;color:var(--accent2);border:1px solid #cdeadd;
+    border-radius:20px;padding:2px 9px;font-size:11.5px;font-weight:600;white-space:nowrap}
+  .tag.warn{background:#fff4ec;color:var(--warn);border-color:#ffd9c2}
+  .tag.mut{background:#eef1f5;color:#5a6673;border-color:#dde2e9}
+  .tag.blue{background:#eaf1ff;color:var(--accent);border-color:#d0e0ff}
+  .num{font-variant-numeric:tabular-nums;font-weight:700}
+  .up{color:var(--accent2)} .down{color:var(--warn)}
+  .fig{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;margin:14px 0}
+  .fig h4{margin:0 0 10px;font-size:14px}
+  .fig img{width:100%;height:auto;border-radius:8px;display:block}
+  .fig .cap{margin:10px 2px 0;font-size:12.5px;color:var(--muted)}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.charts{grid-template-columns:1fr}}
+  .cmp{width:100%;border-collapse:collapse;font-size:13px}
+  .cmp th,.cmp td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right}
+  .cmp th:first-child,.cmp td:first-child{text-align:left}
+  .cmp thead th{background:#f7f9fc;font-size:12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .out{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .out .ico{font-size:20px}
+  .out h4{margin:6px 0 5px;font-size:14.5px}
+  .out p{margin:0;font-size:13px;color:var(--muted)}
+  .out code{background:#f0f3f8;padding:1px 6px;border-radius:5px;font-size:12px}
+  footer{margin-top:34px;color:var(--muted);font-size:12.5px;text-align:center}
+  .callout{background:#fffaf0;border:1px solid #f3e3bf;border-radius:12px;
+    padding:14px 18px;margin:14px 0;font-size:14px}
+  .callout b{color:var(--gold)}
+  code{background:#f0f3f8;padding:1px 6px;border-radius:5px;font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="kicker">BDA · 데이터 분석 실습</div>
+  <h1>“AI 개발은 얼마나 넓어졌나”를 어떻게 파고들었나<br>— 대화로 진화한 분석 과정</h1>
+  <p>GitHub 전수 PR 이벤트에서 AI 에이전트의 흔적을 추적 — 직감과 반박을 거치며 서사와 방법이 뒤집힌 실제 기록</p>
+  <div class="meta">데이터: GH Archive(BigQuery) · 2026-07 · 본 자료는 최종 보고서와 별개의 <b>과정 기록</b>입니다</div>
+</header>
+
+<div class="philo">
+  💡 이 자료의 핵심 메시지: <b>계측기가 서사를 만든다.</b> 무엇을 세느냐(봇 계정? 브랜치명?)에 따라
+  “30배 폭발”이 “처음부터 거대했음”으로 뒤집힌다. 사람이 방향과 직감을 던지고(“이거 이상하지 않아?”),
+  실행이 데이터로 답하며 결론이 다듬어진다. 아래는 그 왕복(티키타카)의 기록입니다.
+</div>
+
+<h2>0. 출발점 — 무엇을 세고 있었나</h2>
+<p class="lead">
+  GH Archive의 전 세계 PR 이벤트에서 AI 코딩 에이전트(Codex·Copilot·Claude Code·Cursor·Devin·Jules)의 흔적을 추적.
+  처음의 계측기는 <b>“자기 봇 계정으로 직접 연 PR”</b>(<code>actor.login</code> = <code>Copilot</code>, <code>Codex</code>, <code>claude[bot]</code>…).
+  이걸로 그린 첫 그림은 “AI PR 비중 <span class="num">0.15% → 5%</span>, <b>30배 폭발</b>”이었다. — 그런데 이게 함정이었다.
+</p>
+
+<h2>1. 대화가 분석을 뒤집은 8개의 장면</h2>
+<p class="lead">각 행은 “사람이 던진 방향/직감 → 왜 중요한 쟁점인지 → 실행이 데이터로 한 대응 → 남은 교훈”.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:34px">#</th>
+      <th style="width:23%">방향·직감 (사람)</th>
+      <th style="width:26%">쟁점 · 왜 중요한가</th>
+      <th style="width:31%">대응 (실행 + 데이터)</th>
+      <th style="width:14%">교훈</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="ph">1</span></td>
+      <td><span class="say">“봇 계정만 세면 진짜 규모가 안 잡히는 거 아냐?”</span><span class="who">계측 대상 의심 — 핵심 전환</span></td>
+      <td>2025-11부터 GH Archive가 PR 텍스트(제목·본문·diff)를 통째로 지웠고, Codex·Claude Code는 <b>사람 로그인</b>으로 PR을 연다 → 봇 집계에선 거의 0. “30배 폭발”은 계측기의 착시일 수 있음.</td>
+      <td><b>브랜치명(<code>head.ref</code>)은 100% 생존</b>한다는 걸 발견. AI 툴은 <code>codex/</code>·<code>claude/</code> 프리픽스를 박는다 → 사람 로그인 PR에 적용해 복원. 결과 <b>봇전용의 2~3배</b>: 전역 AI PR이 2025년 내내 이미 <span class="num">6~10%</span>, 2026-01 <span class="num up">12.8%</span>.</td>
+      <td><span class="tag warn">계측기가 서사를 만든다</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">2</span></td>
+      <td><span class="say">“그럼 ‘폭발’이란 말 자체가 틀린 거 아냐?”</span><span class="who">서사 재검</span></td>
+      <td>복원해 보니 <b>Codex는 처음부터 거대</b>했다 — 봇을 안 써서 안 보였을 뿐. “무(無)에서 폭발”이라는 프레임이 사실과 어긋남.</td>
+      <td>2025-06 <code>codex/</code> 브랜치만 <span class="num">6.8만 건</span> 확인 → 이전 본문 기반 “6월 Codex 등장 9.3%”와 <b>독립 신호가 일치</b>(교차검증). 서사 개정: “폭발”이 아니라 <b>기존 거인(Codex) 위에 연말 Copilot 봇·Claude Code가 합류</b>한 스텝업.</td>
+      <td><span class="tag">서사도 데이터로 교정</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">3</span></td>
+      <td><span class="say">“연말에 확 뜬 느낌 있었는데, 12월 맞아?”</span><span class="who">직감 검증 요청</span></td>
+      <td>“12월 폭발” 체감이 실제 데이터의 변곡점과 맞는지 확인해야 서사가 단단해짐.</td>
+      <td>월별 급증 분해: <b>12월이 절대량 기준 단일월 최대 증가(+1만 건)</b>, 1월이 정점. 직감과 일치 — 단 이륙 자체는 10~11월(10월 결손에 분기점 가림).</td>
+      <td><span class="tag">직감을 수치로 못 박기</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">4</span></td>
+      <td><span class="say">“업계에선 Claude에서 Codex로 옮겨간다던데?”</span><span class="who">통설 대입</span></td>
+      <td>널리 회자되는 이동설이 데이터에 보이는지 — 안 보이면 왜 안 보이는지(계측 사각지대)까지 밝혀야 함.</td>
+      <td>봇 계정으론 <b>확인 불가</b>(둘 다 사람 로그인 → 사각지대). 브랜치명으로 복원하면 오히려 반대: 2026-05 <b>Claude(25,390)가 Codex(24,875)를 추월</b>. 통설과 방향이 어긋남.</td>
+      <td><span class="tag warn">통설도 계측으로 검증</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">5</span></td>
+      <td><span class="say">“6월 데이터가 이상해. 부분수집된 거 아냐?”</span><span class="who">결손 의심</span></td>
+      <td>“우리 파이프라인 버그냐, 상류 문제냐, 진짜 감소냐”를 가르지 못하면 결론 전체가 흔들림.</td>
+      <td>층별 규명: raw는 <b>완전</b>(Push·Create 정상, 일 ~370만 이벤트). <b>PullRequestEvent 스트림만 ~2026-05-20부터 언더수집</b>(정상 200k+/일 → 6월 ~35k). 우리 탓 아닌 상류. <b>5월은 유효, 6월만 제외</b>.</td>
+      <td><span class="tag">결손도 층별로 특정</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">6</span></td>
+      <td><span class="say">“근데 표에서 중간에 월이 왜 빠져 있어?”</span><span class="who">표 전제 점검</span></td>
+      <td>표만 보면 07·08·12·02·03이 없어 보임 → 독자가 “데이터가 구멍투성이”로 오해할 위험.</td>
+      <td>마트 전체 시계열 재확인: 그 달들은 <b>다 있고</b> 표가 변곡점만 발췌한 것뿐. <b>진짜 결손은 2025-10 하나</b>(아카이브 부분수집)+2026-06 partial. → 표를 <b>그래프로 교체</b>해 결손 구간을 시각적으로 명시.</td>
+      <td><span class="tag">발췌 ≠ 결손</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">7</span></td>
+      <td><span class="say">“4월에 Claude 감소 눈에 띄지? 그때 성능 이슈 많았어 — 4/10경 뚝 떨어졌다 opus 4.7로 반등, 그 사이 Codex로 이동. 더 파봐줘.”</span><span class="who">현장 지식 + 딥다이브 요구</span></td>
+      <td>월별 한 점(4월 표본=9·10·11일)은 마침 사건 위에 얹혀 있어 오해하기 쉬움. 인과 서사를 검증하려면 일 단위 해상도가 필요.</td>
+      <td>먼저 <b>비용 규율</b>: 이번 달 무료구간(1TiB) 초과 확인(실지출 ~$4.5) → 범위를 사람이 선택(좁게 4/1~20, +$0.41). 일 단위 스캔 결과: <b>4/1~15 내내 Codex 우위 → 4/16 크로스오버 → Claude가 추월 유지</b>(Opus 4.7 출시와 맞물림). Claude 점유 31~34%→41~42%.</td>
+      <td><span class="tag warn">스캔 전 비용 확인 · 결정은 사람</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">8</span></td>
+      <td><span class="say">“그럼 이 순위가 곧 성능 순위야?”</span><span class="who">해석 남용 경계</span></td>
+      <td>Copilot이 80~95%로 1등이라고 “제일 좋은 모델”로 읽으면 결론이 왜곡됨.</td>
+      <td>사용량≠성능임을 명시: ① Copilot 1등=<b>유통망</b>(GitHub 내장) ② Codex·Claude=사람 로그인 뒤 숨은 거인 ③ 오픈웨이트(Kimi·GLM·Qwen)는 OSS 하네스에 끼워져 유저 이름 커밋 → <b>통째 사각지대</b>. 이 분석은 “자기 정체성으로 활동하는 수직통합 상용 제품”만 잼.</td>
+      <td><span class="tag">사용량 ≠ 성능, 편향 명시</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="fig">
+  <h4>🔑 결정적 대조 — 무엇을 세느냐에 따라 그림이 뒤집힌다 (전역 AI PR 비중)</h4>
+  <table class="cmp">
+    <thead><tr><th>월</th><th>봇 계정만</th><th>+브랜치명 복원(합산)</th><th>배수</th></tr></thead>
+    <tbody>
+      <tr><td>2025-06</td><td>0.15%</td><td class="num">8.0%</td><td class="up">53×</td></tr>
+      <tr><td>2025-11</td><td>3.87%</td><td class="num">10.99%</td><td class="up">2.8×</td></tr>
+      <tr><td>2026-01 (정점)</td><td>5.17%</td><td class="num">12.8%</td><td class="up">2.5×</td></tr>
+      <tr><td>2026-05</td><td>2.31%</td><td class="num">12.02%</td><td class="up">5.2×</td></tr>
+    </tbody>
+  </table>
+  <p class="cap">봇 계정만 세면 “0.15%→5% 30배 폭발”, 브랜치명까지 복원하면 “2025년 내내 이미 6~13%”. 같은 데이터, 다른 계측기.</p>
+</div>
+
+<h2>2. 그래프로 본 결론</h2>
+<p class="lead">티키타카를 거쳐 도달한 그림 4장. (표를 대체해 최종 보고서에도 임베드)</p>
+<div class="charts">
+  <div class="fig">
+    <h4>① AI가 여는 PR 비중 — 전역</h4>
+    <img src="img/ai_pct_monthly.png" alt="월별 AI PR 비중">
+    <p class="cap">2025년 내내 6~10%, 2026-01 정점 12.8%. 회색=2025-10 결손, 속 빈 점=2026-06 부분수집(제외).</p>
+  </div>
+  <div class="fig">
+    <h4>② 툴 3파전 — 월별 건수(합산)</h4>
+    <img src="img/tool_stack_monthly.png" alt="툴별 월간 AI PR">
+    <p class="cap">Codex는 2025-06부터 거대. 연말 Copilot·Claude 합류로 삼분. Claude 4월 저점→5월 Codex 추월.</p>
+  </div>
+  <div class="fig">
+    <h4>③ 확산의 폭 — 도입 레포 내부</h4>
+    <img src="img/adoption_depth.png" alt="활성 레포 내부 AI 비중">
+    <p class="cap">전역 3~5%는 희석값. AI를 도입한 레포 안에서는 전체 PR의 60~77%가 에이전트 발.</p>
+  </div>
+  <div class="fig">
+    <h4>④ 4월 클로즈업 — Claude vs Codex 일별</h4>
+    <img src="img/april_daily_zoom.png" alt="4월 일별 브랜치 크로스오버">
+    <p class="cap">4/1~15 Codex 우위(하단 초록) → 4/16 부호 전환 → Claude 추월 유지(주황). Opus 4.7 반등과 맞물림.</p>
+  </div>
+</div>
+
+<div class="callout" style="background:#fdf7f4;border-color:#f0d5c8">
+  🔍 <b style="color:var(--claude)">4월 딥다이브 — 정직한 판독</b>:
+  유저 직감의 <b>큰 그림</b>(“4월 Claude 부진 → Codex가 앞섬 → Opus 4.7로 반등”)은 4/16 크로스오버로 <b>뚜렷이 확인</b>.
+  다만 계기는 <b>“4/10 단일 절벽”이 아니다</b> — 그날(2,498건)은 이웃 날과 평범하고, 데이터가 지지하는 건
+  <b>“전반기 Codex 우위 → 중순 역전”</b> 형태. 또 이건 집계 점유 이동이지 <b>같은 유저의 스위칭 증거는 아니며</b>,
+  크로스오버↔출시는 상관이지 인과 증명이 아니다. — 직감은 존중하되, 계기와 인과는 과대해석하지 않는다.
+</div>
+
+<h2>3. 관통하는 교훈</h2>
+<div class="lessons">
+  <div class="lesson"><h4>① 계측기를 의심하라</h4><p>무엇을 세느냐가 결론을 만든다. 봇 계정 vs 브랜치명에 따라 “30배 폭발”이 “원래 거대”로 뒤집힌다.</p></div>
+  <div class="lesson"><h4>② 신호를 교차검증하라</h4><p>브랜치명 복원과 본문 시그니처가 “6월 Codex 등장”에서 독립적으로 일치 → 노이즈 아님.</p></div>
+  <div class="lesson"><h4>③ 결손을 층별로 특정</h4><p>“6월 이상”을 raw/스트림/전환으로 분해 → PR 이벤트만 상류 언더수집, 우리 파이프라인 무결.</p></div>
+  <div class="lesson"><h4>④ 발췌와 결손을 구분</h4><p>표에 안 보인다고 데이터가 없는 게 아니다. 진짜 구멍(2025-10)만 그래프에 명시.</p></div>
+  <div class="lesson"><h4>⑤ 직감은 존중, 인과는 절제</h4><p>큰 그림(크로스오버)은 확인하되 “4/10 절벽”·“개별 이동”은 데이터가 지지하는 만큼만.</p></div>
+  <div class="lesson"><h4>⑥ 스캔 전 비용을 확인</h4><p>무료구간 초과를 먼저 재고, 범위 선택은 사람에게. payload 스캔은 진짜 돈이 붙는다.</p></div>
+  <div class="lesson"><h4>⑦ 사용량 ≠ 성능</h4><p>1등은 유통망일 수 있고, 거인은 숨어 있고, 오픈웨이트는 사각지대. 순위를 역량으로 읽지 말 것.</p></div>
+</div>
+
+<h2>4. 산출물 — 무엇이 남았나</h2>
+<div class="grid">
+  <div class="out">
+    <div class="ico">📄</div><h4>최종 보고서</h4>
+    <p><code>20260712_github-ai-trends.md</code> — 합산 트렌드·확산·툴 지형·4월 딥다이브(3.5절)·판도 해석·결손 구간. 표를 그래프 4종으로 교체.</p>
+  </div>
+  <div class="out">
+    <div class="ico">📈</div><h4>그래프 4종</h4>
+    <p><code>reports/img/*.png</code> — AI% 추세·툴 3파전·도입 깊이·4월 일별 클로즈오버. 결손·부분수집 구간을 시각적으로 명시.</p>
+  </div>
+  <div class="out">
+    <div class="ico">🧱</div><h4>BQ 마트 + Metabase</h4>
+    <p>정본 뷰 <code>ai_pr_metrics_monthly</code>(합산 AI%·봇전용 하한·툴6종·도입폭·<code>data_quality</code> 동적 플래그) → 대시보드 자동 반영. 월 갱신 <code>refresh_mart.sh</code>.</p>
+  </div>
+  <div class="out">
+    <div class="ico">🌿</div><h4>브랜치명 복원 우회로</h4>
+    <p>본문 삭제(2025-11) 이후에도 <code>head.ref</code> 프리픽스로 사람 로그인 뒤 숨은 Codex·Claude를 추적하는 재사용 가능한 방법론.</p>
+  </div>
+</div>
+
+<div class="callout">
+  🎯 <b>한 줄 결론</b>: “AI가 여는 PR”은 봇 계정만 보면 3~5%지만, 사람 로그인 뒤 숨은 거인까지 복원하면
+  <b>2025년 내내 이미 6~13%</b>, 도입한 레포 안에서는 <b>60~77%</b>가 에이전트 발. — 그리고 이 결론은
+  <b>“봇만 세도 돼?”부터 “4월 왜 빠졌어?”까지 여덟 번의 반박을 통과하며</b> 뒤집히고 다듬어졌다.
+</div>
+
+<footer>
+  BDA 데이터 분석 실습 · 2026-07 · 과정 기록(최종 보고서와 별개) · 사람은 방향, 실행은 데이터로 답한다
+</footer>
+
+</div>
+</body>
+</html>
