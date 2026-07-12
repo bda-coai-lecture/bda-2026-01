@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 근황 — Fable 5의 귀환과 GPT-5.6</title>
+  <style>
+    :root {
+      --paper:#f4f0e8; --ink:#171714; --muted:#68675f; --line:#d8d2c5;
+      --purple:#6d47d9; --purple-soft:#ece5ff; --green:#23745b;
+      --green-soft:#dff3e9; --orange:#d85f2a; --card:#fffdf8;
+    }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:Inter,
+      Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.55; }
+    a { color:inherit; text-underline-offset:3px; }
+    .wrap { width:min(1120px,calc(100% - 36px)); margin:auto; }
+    .hero { min-height:74vh; display:flex; align-items:center; padding:58px 0 42px; }
+    .eyebrow { display:flex; align-items:center; gap:10px; color:var(--muted); font-size:13px;
+      font-weight:750; letter-spacing:.09em; text-transform:uppercase; }
+    .live { width:9px; height:9px; border-radius:50%; background:#ff4d3d;
+      box-shadow:0 0 0 5px #ff4d3d20; }
+    h1 { margin:24px 0 18px; max-width:980px; font-size:clamp(48px,8vw,102px);
+      line-height:.94; letter-spacing:-.065em; font-weight:880; }
+    h1 .fable { color:var(--purple); } h1 .gpt { color:var(--green); }
+    .hero-copy { max-width:760px; font-size:clamp(18px,2.3vw,25px); color:#3e3d38; }
+    .hero-copy b { color:var(--ink); }
+    .chips { display:flex; flex-wrap:wrap; gap:9px; margin-top:30px; }
+    .chip { border:1px solid var(--line); background:#ffffff80; border-radius:99px;
+      padding:8px 13px; font-size:13px; font-weight:700; }
+    .section { padding:70px 0; border-top:1px solid var(--line); }
+    .section-head { display:grid; grid-template-columns:1fr 2fr; gap:36px; margin-bottom:34px; }
+    .no { font-size:13px; color:var(--muted); font-weight:800; letter-spacing:.08em; }
+    h2 { margin:0; font-size:clamp(30px,4.6vw,56px); line-height:1.02; letter-spacing:-.045em; }
+    .section-lead { margin:4px 0 0; max-width:680px; font-size:18px; color:#4d4b45; }
+    .timeline { display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--line);
+      background:var(--card); border-radius:18px; overflow:hidden; }
+    .time { min-height:190px; padding:22px; border-right:1px solid var(--line); }
+    .time:last-child { border:0; } .date { font-size:13px; color:var(--muted); font-weight:750; }
+    .time h3 { margin:25px 0 8px; font-size:23px; letter-spacing:-.025em; }
+    .time p { margin:0; color:var(--muted); font-size:14px; }
+    .time.hot { background:var(--purple-soft); }
+    .duo { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .model { border:1px solid var(--line); border-radius:22px; padding:30px; background:var(--card); }
+    .model.f { background:linear-gradient(145deg,var(--purple-soft),var(--card) 52%); }
+    .model.g { background:linear-gradient(145deg,var(--green-soft),var(--card) 52%); }
+    .brand { font-size:13px; font-weight:850; letter-spacing:.1em; text-transform:uppercase; }
+    .model h3 { font-size:35px; margin:8px 0 10px; letter-spacing:-.04em; }
+    .one { min-height:57px; font-size:17px; font-weight:700; }
+    .facts { list-style:none; padding:0; margin:24px 0 0; }
+    .facts li { display:grid; grid-template-columns:112px 1fr; gap:12px; padding:12px 0;
+      border-top:1px solid #00000012; font-size:14px; }
+    .facts b { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
+    .tiers { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:22px; }
+    .tier { padding:13px; border-radius:12px; background:#ffffff9c; border:1px solid #00000010; }
+    .tier strong { display:block; } .tier span { color:var(--muted); font-size:12px; }
+    .reactions { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .score-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:18px; background:var(--card); }
+    .scores { width:100%; border-collapse:collapse; min-width:720px; font-size:14px; }
+    .scores th,.scores td { padding:14px 17px; border-bottom:1px solid var(--line); text-align:right; }
+    .scores th:first-child,.scores td:first-child { text-align:left; }
+    .scores th { color:var(--muted); font-size:12px; letter-spacing:.04em; text-transform:uppercase; }
+    .scores tr:last-child td { border-bottom:0; }
+    .win-f { color:var(--purple); font-weight:850; } .win-g { color:var(--green); font-weight:850; }
+    .burn { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:18px; }
+    .burn-card { border-radius:18px; padding:23px; border:1px solid var(--line); background:var(--card); }
+    .burn-card h3 { margin:0 0 5px; font-size:23px; }
+    .price { font-size:30px; font-weight:850; letter-spacing:-.04em; }
+    .bar { height:8px; margin:16px 0 10px; background:#e1ddd4; border-radius:99px; overflow:hidden; }
+    .bar span { display:block; height:100%; border-radius:99px; }
+    .burn-card p { color:var(--muted); font-size:13px; margin:8px 0 0; }
+    .reaction { display:flex; flex-direction:column; min-height:250px; background:var(--card);
+      border:1px solid var(--line); border-radius:18px; padding:22px; }
+    .reaction .mood { font-size:12px; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
+    .reaction blockquote { margin:24px 0 16px; font-size:20px; font-weight:750;
+      letter-spacing:-.02em; }
+    .reaction p { margin:auto 0 0; color:var(--muted); font-size:13px; }
+    .good { color:var(--green); } .wow { color:var(--purple); } .hmm { color:var(--orange); }
+    .takeaway { display:grid; grid-template-columns:1.3fr .7fr; gap:28px; align-items:start; }
+    .big { margin:0; font-size:clamp(28px,4vw,48px); line-height:1.15; letter-spacing:-.04em; }
+    .questions { margin:0; padding:0; list-style:none; counter-reset:q; }
+    .questions li { counter-increment:q; padding:15px 0 15px 42px; border-bottom:1px solid var(--line);
+      position:relative; font-weight:700; }
+    .questions li:before { content:counter(q); position:absolute; left:0; color:var(--muted); }
+    .note { margin-top:28px; padding:17px 20px; border-left:4px solid var(--orange);
+      background:#fff8ed; font-size:14px; }
+    footer { padding:34px 0 60px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
+    footer .sources { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:10px; }
+    @media (max-width:780px) {
+      .hero { min-height:auto; padding-top:50px; } .section-head,.takeaway { grid-template-columns:1fr; }
+      .timeline { grid-template-columns:1fr 1fr; } .time:nth-child(2) { border-right:0; }
+      .time { border-bottom:1px solid var(--line); } .duo,.reactions,.burn { grid-template-columns:1fr; }
+    }
+    @media (max-width:480px) { .timeline { grid-template-columns:1fr; } .time { border-right:0; } }
+    @media print { body { background:white; } .hero { min-height:auto; } .section { break-inside:avoid; } }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="eyebrow"><span class="live"></span>AI field note · 2026.07.12</div>
+      <h1><span class="fable">Fable 5</span>가 돌아왔고,<br><span class="gpt">GPT-5.6</span>이 나왔다.</h1>
+      <p class="hero-copy">이번 주의 관전 포인트는 “누가 벤치마크 1등인가”를 넘어선다. <b>프론티어 모델의 출시는 이제 성능뿐 아니라 규제·안전·컴퓨트·가격 정책이 함께 결정</b>한다.</p>
+      <div class="chips"><span class="chip">19일 만의 중단과 복귀</span><span class="chip">Sol · Terra · Luna</span><span class="chip">에이전트 중심 경쟁</span><span class="chip">성능만큼 중요한 접근성</span></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head"><div class="no">01 · FABLE TIMELINE</div><div><h2>모델 출시가<br>정책 이슈가 됐다.</h2><p class="section-lead">Fable 5의 중단과 복귀는 프론티어 AI를 누가, 어떤 근거와 절차로 제한할 수 있는지 묻게 한 사례다.</p></div></div>
+        <div class="timeline">
+          <article class="time"><div class="date">6월 9일</div><h3>공개</h3><p>Fable 5와 제한된 파트너용 Mythos 5 출시. 두 제품은 같은 기반 모델을 공유한다.</p></article>
+          <article class="time"><div class="date">6월 12일</div><h3>전면 중단</h3><p>미 정부의 즉시 수출통제. 국적을 실시간 검증할 수 없어 Anthropic은 모든 사용자 접근을 멈췄다.</p></article>
+          <article class="time"><div class="date">6월 30일</div><h3>통제 해제</h3><p>사이버 보안 우회 가능성을 둘러싼 검토와 안전장치 보강 뒤 수출통제가 해제됐다.</p></article>
+          <article class="time hot"><div class="date">7월 1일</div><h3>글로벌 복귀</h3><p>Claude.ai·Platform·Code·Cowork에 재배포. 위험 요청은 새 분류기가 감지해 Opus 4.8로 넘긴다.</p></article>
+        </div>
+        <div class="note"><b>접근성은 달라졌다.</b> 구독 한도 내 제공은 7월 7일까지였고 이후에는 사용량 크레딧 방식으로 전환됐다. Anthropic은 새 안전 분류기가 안정화되는 동안 정상 요청의 오탐도 다소 늘 수 있다고 밝혔다.</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head"><div class="no">02 · WHAT CHANGED</div><div><h2>강조점은<br>서로 달랐다.</h2><p class="section-lead">Fable 5는 긴 작업에서의 추론과 자율성을, GPT-5.6은 성능·속도·비용을 나눈 제품군과 에이전트 실행 효율을 강조했다.</p></div></div>
+        <div class="duo">
+          <article class="model f"><div class="brand wow">Anthropic</div><h3>Claude Fable 5</h3><p class="one">긴 맥락의 판단과 복잡한 작업을 끝까지 밀고 나가는 능력으로 주목받은 모델.</p><ul class="facts"><li><b>복귀 변화</b><span>사이버 보안 분류기 강화, 감지된 요청은 Opus 4.8로 전환</span></li><li><b>접근 방식</b><span>글로벌 복귀했지만 기본 구독보다 사용량 크레딧 비중 확대</span></li><li><b>핵심 논쟁</b><span>정부 통제·안전 기준·컴퓨트 배분이 실제 출시 범위를 좌우</span></li></ul></article>
+          <article class="model g"><div class="brand good">OpenAI</div><h3>GPT-5.6</h3><p class="one">하나의 거대 모델 대신, 같은 세대 안에서 품질·비용·속도를 고르는 제품군.</p><div class="tiers"><div class="tier"><strong>Sol</strong><span>flagship<br>$5 / $30</span></div><div class="tier"><strong>Terra</strong><span>balanced<br>$2.5 / $15</span></div><div class="tier"><strong>Luna</strong><span>fast<br>$1 / $6</span></div></div><p style="margin:7px 2px 0;color:var(--muted);font-size:11px">API 100만 토큰당 입력 / 출력 가격</p><ul class="facts"><li><b>에이전트</b><span>도구를 프로그램으로 조율하는 Programmatic Tool Calling, 멀티에이전트 베타</span></li><li><b>배포 범위</b><span>ChatGPT·Codex·API 동시 제공, 작업 강도(max/ultra) 선택</span></li><li><b>실무 변화</b><span>긴 워크플로의 단계·도구 호출·막힘을 줄이는 효율성에 초점</span></li></ul></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head"><div class="no">03 · NUMBERS, NOT VIBES</div><div><h2>초기 독립 평가는<br>우열이 엇갈린다.</h2><p class="section-lead">양쪽 모델을 함께 평가한 독립 플랫폼 결과만 추렸다. 공개 3일 차의 스냅샷이므로 확정 순위가 아니라 초기 신호로 읽어야 한다.</p></div></div>
+        <div class="score-wrap">
+          <table class="scores">
+            <thead><tr><th>Artificial Analysis · 높을수록 좋음</th><th>GPT-5.6 Sol</th><th>Fable 5</th><th>현재 해석</th></tr></thead>
+            <tbody>
+              <tr><td>Intelligence Index v4.1</td><td>58.9</td><td class="win-f">59.9</td><td>사실상 1점 차이</td></tr>
+              <tr><td>Coding Agent Index v1.1</td><td class="win-g">80.0</td><td>77.2</td><td>Sol이 2.8점 우위</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="burn">
+          <article class="burn-card"><h3 class="good">GPT-5.6 Sol</h3><div class="price">$5 / $30</div><div class="bar"><span style="width:60%;background:var(--green)"></span></div><p>100만 입력/출력 토큰 기준. Fable보다 입력 단가는 50%, 출력 단가는 40% 낮다. OpenAI 내부 장면 제작 실험에서는 프로그램 방식의 도구 호출이 직접 호출보다 <b>총 토큰 63.5%·턴 50.1% 감소</b>했다. 벤더 내부 실험이라는 한계가 있으며, ultra는 4개 에이전트 병렬 실행으로 토큰을 더 사용한다.</p></article>
+          <article class="burn-card"><h3 class="wow">Fable 5</h3><div class="price">$10 / $50</div><div class="bar"><span style="width:100%;background:var(--purple)"></span></div><p>100만 입력/출력 토큰 기준, 캐시 입력은 90% 할인된다. Anthropic이 인용한 초기 고객 사례에서는 물리 연구의 추론 토큰 감소와 스프레드시트 과제의 <b>25–30% 빠른 완료</b>가 보고됐다. 역시 벤더가 선별한 사례이며, 긴 자율 작업에서 사용량이 빠르게 줄어든다는 사용자 반응도 많다.</p></article>
+        </div>
+        <div class="note"><b>왜 두 줄만 남겼나:</b> OpenAI가 발표한 SWE-Bench Pro·Terminal-Bench·Agents’ Last Exam 등의 경쟁사 수치는 모두 삭제했다. 벤더가 경쟁 모델의 harness·effort·시간 예산까지 정한 비교이기 때문이다. Artificial Analysis도 완벽한 진실은 아니지만 독립 운영사가 동일 지수로 평가하고 비용·속도·토큰을 함께 공개한다는 점에서 한 단계 낫다. LMArena는 아직 Sol의 공개 비교 조건이 제한돼 제외했다.</div>
+        <div class="note"><b>토큰 소모량은 아직 단정하기 어렵다.</b> “Fable이 항상 몇 배 더 쓴다”는 통제된 공개 통계는 없다. 5.2시간 Claude Code 세션이 API 환산 약 $385·주간 허용량 22%를 사용했다는 사례도 단일 관측이다. 에이전트 비용은 <b>단가 × 출력 길이 × 도구 반복 × 추론 강도</b>를 함께 봐야 한다.</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head"><div class="no">04 · COMMUNITY PULSE</div><div><h2>커뮤니티는<br>성능보다 경험을 말한다.</h2><p class="section-lead">출시 직후 반응은 표본이 짧고 팬덤 편향이 있다. 그래도 반복해서 나타나는 세 가지 테마는 읽을 만하다.</p></div></div>
+        <div class="reactions">
+          <article class="reaction"><div class="mood wow">Fable · “깊이”</div><blockquote>“벤치마크보다 실제로 훨씬 유연하고, 유능하고, 똑똑하게 느껴진다.”</blockquote><p>Fable 지지층은 긴 맥락의 판단, 창의성, 의도를 읽고 밀고 나가는 감각을 높게 평가한다. r/Anthropic의 대표 호평 글은 1천 표 이상을 얻었다.</p></article>
+          <article class="reaction"><div class="mood good">GPT-5.6 · “실행”</div><blockquote>“더 자율적이고, 전체 프로젝트를 더 빨리 이해했다.”</blockquote><p>초기 사용자들은 브라우저 사용, 코드베이스 탐색, 병렬 하위 작업과 지시 준수를 장점으로 꼽는다. ‘똑똑함’보다 완료율과 안정성을 말하는 반응이 많다.</p></article>
+          <article class="reaction"><div class="mood hmm">공통 · “접근성”</div><blockquote>“좋은 모델인데, 내가 계속 쓸 수 있는가?”</blockquote><p>Fable의 credits 전환과 높은 소모량, GPT-5.6의 플랜별 모델·effort 차등이 불만의 중심이다. 승자는 고정 팬덤보다 실제 비용과 한도로 결정된다는 냉정한 반응도 강하다.</p></article>
+        </div>
+        <div class="note"><b>커뮤니티 반응은 체감의 기록이다.</b> Reddit 게시물은 통제된 평가가 아니며 팬덤과 선택 편향이 크다. 현재로서는 “절대 승자”보다 작업 유형과 사용 환경에 따라 선호가 갈린다고 보는 편이 정확하다.</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap takeaway">
+        <div><div class="no">05 · SO WHAT?</div><p class="big">AI 경쟁의 단위가 <b>모델</b>에서 <b>모델 + 에이전트 + 접근권 + 안전 거버넌스</b>로 바뀌고 있다.</p></div>
+        <ol class="questions"><li>가장 똑똑한 모델과 가장 유용한 제품은 같은가?</li><li>정부는 어떤 증거로 모델 출시를 멈출 수 있어야 하는가?</li><li>성능이 커져도 크레딧이 비싸면 혁신은 누구의 것인가?</li></ol>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="wrap"><b>Sources · 2026-07-12 확인</b><div class="sources"><a href="https://www.anthropic.com/news/redeploying-fable-5">Anthropic · Redeploying Fable 5</a><a href="https://www.anthropic.com/news/claude-fable-5-mythos-5">Anthropic · Fable 5 출시·가격</a><a href="https://openai.com/index/gpt-5-6/">OpenAI · GPT-5.6 출시·가격</a><a href="https://artificialanalysis.ai/leaderboards/models/">Artificial Analysis · 독립 리더보드</a><a href="https://deploymentsafety.openai.com/gpt-5-6">GPT-5.6 System Card</a><a href="https://www.reddit.com/r/ClaudeAI/comments/1ula5pn/claude_max_20x_vs_fable_5_usage_credits_before_7/">Fable 사용량 사례</a><a href="https://www.reddit.com/r/Anthropic/comments/1ul18uh/fable_5_is_on_another_level/">r/Anthropic 반응</a><a href="https://www.reddit.com/r/OpenAI/comments/1urybsk/got_access_to_gpt_56_sol_ultra_compared_to_fable_5/">r/OpenAI 비교 후기</a></div></div></footer>
+</body>
+</html>

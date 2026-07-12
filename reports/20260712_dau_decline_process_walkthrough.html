@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DAU 하락 진단 — 분석이 진화한 과정 (강의용)</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --ink:#1c2530; --muted:#6b7683;
+    --line:#e6e9ee; --accent:#2f6df6; --accent2:#0e9f6e;
+    --warn:#e8590c; --gold:#b7791f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo",
+    "Malgun Gothic",sans-serif;line-height:1.65;font-size:15px;}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 20px 64px}
+  header.top{background:linear-gradient(120deg,#1f2a44,#2f6df6);color:#fff;
+    border-radius:16px;padding:32px 34px;margin-bottom:26px;
+    box-shadow:0 8px 26px rgba(31,42,68,.18)}
+  header.top .kicker{font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;
+    opacity:.85;margin-bottom:8px}
+  header.top h1{margin:0 0 8px;font-size:27px;line-height:1.3}
+  header.top p{margin:6px 0 0;opacity:.92;font-size:14.5px}
+  .meta{margin-top:14px;font-size:13px;opacity:.8}
+  h2{font-size:19px;margin:34px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  .lead{color:var(--muted);font-size:14.5px;margin:-4px 0 18px}
+  .philo{background:#eef4ff;border:1px solid #d7e3ff;border-radius:12px;
+    padding:16px 20px;margin:18px 0;font-size:14.5px}
+  .philo b{color:var(--accent)}
+  /* lessons */
+  .lessons{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:12px;margin:8px 0 4px}
+  .lesson{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent2);
+    border-radius:10px;padding:13px 15px}
+  .lesson h4{margin:0 0 5px;font-size:14px}
+  .lesson p{margin:0;font-size:13px;color:var(--muted)}
+  /* table */
+  table{width:100%;border-collapse:collapse;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13.5px}
+  thead th{background:#f0f3f8;text-align:left;padding:11px 13px;font-size:12.5px;
+    letter-spacing:.02em;color:#414a56;border-bottom:1px solid var(--line)}
+  tbody td{padding:12px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#fafbfd}
+  .ph{display:inline-block;min-width:26px;height:26px;line-height:26px;text-align:center;
+    background:var(--accent);color:#fff;border-radius:7px;font-weight:700;font-size:13px}
+  .who{color:var(--muted);font-size:12px;display:block;margin-top:4px}
+  .say{font-weight:600}
+  .tag{display:inline-block;background:#eef7f2;color:var(--accent2);border:1px solid #cdeadd;
+    border-radius:20px;padding:2px 9px;font-size:11.5px;font-weight:600;white-space:nowrap}
+  .tag.warn{background:#fff4ec;color:var(--warn);border-color:#ffd9c2}
+  .tag.mut{background:#eef1f5;color:#5a6673;border-color:#dde2e9}
+  .tag.blue{background:#eaf1ff;color:var(--accent);border-color:#d0e0ff}
+  .num{font-variant-numeric:tabular-nums;font-weight:700}
+  .up{color:var(--accent2)} .down{color:var(--warn)}
+  /* mini figure */
+  .fig{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;margin:14px 0}
+  .fig h4{margin:0 0 10px;font-size:14px}
+  .cmp{width:100%;border-collapse:collapse;font-size:13px}
+  .cmp th,.cmp td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right}
+  .cmp th:first-child,.cmp td:first-child{text-align:left}
+  .cmp thead th{background:#f7f9fc;font-size:12px}
+  /* outputs */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .out{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .out .ico{font-size:20px}
+  .out h4{margin:6px 0 5px;font-size:14.5px}
+  .out p{margin:0;font-size:13px;color:var(--muted)}
+  .out code{background:#f0f3f8;padding:1px 6px;border-radius:5px;font-size:12px}
+  footer{margin-top:34px;color:var(--muted);font-size:12.5px;text-align:center}
+  .callout{background:#fffaf0;border:1px solid #f3e3bf;border-radius:12px;
+    padding:14px 18px;margin:14px 0;font-size:14px}
+  .callout b{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="kicker">BDA · 데이터 분석 실습</div>
+  <h1>“DAU가 떨어진다”를 어떻게 진단했나<br>— 대화로 진화한 분석 과정</h1>
+  <p>지표 하락 하나를 두고, 질문과 반박을 거치며 결론과 방법이 다듬어진 실제 과정</p>
+  <div class="meta">주제: GitHub(GH Archive) DAU/MAU 하락 진단 · 2026-07-12 · 본 자료는 최종 보고서와 별개의 <b>과정 기록</b>입니다</div>
+</header>
+
+<div class="philo">
+  💡 이 자료의 핵심 메시지: <b>정답을 처음부터 아는 게 아니라, 좋은 질문과 반박이 분석을 만든다.</b>
+  사람이 방향을 잡고(“이 비교 이상하지 않아?”), 실행이 데이터로 답한다. 아래는 그 왕복(티키타카)의 기록입니다.
+</div>
+
+<h2>0. 출발점 — 무엇을 보고 있었나</h2>
+<p class="lead">GitHub 공개 활동 로그(GH Archive) 기반 지표에서 DAU/MAU가 눈에 띄게 하락. 초기 진단은 “유저 이탈이 아니라 데이터 수집 쪽 문제”. 이를 뒷받침할 <b>진단용 마트(diag_*)</b>와 <b>Metabase 대시보드 진단 카드</b>가 이미 구축된 상태에서 시작.</p>
+
+<h2>1. 대화가 분석을 바꾼 8개의 장면</h2>
+<p class="lead">각 행은 “사람이 던진 방향 → 왜 중요한 쟁점인지 → 실행이 한 대응 → 남은 교훈”.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:34px">#</th>
+      <th style="width:24%">방향 제시 (사람)</th>
+      <th style="width:26%">쟁점 · 왜 중요한가</th>
+      <th style="width:30%">대응 (실행 + 데이터)</th>
+      <th style="width:16%">교훈</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="ph">1</span></td>
+      <td><span class="say">“7월은 이제 막 시작인데, 4월이랑 그냥 비교해도 돼?”</span><span class="who">비교 방법론 의심</span></td>
+      <td>30일치(4월)와 11일치(7월) <b>총합을 그대로 비교</b>하면 7월이 날짜가 덜 쌓였다는 이유만으로 낮게 나와 감소가 과장됨. MAU는 롤링 윈도우라 더 위험.</td>
+      <td>두 가지 정합 비교로 교체 — <b>A: 완성월끼리(4월 vs 6월)</b>, <b>B: 같은 창끼리(1–11일)</b>. 모든 지표를 <b>일평균</b>으로 정규화.</td>
+      <td><span class="tag">부분기간 통짜 비교 금지</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">2</span></td>
+      <td><span class="say">“보고서 두괄식으로. 결론+수치 먼저, 비즈니스 언어로, 기술은 하단.”</span><span class="who">전달 방식</span></td>
+      <td>분석이 맞아도 <b>읽는 사람이 결론을 못 잡으면</b> 소용없음. 이해관계자는 “겉보기 하락 vs 실제 건강도”가 한눈에 필요.</td>
+      <td>맨 앞에 요약(3열 대조표) + 누구나 아는 레포로 만든 스토리를 상단에, 검증·쿼리는 기술 부록으로 완전 분리.</td>
+      <td><span class="tag">결론 먼저 · 청중 언어</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">3</span></td>
+      <td><span class="say">“예시로 든 <code>anthropics/skills</code>는 최근 레포잖아?”</span><span class="who">예시 전제 점검</span></td>
+      <td>“꾸준히 인기 있던 레포가 무너졌다”는 논거인데, <b>최근 출시라 원래 감쇠 중</b>이면 예시로 부적절.</td>
+      <td>수년째 안정적인 <code>torvalds/linux</code> 등으로 교체.</td>
+      <td><span class="tag">예시의 전제를 검증</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">4</span></td>
+      <td><span class="say">“‘안 잡힌다’면 유실이란 거야? 원본이랑 교차검증하면 되잖아. 그냥 트렌드가 빨리 바뀐 거 아냐?”</span><span class="who">가장 날카로운 반박</span></td>
+      <td>기존 “원본 vs 우리 데이터 99.6% 일치”는 <b>같은 혈통끼리의 대조라 순환논리</b> — 우리 충실도만 증명할 뿐, 원본의 진위는 증명 못 함.</td>
+      <td><b>완전히 독립된 소스</b>(GitHub 라이브 스타 카운터)로 실제 속도 측정: build-your-own-x는 지금도 <span class="num">~5,800/월</span>인데 우리 데이터엔 <span class="num down">~2%</span>만.</td>
+      <td><span class="tag warn">검증은 독립 소스로</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">5</span></td>
+      <td><span class="say">“문서화 말고 구멍을 메워. 우리 데이터 파이프라인 이상 아냐?”</span><span class="who">원인 지점 추궁</span></td>
+      <td>실제 별은 나는데 우리엔 2%뿐 → <b>어디서 새는가</b>를 층별로 특정해야 함(우리 탓이면 고쳐야 함).</td>
+      <td>3층 측정: 실제 GitHub(정상) → <b>GH Archive 원본(글로벌 WatchEvent 하루 <span class="num down">863건</span>, 붕괴)</b> → 우리 fact(원본을 충실 반영). 인제스트 코드에 이벤트 타입 필터 없음 확인.</td>
+      <td><span class="tag">누수를 층별로 특정</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">6</span></td>
+      <td><span class="say">“BQ의 GH Archive가 source of truth야. 원본에 없으면 없는 거. 중간 파이프라인 검사만 빡세게 해.”</span><span class="who">스코프 교정 — 핵심 전환</span></td>
+      <td>외부 API로 원본을 감사하거나 우회 수집하는 건 <b>분석 경계 밖 · 오버엔지니어링</b>. 우리가 통제하는 유일한 지점은 원본→마트 전환.</td>
+      <td>라이브 API 우회 수집기·워치독·임시 테이블 <b>전부 폐기</b>. 대신 <b>dbt 중간 검증 4종</b> 추가 — 전부 통과(이벤트 수 <b>보존 0건 위반</b>).</td>
+      <td><span class="tag">경계 존중 · 통제점만 검증</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">7</span></td>
+      <td><span class="say">“레포가 인기를 잃은 게 아니라, 몇 달 전 잠깐 늘었던 건 아냐?”</span><span class="who">대안 가설 · 반증 요구</span></td>
+      <td>절벽 직전(2–4월)이 <b>일시적 스파이크</b>였다면 “붕괴”가 아니라 “정상 복귀”일 수 있음.</td>
+      <td>풀 히스토리 확인: linux는 <b>2025-09~2026-04 내내 월 900~1,650으로 평탄</b> → 5월부터 붕괴. 스파이크 가설 반증, 예시가 더 단단해짐.</td>
+      <td><span class="tag">반증 시도로 견고화</span></td>
+    </tr>
+    <tr>
+      <td><span class="ph">8</span></td>
+      <td><span class="say">“웹서치로 공론화된 적 있는지 다각도로 봐줘.”</span><span class="who">외부 근거</span></td>
+      <td>같은 현상이 <b>실제 세계에서 보고된 적 있는지</b> 확인하면 진단의 설득력이 올라감.</td>
+      <td>동일 실패 모드 선례 확인(GitHub Community #178788: 2025-10 GH Archive 손실, WatchEvent −38% 등, Event API 아웃티지). <b>디폴트 분석은 유실 무전제로 두고</b>, 이 해석은 별도 레이어(§T7)로 분리.</td>
+      <td><span class="tag">외부 방증 · 단 분리</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="fig">
+  <h4>📊 결정적 숫자 — 방향이 서로 어긋난다 (2026-04 → 2026-06, 완성월 일평균)</h4>
+  <table class="cmp">
+    <thead><tr><th>지표</th><th>2026-04</th><th>2026-06</th><th>변화</th></tr></thead>
+    <tbody>
+      <tr><td>평균 DAU</td><td>705,089</td><td>638,767</td><td class="down">▼ 9.4%</td></tr>
+      <tr><td>일 총 이벤트</td><td>3,632,805</td><td>3,741,330</td><td class="up">▲ 3.0%</td></tr>
+      <tr><td>일 커밋(Push)</td><td>2,665,011</td><td>3,179,943</td><td class="up">▲ 19.3%</td></tr>
+      <tr><td>일 소셜(별·포크·PR·이슈)</td><td>424,444</td><td>79,545</td><td class="down">▼ 81.3%</td></tr>
+    </tbody>
+  </table>
+  <p style="margin:10px 0 0;font-size:12.5px;color:var(--muted)">
+    유저 수는 줄었는데 총 활동·커밋은 오히려 늘고 재방문율(0.44)은 그대로 → 코어 유저 이탈이 아니라, 가벼운 활동으로만 잡히던 라이트 유저가 빠진 것.</p>
+</div>
+
+<h2>2. 관통하는 교훈</h2>
+<div class="lessons">
+  <div class="lesson"><h4>① 기간을 맞춰라</h4><p>부분월 총합 비교는 감소를 과장한다. 완성월·동일 창·일평균(rate)으로 정규화.</p></div>
+  <div class="lesson"><h4>② 순환논리를 경계하라</h4><p>같은 소스에서 파생된 두 데이터의 일치는 “진위”가 아니라 “충실도”만 증명한다. 검증은 독립 소스로.</p></div>
+  <div class="lesson"><h4>③ 경계를 지켜라</h4><p>정의된 원본이 source of truth. 원본에 없으면 없는 것. 밖으로 나가 감사·우회하는 건 과잉.</p></div>
+  <div class="lesson"><h4>④ 통제점만 검증하라</h4><p>못 고치는 상류 대신, 우리가 소유한 원본→마트 전환의 무결성을 기계적으로 보증(dbt).</p></div>
+  <div class="lesson"><h4>⑤ 반증을 시도하라</h4><p>“스파이크 아니냐”처럼 결론을 깰 가설을 직접 던져 통과시키면 예시가 단단해진다.</p></div>
+  <div class="lesson"><h4>⑥ 청중을 먼저 생각하라</h4><p>결론·수치를 앞에, 근거·쿼리는 부록에. 같은 분석도 전달 구조로 설득력이 갈린다.</p></div>
+</div>
+
+<h2>3. 산출물 — 무엇이 남았나</h2>
+<div class="grid">
+  <div class="out">
+    <div class="ico">📄</div><h4>최종 보고서</h4>
+    <p><code>dau_mau_decline_diagnosis_20260712.md</code> — 두괄식 요약 + 스토리 + 기술 부록(T1~T7). 액면 분석과 외부 해석(T7) 분리.</p>
+  </div>
+  <div class="out">
+    <div class="ico">🧱</div><h4>진단용 마트 (diag_*)</h4>
+    <p>이벤트 인덱스·소셜 원계열·유저 인구·커버리지·활성화 등 5종. 대시보드가 풀스캔 대신 작은 롤업만 읽도록 사전집계(새로고침 비용 ~180원 → ~0.5원).</p>
+  </div>
+  <div class="out">
+    <div class="ico">📈</div><h4>Metabase 대시보드 보강</h4>
+    <p>“GitHub Core Metrics” 대시보드 하단에 <b>진단 카드 6종</b>으로 하락의 정체(소셜 이벤트 붕괴)를 상시 가시화.</p>
+  </div>
+  <div class="out">
+    <div class="ico">✅</div><h4>dbt 중간 파이프라인 검증 (신규)</h4>
+    <p>이벤트 수 <b>보존</b>·grain <b>유일성</b>·양수·날짜 상식성 4종. 원본→마트 전환이 데이터를 왜곡·누락하지 않음을 매 빌드 보증(현재 전부 통과).</p>
+  </div>
+</div>
+
+<h2>4. 장기적 관점 — 일회성 진단에서 지속 가능한 관측으로</h2>
+<p class="lead">보고서는 한 시점의 스냅샷이다. 진짜 가치는 이 분석이 <b>마트 → 대시보드 → 자동 검증</b>으로 이어져, 다음에 또 이런 일이 생겼을 때 <b>스스로 드러나는 데이터 환경</b>으로 남는 데 있다. (“실패를 잡는 것”이 아니라 “실패가 보이는 환경”을 만드는 관점)</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:16%">영역</th>
+      <th style="width:34%">지금 — 스냅샷 · 일회성</th>
+      <th style="width:38%">지속 · 다음 — 체계 · 장기</th>
+      <th style="width:12%">상태</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>관측</b></td>
+      <td>보고서로 하락의 정체를 한 번 규명.</td>
+      <td>diag_ 마트 + Metabase 진단 카드 6종으로 <b>상시 가시화</b> — 리포트를 넘어 대시보드로 계속 추적.</td>
+      <td><span class="tag">완료</span></td>
+    </tr>
+    <tr>
+      <td><b>파이프라인 무결성</b></td>
+      <td>코드 리뷰로 “우리 탓 아님” 확인.</td>
+      <td>dbt 검증 4종이 <b>매 빌드 실행</b> → 원본→마트 전환이 조용히 망가지지 않음을 계속 보증.</td>
+      <td><span class="tag">완료</span></td>
+    </tr>
+    <tr>
+      <td><b>자동 갱신</b></td>
+      <td>diag_ 마트가 아직 <b>수동 실행</b> — 방치하면 대시보드가 굳음.</td>
+      <td>Airflow daily DAG로 스케줄링해 마트·카드가 매일 최신을 반영하도록.</td>
+      <td><span class="tag warn">다음 단계</span></td>
+    </tr>
+    <tr>
+      <td><b>상류 리스크</b></td>
+      <td>이번엔 사후에 발견(몇 달 뒤).</td>
+      <td>GH Archive/Event API는 <b>언제든 또 변할 수 있음</b> → 커버리지 급변 감지를 기존 dbt validate에 흡수해 조기 경보.</td>
+      <td><span class="tag warn">다음 단계</span></td>
+    </tr>
+    <tr>
+      <td><b>지표 정의</b></td>
+      <td>단일 DAU가 구성 변화에 취약함이 드러남.</td>
+      <td>코어(커밋) vs 라이트(소셜)를 <b>분리한 지표</b>를 1차 KPI로 승격 — 이벤트 타입 구성을 지표로.</td>
+      <td><span class="tag blue">권고</span></td>
+    </tr>
+    <tr>
+      <td><b>추천 보호</b></td>
+      <td>오염 구간 식별(2026-05~).</td>
+      <td>“2026-03 이전 정상 구간 고정, 그 이후 재학습 금지”를 <b>상시 가드레일</b>로 유지.</td>
+      <td><span class="tag mut">정책</span></td>
+    </tr>
+  </tbody>
+</table>
+<p style="margin:12px 2px 0;font-size:13px;color:var(--muted)">
+  요지: 좋은 분석의 끝은 “결론 문서”가 아니라 <b>같은 문제가 재발하면 저절로 보이고, 파이프라인이 스스로 무결성을 증명하는 상태</b>다. 마트·대시보드·dbt 검증이 그 지속 장치다.</p>
+
+<div class="callout">
+  🎯 <b>한 줄 결론</b>: DAU 하락의 정체는 “코어 유저 이탈”이 아니라 “특정 이벤트 종류(소셜)의 기록 급감”. 우리 파이프라인은 무결(dbt로 보증), 원인은 상류 공개 이벤트 스트림 — 그리고 <b>이 결론은 8번의 반박을 통과하며 다듬어졌다.</b>
+</div>
+
+<footer>
+  BDA 데이터 분석 실습 · 2026-07-12 · 과정 기록(최종 보고서와 별개) · 사람은 방향, 실행은 데이터로 답한다
+</footer>
+
+</div>
+</body>
+</html>
