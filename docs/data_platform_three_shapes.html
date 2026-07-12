@@ -112,9 +112,10 @@
       }
 
       .slide.title {
-        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
         gap: 34px;
         align-items: center;
+        align-content: center;
       }
 
       .slide.split {
@@ -226,6 +227,53 @@
       .card span {
         color: var(--muted);
         font-size: 16px;
+      }
+
+      .flow {
+        display: grid;
+        gap: 14px;
+        margin-top: 26px;
+      }
+
+      .flow-row {
+        display: grid;
+        grid-template-columns: 128px minmax(0, 1fr) 92px;
+        align-items: stretch;
+        gap: 12px;
+      }
+
+      .flow-tag,
+      .flow-out {
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        color: #fff;
+        font-weight: 850;
+        text-align: center;
+      }
+
+      .flow-tag.raw { background: var(--raw); }
+      .flow-tag.model { background: var(--model); }
+      .flow-tag.bq { background: var(--bq); }
+      .flow-tag.auto { background: var(--auto); }
+      .flow-out { background: #334155; }
+
+      .flow-box {
+        padding: 17px 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .flow-box strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 18px;
+      }
+
+      .flow-box span {
+        color: var(--muted);
+        font-size: 15px;
       }
 
       .map {
@@ -409,12 +457,12 @@
           section: "Overview",
           title: "데이터 플랫폼의 세 가지 형태",
           subtitle: "극초기 스타트업, 중간 규모 서비스, MAU 1000만 이상 테크 대기업은 같은 말을 써도 완전히 다른 데이터 플랫폼을 가짐.",
-          visual: "maturity",
-          note: "핵심 질문: 지금 우리에게 필요한 것은 거대한 플랫폼인가, 반복 가능한 최소 구조인가, 아니면 전문 기능인가.",
-          cards: [
-            ["1. 거의 없음", "데이터가 작고 질문이 즉흥적이면 쿼리와 시트만으로도 충분함."],
-            ["2. 중간 레이어", "raw를 직접 다루기 어려워지고 팀별 필요가 달라지면서 플랫폼이 필요해짐."],
-            ["3. 이미 있음", "대기업에서는 플랫폼과 직군이 이미 세분화되어 있고, 한 기능을 깊게 맡게 됨."]
+          tagline: "오늘의 질문: 지금 필요한 것은 거대한 플랫폼인가, 반복 가능한 최소 구조인가, 아니면 전문 기능인가.",
+          titleFlow: [
+            ["raw", "초기", "쿼리와 시트", "데이터가 작고 질문이 자주 바뀌면 빠르게 묻고 답하는 것이 우선.", "속도"],
+            ["model", "중간", "Fact + Mart", "raw가 커지고 팀별 요구가 갈라지면 공통 가공 레이어가 필요.", "합의"],
+            ["bq", "대기업", "전문 플랫폼", "이미 있는 플랫폼 위에서 PA, BI, DE, MLE가 분업.", "분업"],
+            ["auto", "AI/FDE", "경계 재편", "개발 장벽이 낮아지며 데이터 접근권과 구현력이 같이 중요해짐.", "전환"]
           ]
         },
         {
@@ -564,6 +612,32 @@
           note: "데모에서는 '이 정도면 굳이 더 만들 필요가 있나?'를 먼저 물어보면 좋음."
         },
         {
+          section: "1.5 DA의 역할",
+          title: "초기에는 DA도 로그 수집에 직접 기여할 수 있음",
+          visual: "daLogControl",
+          bullets: [
+            "초기~중간 단계에서는 이벤트 로그 체계가 아직 완전히 굳어 있지 않음.",
+            "기본기가 있는 DA는 단순히 쿼리만 받는 사람이 아니라, 어떤 이벤트를 남길지와 어떤 속성이 필요한지를 제안할 수 있음.",
+            "예를 들어 signup_completed, payment_started, feature_used 같은 이벤트 이름과 user_id, plan, channel 같은 속성을 같이 설계함.",
+            "엔지니어는 SDK와 저장 파이프라인을 만들고, DA는 분석 가능한 로그 정의와 검증 기준을 잡는 식으로 기여함."
+          ],
+          note: "초기 회사에서는 이 차이가 큼. 로그가 잘못 남으면 나중에 아무리 좋은 BI를 붙여도 답이 안 나옴."
+        },
+        {
+          section: "1.5 DA의 역할",
+          title: "로그 설계는 분석 기본기의 확장임",
+          visual: "eventSpec",
+          table: [
+            ["DA가 볼 질문", "로그 설계로 바뀌는 것"],
+            ["이 행동을 누가 했나", "stable user_id, anonymous_id, account_id"],
+            ["언제 했나", "server timestamp, client timestamp, timezone 기준"],
+            ["무슨 행동인가", "event name과 action taxonomy"],
+            ["어떤 조건에서 했나", "plan, channel, device, experiment_group 같은 속성"],
+            ["성공/실패를 구분할 수 있나", "status, error_code, result reason"],
+            ["나중에 다시 믿을 수 있나", "중복, 누락, schema 변경 검증 기준"]
+          ]
+        },
+        {
           section: "External Case",
           title: "외부 사례: warehouse를 안 쓰는 팀도 많음",
           visual: "warehouseSkip",
@@ -619,6 +693,17 @@
             ["raw", "엔지니어링", "로그 수집, schema 변경, 비용 제어"]
           ],
           note: "팀별 요구가 틀린 것이 아니라, 같은 raw에서 필요한 view가 달라지는 것임."
+        },
+        {
+          section: "2. 중간 규모",
+          title: "중간 규모에서도 DA는 upstream에 기여할 수 있음",
+          visual: "daUpstream",
+          bullets: [
+            "서비스가 커지면 raw 로그를 마음대로 바꾸기 어렵지만, 여전히 DA가 upstream에 기여할 여지는 큼.",
+            "DA는 dashboard를 보다가 이벤트 누락, 잘못된 속성, grain 불일치, 실험 group 누락을 가장 빨리 발견하는 경우가 많음.",
+            "좋은 DA는 '숫자가 이상하다'에서 멈추지 않고 어떤 로그 정의나 수집 방식이 문제인지까지 좁혀서 제안함.",
+            "이 단계에서 DA가 로그 스펙, QA 쿼리, tracking plan, event dictionary에 기여하면 플랫폼 품질이 크게 올라감."
+          ]
         },
         {
           section: "2. 중간 규모",
@@ -1016,6 +1101,22 @@
         parent.appendChild(wrap);
       }
 
+      function addFlow(parent, rows) {
+        if (!rows) return;
+        const wrap = el("div", "flow");
+        rows.forEach(([kind, tag, title, body, out = "핵심"]) => {
+          const row = el("div", "flow-row");
+          row.appendChild(el("div", `flow-tag ${kind}`, tag));
+          const box = el("div", "flow-box");
+          box.appendChild(el("strong", "", title));
+          box.appendChild(el("span", "", body));
+          row.appendChild(box);
+          row.appendChild(el("div", "flow-out", out));
+          wrap.appendChild(row);
+        });
+        parent.appendChild(wrap);
+      }
+
       function addMap(parent, items) {
         if (!items) return;
         const wrap = el("div", "map");
@@ -1068,7 +1169,10 @@
           sheetPlatform: "Spreadsheet as a platform",
           warehouseSkip: "Many teams skip the warehouse",
           leanStack: "Lean startup data stack",
+          daLogControl: "DA can shape logging",
+          eventSpec: "Event spec from analysis basics",
           fragmentation: "Fragmentation starts naturally",
+          daUpstream: "DA contributes upstream",
           processingLayers: "Intermediate layers appear",
           grain: "Fact table grain",
           roleSplit: "Roles split as stakes rise",
@@ -1098,7 +1202,10 @@
           sheetPlatform: memePanel("시트가 사실상 플랫폼인 순간", ["데이터 플랫폼", "라고 부르긴 민망함", "그래도 일은 굴러감"], ["파일명_v23_final", "담당자와 수식이 핵심 인프라"], "#b45309"),
           warehouseSkip: memePanel("Warehouse가 항상 1번은 아님", ["초기 팀", "DB + BI + 시트"], ["필요해질 때", "warehouse와 mart"], "#2563eb"),
           leanStack: simpleFlow("Lean stack", [["SaaS API", "작게 가져옴"], ["Postgres/DuckDB", "단순 저장"], ["Parquet", "저렴한 파일"], ["BI", "필요한 만큼"]], "#0f766e"),
+          daLogControl: simpleFlow("초기 DA의 로그 기여", [["질문", "무엇을 알고 싶나"], ["이벤트 정의", "어떤 행동인가"], ["속성 설계", "어떤 조건인가"], ["엔지니어 구현", "SDK와 저장"], ["검증 쿼리", "잘 남는가"]], "#15803d"),
+          eventSpec: `<svg viewBox="0 0 980 370" role="img" aria-label="event spec"><rect x="24" y="28" width="932" height="314" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="490" y="76" text-anchor="middle" font-size="25" font-weight="900" fill="#172033">분석 질문이 로그 스펙으로 바뀜</text><g transform="translate(85,125)" font-size="14" fill="#172033"><rect width="170" height="120" rx="12" fill="#fff" stroke="#15803d" stroke-width="3"/><text x="85" y="35" text-anchor="middle" font-weight="900">누가</text><text x="85" y="62" text-anchor="middle" fill="#64748b">user_id</text><text x="85" y="84" text-anchor="middle" fill="#64748b">account_id</text></g><g transform="translate(285,125)" font-size="14" fill="#172033"><rect width="170" height="120" rx="12" fill="#fff" stroke="#2563eb" stroke-width="3"/><text x="85" y="35" text-anchor="middle" font-weight="900">언제</text><text x="85" y="62" text-anchor="middle" fill="#64748b">timestamp</text><text x="85" y="84" text-anchor="middle" fill="#64748b">timezone</text></g><g transform="translate(485,125)" font-size="14" fill="#172033"><rect width="170" height="120" rx="12" fill="#fff" stroke="#b45309" stroke-width="3"/><text x="85" y="35" text-anchor="middle" font-weight="900">무엇을</text><text x="85" y="62" text-anchor="middle" fill="#64748b">event name</text><text x="85" y="84" text-anchor="middle" fill="#64748b">action type</text></g><g transform="translate(685,125)" font-size="14" fill="#172033"><rect width="170" height="120" rx="12" fill="#fff" stroke="#6d28d9" stroke-width="3"/><text x="85" y="35" text-anchor="middle" font-weight="900">어떤 조건</text><text x="85" y="62" text-anchor="middle" fill="#64748b">plan/channel</text><text x="85" y="84" text-anchor="middle" fill="#64748b">experiment</text></g><text x="490" y="300" text-anchor="middle" font-size="16" font-weight="800" fill="#172033">좋은 로그는 나중에 SQL을 쉽게 만드는 것이 아니라, 질문에 답할 수 있게 만드는 것</text></svg>`,
           fragmentation: `<svg viewBox="0 0 980 390" role="img" aria-label="fragmentation"><defs><marker id="arrow-f" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#64748b"/></marker></defs><rect x="24" y="24" width="932" height="332" rx="16" fill="#f8fafc" stroke="#d6dee8"/><rect x="70" y="145" width="190" height="95" rx="14" fill="#fff" stroke="#475569" stroke-width="3"/><text x="165" y="185" text-anchor="middle" font-size="20" font-weight="900" fill="#172033">Raw Event</text><text x="165" y="212" text-anchor="middle" font-size="13" fill="#64748b">하나의 원천</text><g font-size="16" font-weight="900" fill="#172033"><rect x="500" y="65" width="160" height="62" rx="10" fill="#ecfdf5" stroke="#0f766e" stroke-width="2"/><text x="580" y="103" text-anchor="middle">제품팀</text><rect x="710" y="115" width="160" height="62" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/><text x="790" y="153" text-anchor="middle">마케팅</text><rect x="500" y="235" width="160" height="62" rx="10" fill="#fef2f2" stroke="#b91c1c" stroke-width="2"/><text x="580" y="273" text-anchor="middle">운영팀</text><rect x="710" y="275" width="160" height="62" rx="10" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"/><text x="790" y="313" text-anchor="middle">ML팀</text></g><path d="M260 190 C340 95 420 95 495 96" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow-f)"/><path d="M260 190 C430 140 520 145 705 146" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow-f)"/><path d="M260 190 C390 245 430 266 495 266" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow-f)"/><path d="M260 190 C460 250 560 305 705 306" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow-f)"/></svg>`,
+          daUpstream: simpleFlow("DA가 upstream에 기여하는 방식", [["이상 탐지", "숫자가 이상함"], ["원인 좁히기", "이벤트/속성 문제"], ["스펙 제안", "tracking plan"], ["QA 쿼리", "누락/중복 검증"], ["플랫폼 품질", "신뢰도 상승"]], "#0f766e"),
           processingLayers: simpleFlow("중간 가공 레이어", [["Raw", "있는 그대로"], ["Staging", "정리"], ["Fact", "grain 고정"], ["Mart", "질문별 소비"], ["Feature", "ML용 변수"]], "#b45309"),
           grain: `<svg viewBox="0 0 980 360" role="img" aria-label="fact table grain"><rect x="24" y="28" width="932" height="304" rx="16" fill="#f8fafc" stroke="#d6dee8"/><text x="490" y="76" text-anchor="middle" font-size="25" font-weight="900" fill="#172033">fact_user_repo_activity의 한 행</text><g transform="translate(85,125)" font-size="15" fill="#172033"><rect width="180" height="95" rx="12" fill="#fff" stroke="#475569" stroke-width="3"/><text x="90" y="38" text-anchor="middle" font-weight="900">activity_date</text><text x="90" y="64" text-anchor="middle" fill="#64748b">어느 날인가</text></g><g transform="translate(295,125)" font-size="15" fill="#172033"><rect width="150" height="95" rx="12" fill="#fff" stroke="#0f766e" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-weight="900">user_id</text><text x="75" y="64" text-anchor="middle" fill="#64748b">누가</text></g><g transform="translate(475,125)" font-size="15" fill="#172033"><rect width="150" height="95" rx="12" fill="#fff" stroke="#2563eb" stroke-width="3"/><text x="75" y="38" text-anchor="middle" font-weight="900">repo_id</text><text x="75" y="64" text-anchor="middle" fill="#64748b">어디서</text></g><g transform="translate(655,125)" font-size="15" fill="#172033"><rect width="180" height="95" rx="12" fill="#fff" stroke="#b45309" stroke-width="3"/><text x="90" y="38" text-anchor="middle" font-weight="900">action</text><text x="90" y="64" text-anchor="middle" fill="#64748b">무슨 행동</text></g><path d="M245 252 H735" stroke="#64748b" stroke-width="3"/><text x="490" y="288" text-anchor="middle" font-size="17" font-weight="900" fill="#172033">이 조합을 기준으로 DAU, WAU, retention을 계산</text><text x="490" y="314" text-anchor="middle" font-size="14" fill="#64748b">raw payload 해석을 반복하지 않기 위한 공통 기준점</text></svg>`,
           roleSplit: simpleFlow("직군 세분화", [["PM/BE", "직접 쿼리"], ["Analyst", "BI와 해석"], ["AE/DE", "mart와 수집"], ["ML/DS", "feature와 모델"]], "#6d28d9"),
@@ -1134,6 +1241,7 @@
         main.appendChild(el("p", "eyebrow", `${String(index + 1).padStart(2, "0")} · ${slide.section}`));
         main.appendChild(el(index === 0 ? "h1" : "h2", "", slide.title));
         if (slide.subtitle) main.appendChild(el("p", "subtitle", slide.subtitle));
+        if (slide.tagline) main.appendChild(el("div", "tagline", slide.tagline));
         addBullets(main, slide.bullets);
         addVisual(main, slide.visual);
         addMap(main, slide.map);
@@ -1146,9 +1254,13 @@
 
         if (slide.layout === "title") {
           const side = el("div");
-          side.appendChild(el("div", "number", String(slides.length)));
-          side.appendChild(el("p", "subtitle", "slides"));
-          side.appendChild(el("div", "tagline", "규모가 바뀌면 좋은 데이터 플랫폼의 모양도 바뀐다."));
+          if (slide.titleFlow) {
+            addFlow(side, slide.titleFlow);
+          } else {
+            side.appendChild(el("div", "number", String(slides.length)));
+            side.appendChild(el("p", "subtitle", "slides"));
+            side.appendChild(el("div", "tagline", "규모가 바뀌면 좋은 데이터 플랫폼의 모양도 바뀐다."));
+          }
           article.appendChild(side);
         }
         return article;

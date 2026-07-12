@@ -147,12 +147,12 @@ bda-2/
 | ALS | 0.00117 | 0.00164 | 0.00178 |
 | **Two-Stage** | **0.00150** | **0.00206** | **0.00220** |
 
-### Retrieval 모델 비교 (2026-05-16 mart, warm users)
+### Retrieval 모델 비교 (2026-05-16 mart, 100k item catalog, full warm users)
 
 | Model | K=10 NDCG | K=50 NDCG | K=100 NDCG | Unique@100 | 특징 |
 |---|---:|---:|---:|---:|---|
-| ALS | 0.009135 | 0.011912 | 0.013327 | 7,136 | interaction-only collaborative baseline |
-| Two-Tower | 0.003513 | 0.005231 | 0.006745 | 70,537 | user/repo side feature 기반 다양성 보강 |
+| ALS | 0.008141 | 0.010538 | 0.011666 | 9,970 | interaction-only collaborative baseline |
+| Two-Tower | 0.003480 | 0.005865 | 0.007365 | 99,615 | user/repo side feature 기반 다양성 보강 |
 
 Two-Tower는 현재 ALS 대체재라기보다 candidate source를 넓히는 retrieval 보강재로 해석한다.
 

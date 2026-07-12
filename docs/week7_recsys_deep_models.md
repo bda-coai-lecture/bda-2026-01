@@ -100,33 +100,33 @@ Two-Tower는 `airflow_20260516_lgbm_eval`의 ALS/mapping과 같은 100k-item cat
 - `data/models/week6/two_tower_airflow_20260516_two_tower_summary.json`
 - `data/models/week6/two_tower_airflow_20260516_two_tower.pt`
 
-### 2026-07-05 빠른 재학습 확인
+### 2026-07-05 전체 warm user 재학습 확인
 
-강의 정리 전 최신 mart 경로가 여전히 정상 동작하는지 확인하기 위해 `airflow_20260516_lgbm_eval` ALS/mapping을 재사용하고 Two-Tower만 1 epoch로 다시 학습했다. 이 run은 수렴 전 빠른 검증이므로 최종 성능 비교에는 위 3 epoch 결과를 사용한다.
+강의 정리 전 최신 mart 경로가 여전히 정상 동작하는지 확인하기 위해 `airflow_20260516_lgbm_eval` ALS/mapping을 재사용하고 Two-Tower를 3 epoch로 다시 학습했다. item catalog는 저장된 ALS/mapping의 100k repo를 사용했고, 평가는 test split의 warm user 전체 141,190명을 사용했다.
 
 ```bash
 OMP_NUM_THREADS=1 uv run python scripts/train_two_tower_week6_full_v2.py \
   --suffix airflow_20260516_lgbm_eval \
-  --output-suffix latest_20260705_e1_fast \
-  --epochs 1 \
-  --batch-size 8192 \
-  --eval-users 1000 \
+  --output-suffix latest_20260705_full_e3 \
+  --epochs 3 \
+  --batch-size 4096 \
+  --eval-users 999999 \
   --no-mlflow
 ```
 
 | 모델 | NDCG@10 | NDCG@50 | NDCG@100 | Recall@100 | Unique@100 |
 |---|---:|---:|---:|---:|---:|
-| Popularity | 0.002917 | 0.006834 | 0.007935 | 0.033078 | 106 |
-| ALS | 0.010152 | 0.011757 | 0.012264 | 0.028261 | 5,770 |
-| Two-Tower | 0.001005 | 0.002022 | 0.003237 | 0.012322 | 29,242 |
+| Popularity | 0.002234 | 0.005661 | 0.008002 | 0.035600 | 183 |
+| ALS | 0.008141 | 0.010538 | 0.011666 | 0.030740 | 9,970 |
+| Two-Tower | 0.003480 | 0.005865 | 0.007365 | 0.025077 | 99,615 |
 
-해석은 기존 결론과 같다. 빠른 재학습에서도 ALS가 정확도 기준으로 앞서고, Two-Tower는 추천 catalog 다양성이 훨씬 크다.
+해석은 기존 결론과 같다. 전체 warm user 평가에서도 ALS가 정확도 기준으로 앞서고, Two-Tower는 추천 catalog 다양성이 훨씬 크다.
 
 산출물:
 
-- `data/models/week6/two_tower_latest_20260705_e1_fast_metrics.csv`
-- `data/models/week6/two_tower_latest_20260705_e1_fast_summary.json`
-- `data/models/week6/two_tower_latest_20260705_e1_fast.pt`
+- `data/models/week6/two_tower_latest_20260705_full_e3_metrics.csv`
+- `data/models/week6/two_tower_latest_20260705_full_e3_summary.json`
+- `data/models/week6/two_tower_latest_20260705_full_e3.pt`
 
 ## 이전 full-scale 실험 결과
 

@@ -112,9 +112,10 @@
       }
 
       .slide.title {
-        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
         gap: 34px;
         align-items: center;
+        align-content: center;
       }
 
       .slide.split {
@@ -226,6 +227,54 @@
       .card span {
         color: var(--muted);
         font-size: 16px;
+      }
+
+      .flow {
+        display: grid;
+        gap: 14px;
+        margin-top: 26px;
+      }
+
+      .flow-row {
+        display: grid;
+        grid-template-columns: 128px minmax(0, 1fr) 92px;
+        align-items: stretch;
+        gap: 12px;
+      }
+
+      .flow-tag,
+      .flow-out {
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        color: #fff;
+        font-weight: 850;
+        text-align: center;
+      }
+
+      .flow-tag.raw { background: var(--raw); }
+      .flow-tag.bq { background: var(--bq); }
+      .flow-tag.model { background: var(--model); }
+      .flow-tag.quality { background: var(--quality); }
+      .flow-tag.bi { background: var(--bi); }
+      .flow-out { background: #334155; }
+
+      .flow-box {
+        padding: 17px 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .flow-box strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 18px;
+      }
+
+      .flow-box span {
+        color: var(--muted);
+        font-size: 15px;
       }
 
       .map {
@@ -409,10 +458,12 @@
           section: "중간복습",
           title: "중간복습",
           subtitle: "GitHub Archive 로그를 다루면서 생긴 데이터 핸들링 흐름과 현재 플랫폼 아키텍처를 정리함.",
-          note: "이 복습은 모델링 파트가 아니라 데이터 수집, 저장, 지표화, 품질, 운영 구조를 다시 잡는 시간.",
-          cards: [
-            ["목표", "지금까지 생긴 데이터 흐름을 한 장의 아키텍처로 말할 수 있게 됨."],
-            ["다음 단계", "소규모, 중간 규모, 대기업 데이터 플랫폼 케이스 스터디로 넘어감."]
+          tagline: "오늘의 목표: raw event를 fact, mart, dashboard, 운영 흐름으로 바꾸는 과정을 한 번에 설명하기.",
+          titleFlow: [
+            ["raw", "Raw", "GitHub Archive 로그", "actor, repo, event type, created_at이 들어 있는 원천 이벤트를 확인한다.", "입력"],
+            ["bq", "Fact", "user-repo-action-day", "분석 가능한 grain으로 정리해서 반복 지표의 기준점을 만든다.", "기준"],
+            ["model", "Mart", "DAU / WAU / Retention", "dbt mart로 dashboard와 분석이 바로 쓰는 지표를 만든다.", "지표"],
+            ["quality", "Ops", "Airflow + Quality", "갱신, 검증, drift, 비용 guard를 운영 흐름으로 묶는다.", "운영"]
           ]
         },
         {
@@ -766,6 +817,22 @@
         parent.appendChild(wrap);
       }
 
+      function addFlow(parent, rows) {
+        if (!rows) return;
+        const wrap = el("div", "flow");
+        rows.forEach(([kind, tag, title, body, out = "핵심"]) => {
+          const row = el("div", "flow-row");
+          row.appendChild(el("div", `flow-tag ${kind}`, tag));
+          const box = el("div", "flow-box");
+          box.appendChild(el("strong", "", title));
+          box.appendChild(el("span", "", body));
+          row.appendChild(box);
+          row.appendChild(el("div", "flow-out", out));
+          wrap.appendChild(row);
+        });
+        parent.appendChild(wrap);
+      }
+
       function addMap(parent, items) {
         if (!items) return;
         const wrap = el("div", "map");
@@ -823,6 +890,7 @@
         main.appendChild(el("p", "eyebrow", `${String(index + 1).padStart(2, "0")} · ${slide.section}`));
         main.appendChild(el(index === 0 ? "h1" : "h2", "", slide.title));
         if (slide.subtitle) main.appendChild(el("p", "subtitle", slide.subtitle));
+        if (slide.tagline) main.appendChild(el("div", "tagline", slide.tagline));
         addBullets(main, slide.bullets);
         addVisual(main, slide.visual);
         addMap(main, slide.map);
@@ -835,9 +903,13 @@
 
         if (slide.layout === "title") {
           const side = el("div");
-          side.appendChild(el("div", "number", String(slides.length)));
-          side.appendChild(el("p", "subtitle", "slides"));
-          side.appendChild(el("div", "tagline", "복습의 기준은 현재 repo에 남아 있는 데이터 플랫폼 구조다."));
+          if (slide.titleFlow) {
+            addFlow(side, slide.titleFlow);
+          } else {
+            side.appendChild(el("div", "number", String(slides.length)));
+            side.appendChild(el("p", "subtitle", "slides"));
+            side.appendChild(el("div", "tagline", "복습의 기준은 현재 repo에 남아 있는 데이터 플랫폼 구조다."));
+          }
           article.appendChild(side);
         }
         return article;
