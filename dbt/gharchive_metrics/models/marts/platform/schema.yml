@@ -1,6 +1,181 @@
 version: 2
 
 models:
+  - name: dim_push_automation_actor
+    description: >
+      Push actors flagged for exclusion as explicit bots or high-confidence
+      machine-rate automation. Grain: one row per GitHub event actor.id
+      (`user_id`). An actor is retained when any observed login ends in `[bot]`,
+      any minute contains at least 100 PushEvents, or any minute contains Pushes
+      to at least 100 distinct repositories. The observed date range is UTC and
+      comes from the bounded daily intermediate model. This is a high-precision
+      operational exclusion list, not a complete classification of automation.
+    columns:
+      - name: user_id
+        description: GitHub event actor.id.
+        tests:
+          - not_null
+          - unique
+      - name: explicit_bot
+        description: True when any observed login ends in `[bot]`, case-insensitively.
+        tests:
+          - not_null
+      - name: machine_rate_suspect
+        description: >
+          True when the actor reached at least 100 PushEvents or 100 distinct
+          Push repositories in a single UTC minute.
+        tests:
+          - not_null
+      - name: flag_reason
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - explicit_bot
+                  - machine_rate
+                  - explicit_bot_and_machine_rate
+      - name: observed_from
+        tests:
+          - not_null
+      - name: observed_through
+        tests:
+          - not_null
+
+  - name: fct_push_repo_episode
+    description: >
+      Push repository activity episodes separated by more than 28 days between
+      consecutive Push dates. Grain: one row per repo_id and episode_start_date,
+      in UTC. Collaboration and churn are independent axes. Entropy uses
+      episode-anchored seven-day calendar bins and is normalized by the number
+      of elapsed calendar bins, including empty bins. Bots and automation actors
+      are included because user_id represents GitHub event actor.id without an
+      actor-type classification. Recent rows remain provisional until 28 days
+      after their last Push.
+    columns:
+      - name: episode_id
+        description: Stable hash of repo_id and episode_start_date.
+        tests:
+          - not_null
+          - unique
+      - name: repo_id
+        tests:
+          - not_null
+      - name: episode_start_date
+        tests:
+          - not_null
+      - name: last_push_date
+        tests:
+          - not_null
+      - name: previous_episode_last_push_date
+        description: Last Push date of the preceding observable episode for the repository.
+      - name: days_since_previous_episode_push
+        description: >
+          Calendar-day difference from the preceding episode's final Push.
+          It is greater than 28 when a preceding observable episode exists.
+      - name: next_episode_start_date
+        description: Start date of the next observable episode for the repository.
+      - name: churn_date
+        tests:
+          - not_null
+      - name: entry_actor_count
+        tests:
+          - not_null
+      - name: lifetime_actor_count
+        tests:
+          - not_null
+      - name: total_push_events
+        tests:
+          - not_null
+      - name: normalized_entropy
+        description: >
+          Episode Push-event Shannon entropy divided by ln(elapsed calendar
+          weeks). It is zero for a one-week episode. Apply analysis thresholds
+          dynamically rather than persisting a fixed low-entropy flag.
+        tests:
+          - not_null
+      - name: data_through_date
+        tests:
+          - not_null
+
+  - name: metrics_push_repo_episode_started_monthly
+    description: >
+      Monthly Push episode-start cohorts. Collaboration transition and entropy
+      columns ending in as_of include provisional episodes and must be
+      interpreted as snapshots at as_of_date. Finalized entropy columns include
+      only episodes whose 28-day churn is observable.
+    columns:
+      - name: cohort_month
+        tests:
+          - not_null
+          - unique
+      - name: as_of_date
+        tests:
+          - not_null
+      - name: episode_count
+        tests:
+          - not_null
+      - name: avg_normalized_entropy_as_of
+        tests:
+          - not_null
+      - name: median_normalized_entropy_as_of
+        tests:
+          - not_null
+
+  - name: metrics_push_repo_episode_started_30d_monthly
+    description: >
+      Equal-follow-up comparison of Push episode-start cohorts. Grain: one row
+      per UTC cohort_month. Only episodes with a complete 30-calendar-day
+      window are included. Duration is the inclusive span from episode start to
+      the last Push within days 1-30; later Pushes are intentionally ignored.
+      reached_day_30 means the episode has a Push on or after the thirtieth
+      calendar day and is not a generic actor survival estimate.
+    columns:
+      - name: cohort_month
+        tests:
+          - not_null
+          - unique
+      - name: episode_count_with_complete_30d_window
+        tests:
+          - not_null
+      - name: avg_observed_duration_days_30d
+        tests:
+          - not_null
+      - name: reached_day_30_count
+        tests:
+          - not_null
+      - name: reached_day_30_share
+        tests:
+          - not_null
+
+  - name: metrics_push_repo_episode_churned_monthly
+    description: >
+      Finalized Push episode metrics by churn month. This reports episode
+      closures and duration rather than a cohort churn rate, which would
+      converge to 100 percent under the 28-day episode definition. Duration,
+      entropy, and later-collaboration columns are descriptive closure-month
+      attributes, not comparable time-series KPIs: episodes starting before
+      the source boundary are excluded, so early closure months are
+      left-truncated and cannot contain equally long episodes. Use an equal
+      follow-up window by episode-start cohort for trend comparisons.
+    columns:
+      - name: churn_month
+        tests:
+          - not_null
+          - unique
+      - name: as_of_date
+        tests:
+          - not_null
+      - name: churned_episode_count
+        tests:
+          - not_null
+      - name: avg_normalized_entropy
+        tests:
+          - not_null
+      - name: median_normalized_entropy
+        tests:
+          - not_null
+
   - name: metrics_daily
     description: Daily GitHub Archive activity metrics for dashboarding.
     columns:

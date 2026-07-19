@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>1. GitHub 프로젝트 활동 — 대부분은 하루, 일부는 더 오래</title>
+  <style>
+    :root{--bg:#f4f6fa;--paper:#fff;--ink:#172033;--muted:#687386;--line:#e2e7ef;
+      --navy:#14284d;--blue:#3867e8;--green:#128765;--orange:#df762f;
+      --soft-blue:#edf3ff;--soft-green:#eaf8f3;--soft-orange:#fff4e9;
+      --shadow:0 11px 32px rgba(20,40,77,.09)}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo",
+      "Noto Sans KR","Malgun Gothic",sans-serif;line-height:1.65;font-size:15px}
+    .wrap{max-width:1160px;margin:0 auto;padding:30px 22px 72px}
+    .hero{padding:40px 42px;color:#fff;background:linear-gradient(125deg,#101d36,#21468a 58%,#248da6);
+      border-radius:22px;box-shadow:0 16px 42px rgba(20,40,77,.22)}
+    .kicker{font-size:12px;font-weight:750;letter-spacing:.15em;text-transform:uppercase;opacity:.78}
+    h1{margin:9px 0;font-size:clamp(27px,4vw,40px);line-height:1.24}
+    .hero p{max-width:850px;margin:12px 0;font-size:16px}.meta{font-size:12.5px;opacity:.72}
+    h2{margin:39px 0 15px;padding-bottom:9px;border-bottom:2px solid var(--line);font-size:21px}
+    h3{margin:0 0 8px;font-size:16px}p{margin:8px 0 14px}.muted{color:var(--muted)}
+    .verdict{margin:24px 0;padding:23px 25px;background:var(--paper);border:1px solid var(--line);
+      border-left:6px solid var(--green);border-radius:15px;box-shadow:var(--shadow);font-size:16.5px}
+    .verdict strong{color:var(--green)}
+    .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
+    .card,.panel{min-width:0;padding:18px;background:var(--paper);border:1px solid var(--line);
+      border-radius:14px;box-shadow:0 6px 20px rgba(20,40,77,.05)}
+    .label{color:var(--muted);font-size:12px;font-weight:700}.value{margin:7px 0 2px;font-size:24px;font-weight:800}
+    .delta{font-size:12px;font-weight:750}.up{color:var(--green)}.down{color:var(--orange)}.flat{color:var(--blue)}
+    .note{color:var(--muted);font-size:11.5px}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .classification{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+    .class-card{padding:17px;background:var(--paper);border:1px solid var(--line);border-top:4px solid var(--blue);border-radius:12px}
+    .class-card:nth-child(2){border-top-color:var(--green)}.class-card:nth-child(3){border-top-color:var(--orange)}
+    .callout{margin:16px 0;padding:17px 19px;border-radius:13px;background:var(--soft-blue);border:1px solid #d5e2ff}
+    .callout.good{background:var(--soft-green);border-color:#ccebdd}.callout.warn{background:var(--soft-orange);border-color:#f1d7ba}
+    .table-wrap{overflow-x:auto;border-radius:14px}table{width:100%;min-width:850px;border-collapse:collapse;background:var(--paper);
+      border:1px solid var(--line);font-size:12.5px}th{padding:10px;background:#edf1f7;color:#3e4a5e;text-align:right}
+    td{padding:10px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+    th:first-child,td:first-child{text-align:left}tr.recent td{background:#f3f8ff}
+    code{padding:2px 6px;border-radius:5px;background:#edf1f7;color:#344054;font-size:12px}
+    .formula{margin:13px 0;padding:16px;background:var(--navy);color:#fff;border-radius:12px;text-align:center;font:18px Georgia,serif}
+    ul{margin:8px 0;padding-left:20px}.footnotes{padding:18px 20px;background:#eef1f5;border-radius:13px;color:var(--muted);font-size:12px}
+    footer{margin-top:34px;color:var(--muted);text-align:center;font-size:11.5px}
+    @media(max-width:860px){.cards{grid-template-columns:repeat(2,1fr)}.two-col,.classification{grid-template-columns:1fr}.hero{padding:30px 25px}}
+    @media(max-width:520px){.wrap{padding:15px 11px 48px}.cards{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header class="hero">
+    <div class="kicker">BDA 2 · GitHub 프로젝트 활동 분석</div>
+    <h1>새 프로젝트 활동은 늘었다.<br>첫 주 협업 비중은 조금 낮아졌다.</h1>
+    <p>한 저장소에서 코드가 올라오기 시작한 뒤 28일 동안 새 업로드가 없을 때까지를 하나의 ‘활동 묶음’으로 보고, 혼자 시작했는지·협업으로 이어졌는지·얼마나 오래 활동했는지를 비교했다.</p>
+    <div class="meta">2026-07-19 · GitHub 공개 코드 업로드 기록 · 데이터 기준일 2026-07-18</div>
+  </header>
+
+  <section class="verdict">
+    <strong>먼저 결론.</strong> 2025년 8월부터 2026년 6월 사이 새로 시작된 프로젝트 활동은
+    34.0% 늘었지만, 첫 주부터 여러 계정이 참여한 비중은 조금 낮아졌다.
+    종료 월 기준으로 장기 활동과 이후 협업이 늘어난 신호도 보이지만, 초기 데이터 경계의 영향을 받는다.
+    <b>따라서 지금 확정할 수 있는 결론은 시작 활동 증가와 첫 주 협업 비중의 소폭 하락까지다.</b>
+  </section>
+
+  <section>
+    <h2>1. 핵심 숫자 · 2025년 8월 → 2026년 6월</h2>
+    <div class="cards">
+      <article class="card"><div class="label">한 달간 새로 시작한 활동</div><div class="value">535.2만 → 716.9만</div><div class="delta up">+34.0%</div><div class="note">시작 건수는 크게 증가</div></article>
+      <article class="card"><div class="label">첫 주부터 여러 계정이 참여</div><div class="value">4.98% → 4.51%</div><div class="delta down">−0.47%p</div><div class="note">협업 시작 비중은 조금 감소</div></article>
+      <article class="card"><div class="label">30일 고정창 평균 기간</div><div class="value">5.18일 → 5.63일</div><div class="delta up">+8.8%</div><div class="note">30일까지 지속: 6.40% → 7.20% · 2025-08 → 2026-05</div></article>
+      <article class="card"><div class="label">가장 흔한 활동 모습</div><div class="value">하루만 활동</div><div class="delta flat">10개월 전과 같음</div><div class="note">절반 이상이 한 주 안에 끝남</div></article>
+    </div>
+    <p class="muted">첫 두 카드는 2025-08과 2026-06 시작 활동을 비교한다. 기간 카드는 양쪽에 같은 30일 관찰창을 적용하기 위해 2025-08과 2026-05를 비교한다.</p>
+    <div class="callout good"><b>쉽게 말하면:</b> 새 활동은 크게 늘었지만 처음부터 협업한 비중은 조금 낮아졌다. 같은 30일만 보면 활동 기간 증가는 8.8%로, 종료 월 평균에서 보였던 큰 폭의 증가보다 훨씬 작다.</div>
+  </section>
+
+  <section>
+    <h2>2. 무엇을 따로 봤나</h2>
+    <div class="classification">
+      <article class="class-card"><h3>누가 시작했나</h3><p>첫 7일에 한 계정만 참여했는지, 여러 계정이 함께 참여했는지 본다.</p><p class="muted">한 계정이라고 반드시 개인 프로젝트인 것은 아니다.</p></article>
+      <article class="class-card"><h3>나중에 협업으로 이어졌나</h3><p>한 계정으로 시작한 뒤 다른 계정이 추가로 참여했는지 본다.</p><p class="muted">얼마나 오래 활동했는지와는 따로 본다.</p></article>
+      <article class="class-card"><h3>얼마나 오래, 고르게 활동했나</h3><p>마지막 코드 업로드 뒤 28일 동안 새 업로드가 없으면 활동이 끝난 것으로 본다.</p><p class="muted">업로드가 한 주에 몰렸는지 여러 주에 퍼졌는지도 함께 본다.</p></article>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. 장기 활동과 이후 협업의 탐색 신호</h2>
+    <div class="two-col">
+      <article class="panel"><h3>한 시기에 몰아 작업한 활동</h3><p style="font-size:28px;font-weight:800;color:var(--green)">84.3% → 79.5%</p><p>코드 업로드가 한 주 또는 짧은 시기에 집중된 활동의 비중이다. 2025년 8월보다 2026년 6월에 4.9%p 낮아져, 여러 주에 걸쳐 작업한 활동이 그만큼 늘었다.</p></article>
+      <article class="panel"><h3>혼자 시작했다가 협업으로 발전</h3><p style="font-size:28px;font-weight:800;color:var(--blue)">0.93% → 1.89%</p><p>한 계정으로 시작한 활동 가운데 나중에 다른 계정이 참여한 비중이다. 아직 2%가 안 되지만 약 두 배로 늘었다.</p></article>
+    </div>
+    <div class="callout warn"><b>이 비교는 확정 결론이 아니다.</b> 두 수치는 종료 월 기준이라 2025년 8월에는 데이터 시작 전부터 이어진 장기 활동이 빠진다. 방향성 신호로만 보고, 고정 관찰창으로 재검증해야 한다.</div>
+  </section>
+
+  <section>
+    <h2>4. ‘한 시기에 몰아 작업했다’는 기준을 바꿔도 같은가</h2>
+    <p>내부적으로는 업로드가 한 주에만 있으면 0점, 여러 주에 고르게 퍼질수록 1점에 가까워지는 ‘업로드 분산 점수’를 쓴다. 위의 84.3% → 79.5%는 0.25점 이하를 기본 기준으로 삼은 결과다. 기준을 바꿔도 방향이 유지되는지 아래에서 확인했다.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>활동 종료 월</th><th>매우 엄격한 기준</th><th>기본 기준</th><th>느슨한 기준</th><th>평균 분산 점수</th><th>가운데 값</th></tr></thead>
+      <tbody>
+        <tr><td>2025-08</td><td>84.06%</td><td>84.34%</td><td>87.19%</td><td>0.113</td><td>0</td></tr>
+        <tr><td>2025-12</td><td>80.76%</td><td>81.01%</td><td>83.92%</td><td>0.139</td><td>0</td></tr>
+        <tr><td>2026-01</td><td>78.87%</td><td>79.16%</td><td>82.43%</td><td>0.151</td><td>0</td></tr>
+        <tr><td>2026-06</td><td>79.21%</td><td>79.48%</td><td>82.70%</td><td>0.149</td><td>0</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">어떤 기준에서도 관측 방향은 같지만 종료 월 비교의 왼쪽 검열은 남아 있다. 이 기준은 프로젝트 품질을 평가하는 점수가 아니다.</p>
+  </section>
+
+  <section>
+    <h2>5. 확정 종료 월별 참고표</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>종료 월</th><th>끝난 활동 묶음</th><th>가운데 활동 기간</th><th>평균 분산 점수</th><th>한 시기 집중</th><th>첫 주부터 협업</th><th>나중에 협업</th></tr></thead>
+      <tbody>
+        <tr><td>2025-08</td><td>534.4만</td><td>1일</td><td>0.113</td><td>84.34%</td><td>4.63%</td><td>0.93%</td></tr>
+        <tr><td>2025-09</td><td>513.1만</td><td>1일</td><td>0.126</td><td>82.58%</td><td>4.68%</td><td>1.16%</td></tr>
+        <tr><td>2025-10</td><td>568.0만</td><td>1일</td><td>0.131</td><td>81.91%</td><td>4.71%</td><td>1.32%</td></tr>
+        <tr><td>2025-11</td><td>430.4만</td><td>1일</td><td>0.121</td><td>83.09%</td><td>5.04%</td><td>1.36%</td></tr>
+        <tr><td>2025-12</td><td>587.6만</td><td>1일</td><td>0.139</td><td>81.01%</td><td>5.38%</td><td>1.74%</td></tr>
+        <tr><td>2026-01</td><td>534.6만</td><td>1일</td><td>0.151</td><td>79.16%</td><td>5.27%</td><td>1.99%</td></tr>
+        <tr><td>2026-02</td><td>498.9만</td><td>1일</td><td>0.136</td><td>81.14%</td><td>4.51%</td><td>1.47%</td></tr>
+        <tr><td>2026-03</td><td>617.8만</td><td>1일</td><td>0.137</td><td>81.16%</td><td>4.36%</td><td>1.44%</td></tr>
+        <tr><td>2026-04</td><td>680.1만</td><td>1일</td><td>0.141</td><td>80.59%</td><td>4.47%</td><td>1.61%</td></tr>
+        <tr><td>2026-05</td><td>685.6만</td><td>1일</td><td>0.150</td><td>79.24%</td><td>4.84%</td><td>1.85%</td></tr>
+        <tr class="recent"><td>2026-06</td><td>698.9만</td><td>1일</td><td>0.149</td><td>79.48%</td><td>4.86%</td><td>1.89%</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">이 표는 종료량과 구성 확인용이다. 2025-06~07은 원천 시작 경계, 2026-07은 부분 월 때문에 제외했다. 종료 월별 기간 평균은 월마다 가능한 최대 관찰 길이가 달라 추세 지표에서 제거했다.</p>
+  </section>
+
+  <section>
+    <h2>6. 계산 방법이 궁금하다면</h2>
+    <div class="two-col">
+      <article class="panel"><h3>활동 묶음을 나누는 법</h3><ul><li>같은 저장소에서 코드가 올라온 날짜들을 순서대로 본다.</li><li>이전 업로드 후 28일 넘게 비었다면 새 활동으로 나눈다.</li><li>첫 7일에 참여한 계정 수로 시작 방식을 구분한다.</li><li>최근 활동은 아직 끝났는지 알 수 없으므로 별도 표시한다.</li></ul></article>
+      <article class="panel"><h3>업로드 분산 점수</h3><p>한 활동 묶음의 코드 업로드가 몇 주에 걸쳐 퍼져 있는지를 0~1로 나타낸다. 0은 한 주에만 업로드, 1에 가까울수록 여러 주에 고르게 업로드했다는 뜻이다.</p><div class="formula">기술명: normalized weekly Push entropy</div><p class="muted">계산식과 원본 컬럼은 분석용 표에 보존한다.</p></article>
+    </div>
+
+  </section>
+
+  <section>
+    <h2>7. 재현성·비용·품질</h2>
+    <div class="cards">
+      <article class="card"><div class="label">분석한 활동 묶음</div><div class="value">81,211,316건</div><div class="note">2025-05-29~2026-07-18</div></article>
+      <article class="card"><div class="label">확인한 코드 업로드</div><div class="value">807,459,224건</div><div class="note">경계 제외 후 적격 원천과 mart 합계 일치</div></article>
+      <article class="card"><div class="label">전체 다시 계산 비용</div><div class="value">약 $0.18</div><div class="note">처리량 32.22GB</div></article>
+      <article class="card"><div class="label">검증에서 발견된 오류</div><div class="value">0건</div><div class="note">중복·계산 규칙 위반</div></article>
+    </div>
+    <div class="callout"><b>lineage:</b> <code>fact_user_repo_activity</code> → <code>fct_push_repo_episode</code> → <code>metrics_push_repo_episode_started_monthly</code> / <code>metrics_push_repo_episode_churned_monthly</code></div>
+  </section>
+
+  <section>
+    <h2>8. 그래서 무엇을 할 것인가</h2>
+    <div class="callout good">
+      <b>의사결정:</b> 새로 시작한 활동이 늘었다는 이유만으로 성장 성과라고 판단하지 않는다.
+      저장소 활동 분석에도 이미 만든 자동화 actor 차원을 연결하고, 동일한 고정 관찰창으로 다시 계산한다.
+      경계와 자동화 영향을 분리한 뒤에만 온보딩이나 협업 개입을 설계한다.
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>순서</th><th>실행</th><th>확인할 지표</th><th>다음 결정</th></tr></thead>
+      <tbody>
+        <tr><td>지금 · 운영</td><td>최근 3개월의 변화를 매달 확인하는 화면을 만든다.</td><td>활동 수, 가운데·상위 25%·상위 10%의 기간, 업로드 분산 점수, 협업 비중</td><td>평균만 오르고 오래 활동한 상위 그룹이 그대로면 “개선” 판단을 보류</td></tr>
+        <tr><td>1순위 · 진단</td><td>자동화 제외 차원을 episode 집계에 연결하고 30일 고정창으로 다시 계산한다.</td><td>자동화 제외 전후의 30일 지속·분산 점수·협업 비중</td><td>개선 폭이 대부분 사라지면 사용자 행동이 아니라 데이터 구성 변화로 판단</td></tr>
+        <tr><td>2순위 · 비교</td><td>오래 이어진 활동과 하루 만에 끝난 활동의 첫 7일을 비교한다.</td><td>업로드 수, 활동한 날짜 수, 다른 계정이 합류한 시점</td><td>여러 달에 걸쳐 같은 특징이 반복될 때만 개입 후보로 채택</td></tr>
+        <tr><td>3순위 · 실험</td><td>선별된 대상에 협업 초대나 재방문 유도 같은 작은 실험을 한다.</td><td>28일 안의 재방문, 다른 계정 합류, 오래 활동한 상위 25%의 기간</td><td>아무 조치도 하지 않은 비교 집단보다 좋아질 때만 확대</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="two-col" style="margin-top:16px">
+      <article class="panel">
+        <h3>월간 경보 규칙</h3>
+        <ul>
+          <li>처음부터 협업 비중이 최근 6개월 기준보다 0.5%p 이상 낮은 상태가 2개월 지속</li>
+          <li>아직 종료 여부가 확정되지 않은 활동이 10%를 넘는 월은 결론에서 제외</li>
+          <li>분산 점수 기준을 바꿀 때 결과 방향이 달라지면 판단을 보류</li>
+        </ul>
+      </article>
+      <article class="panel">
+        <h3>성공 조건</h3>
+        <ul>
+          <li>봇 제외 후에도 오래 활동한 상위 25%·10%의 기간이 상승</li>
+          <li>혼자 시작 후 다른 계정이 합류한 비중이 실제 건수와 함께 상승</li>
+          <li>가운데 값이 그대로면 “전체 개선”이 아니라 “일부 장기 활동 증가”로 보고</li>
+        </ul>
+      </article>
+    </div>
+    <p class="muted">위 경보값은 인과적으로 검증된 임계값이 아니라 운영을 시작하기 위한 제안이다. 3개월 운용 후 변동성을 보고 조정한다.</p>
+  </section>
+
+  <section>
+    <h2>9. 해석의 한계</h2>
+    <div class="footnotes"><ul>
+      <li><b>코드 업로드 기록은 프로젝트의 생성 목적이나 품질을 보여주지 않는다.</b> 쉬었다가 다시 작업한 기존 저장소도 새 활동으로 잡힌다.</li>
+      <li><b>이 저장소 활동 mart에는 봇과 자동화가 포함된다.</b> lifecycle 분석용 제외 목록은 만들었지만 이 표에는 아직 연결하지 않았으므로, 여러 계정 참여를 사람끼리 협업으로 단정할 수 없다.</li>
+      <li><b>왼쪽 검열이 있다.</b> 2025년 8월 종료 활동은 최대 67일, 2026년 6월 종료 활동은 최대 370일까지 관측될 수 있어 종료 월 평균 기간을 직접 비교할 수 없다.</li>
+      <li><b>가장 흔한 모습이 하루 활동이라는 사실을 함께 봐야 한다.</b> 평균 상승은 일부 장기 활동의 변화다.</li>
+      <li><b>최신 데이터는 아직 끝났는지 알 수 없다.</b> 2026년 6월 활동의 45.3%, 7월 활동의 100%는 기준일 현재 진행 중이거나 관찰 대기 중이다.</li>
+      <li><b>관찰은 인과가 아니다.</b> 무엇이 기간·협업 변화를 만들었는지는 이 데이터만으로 판별할 수 없다.</li>
+    </ul></div>
+  </section>
+
+  <footer>BDA 2 · GitHub Push repository episode analysis</footer>
+</main>
+</body>
+</html>

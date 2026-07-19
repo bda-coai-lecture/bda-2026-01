@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: int_push_automation_actor_day
+    description: >
+      Daily Push automation evidence derived from bounded GitHub Archive shards.
+      Grain: UTC activity_date × GitHub event actor.id (`user_id`). The model is
+      partitioned by activity_date and uses insert_overwrite, so callers must
+      always provide the intended `analysis_start_date` and `analysis_end_date`
+      refresh range. Login suffix evidence and per-minute velocity maxima are
+      preserved for the downstream automation actor dimension.
+    columns:
+      - name: actor_day_id
+        description: Stable hash of activity_date and user_id.
+        tests:
+          - not_null
+          - unique
+      - name: activity_date
+        tests:
+          - not_null
+      - name: user_id
+        description: GitHub event actor.id.
+        tests:
+          - not_null
+      - name: explicit_bot
+        tests:
+          - not_null
+      - name: machine_rate_suspect
+        tests:
+          - not_null
+      - name: max_push_events_in_minute
+        tests:
+          - not_null
+      - name: max_repos_in_minute
+        tests:
+          - not_null
+      - name: observed_push_events
+        tests:
+          - not_null

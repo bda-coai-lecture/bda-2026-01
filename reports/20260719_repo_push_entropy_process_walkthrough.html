@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2. 탐색 분석이 운영 mart가 되기까지</title>
+  <style>
+    :root{--bg:#f4f6f8;--card:#fff;--ink:#18212b;--muted:#66717f;--line:#e3e7ec;
+      --navy:#19324d;--blue:#3478f6;--green:#15956f;--orange:#dd6b20;--violet:#7559c7;
+      --soft-blue:#edf4ff;--soft-green:#ecf9f4;--soft-orange:#fff5eb}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+      line-height:1.65;font-size:15px}.wrap{max-width:1080px;margin:auto;padding:32px 20px 64px}
+    header{background:linear-gradient(125deg,#172b42,#3169bb);color:#fff;border-radius:18px;
+      padding:34px 36px;box-shadow:0 12px 32px rgba(20,43,69,.18)}
+    header .kicker{font-size:12px;letter-spacing:.13em;text-transform:uppercase;opacity:.78}
+    header h1{font-size:29px;line-height:1.3;margin:8px 0}header p{margin:6px 0;opacity:.92}
+    header .meta{font-size:12.5px;opacity:.72;margin-top:15px}
+    h2{font-size:20px;margin:36px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+    h3{font-size:15px;margin:0 0 7px}p{margin:8px 0}.lead{color:var(--muted)}
+    .hero-note{background:var(--soft-blue);border:1px solid #d3e3ff;border-radius:13px;padding:17px 20px;margin:22px 0}
+    .hero-note b{color:#245fb8}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+    .card,.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:17px 18px}
+    .label{font-size:12px;color:var(--muted)}.value{font-size:25px;font-weight:760;margin:3px 0}
+    .note,.evidence{font-size:12.5px;color:var(--muted)}.green{color:var(--green)}.orange{color:var(--orange)}.blue{color:var(--blue)}
+    table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);font-size:13px}
+    th{background:#edf1f5;text-align:left;color:#424c59;font-size:12px;padding:11px 12px}
+    td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}
+    .num{display:inline-grid;place-items:center;background:var(--blue);color:#fff;border-radius:7px;width:27px;height:27px;font-weight:750}
+    .say{font-weight:700}.who{display:block;font-size:11.5px;color:var(--muted)}
+    .tag{display:inline-block;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;white-space:nowrap}
+    .tag.user{color:#245fb8;background:var(--soft-blue)}.tag.skill{color:#6547b4;background:#f2effc}
+    .tag.data{color:var(--green);background:var(--soft-green)}.tag.caution{color:var(--orange);background:var(--soft-orange)}
+    .flow{display:grid;grid-template-columns:1fr 42px 1fr 42px 1fr;align-items:stretch;margin:15px 0}
+    .arrow{display:grid;place-items:center;color:#99a4b1;font-size:24px}.quote{font-weight:700;color:var(--navy)}
+    .split,.impact{display:grid;grid-template-columns:1fr 1fr;gap:14px}.impact{grid-template-columns:repeat(3,1fr)}
+    .impact .panel{border-top:4px solid var(--violet)}.callout{border-radius:12px;padding:15px 18px;margin:14px 0;background:var(--soft-green);border:1px solid #ccecdf}
+    .callout.warn{background:var(--soft-orange);border-color:#f5d9bf}code{background:#eef1f5;padding:2px 6px;border-radius:5px;font-size:12px}
+    ul{margin:8px 0;padding-left:20px}footer{text-align:center;color:var(--muted);font-size:12px;margin-top:38px}
+    @media(max-width:780px){.cards,.impact,.split,.flow{grid-template-columns:1fr}.arrow{height:38px;transform:rotate(90deg)}
+      header{padding:26px 22px}header h1{font-size:24px}table{display:block;overflow-x:auto}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="kicker">BDA · Analysis Process Walkthrough</div>
+    <h1>좋은 반박 하나가<br>분석의 grain을 바꿨다</h1>
+    <p>90일·8주·4개 유형의 탐색 분석을 버리고, 28일 episode와 독립된 협업·종료 축을 운영 mart로 만든 과정</p>
+    <div class="meta">2026-07-19 · GitHub Archive PushEvent · 결과보다 정의가 어떻게 교정됐는지를 기록</div>
+  </header>
+
+  <div class="hero-note">
+    <b>한 줄 요약:</b> 첫 분석은 “짧게 끝남”과 “협업 여부”를 하나의 프로젝트 유형으로 묶었다.
+    “여기서는 협업이냐 아니냐를 따지고, 종료는 별개 축”이라는 반박 이후 분석 단위 자체를 다시 설계했다.
+    결과적으로 결론은 더 절제됐고, 일회성 SQL은 8,121만 행의 재사용 가능한 episode mart가 됐다.
+  </div>
+
+  <h2>0. 무엇이 바뀌었나</h2>
+  <div class="cards">
+    <article class="card"><div class="label">폐기한 정의</div><div class="value orange">90일 · 8주 · 4유형</div><div class="note">협업과 종료가 한 축에 혼재</div></article>
+    <article class="card"><div class="label">채택한 정의</div><div class="value green">28일 episode</div><div class="note">협업·종료·entropy 원자 적재</div></article>
+    <article class="card"><div class="label">최종 운영 단위</div><div class="value blue">81,211,316행</div><div class="note">repo × episode_start_date</div></article>
+  </div>
+
+  <h2>1. 분석이 바뀐 10개의 장면</h2>
+  <p class="lead">사람은 질문과 의미를 교정했고, 후속 감사에서는 오른쪽 검열을 처리한 뒤에도 남은 왼쪽 검열 문제를 찾아냈다.</p>
+  <table>
+    <thead><tr><th>#</th><th>질문·반박</th><th>문제</th><th>분석에 생긴 변화</th><th>주도</th></tr></thead>
+    <tbody>
+      <tr><td><span class="num">1</span></td><td><span class="say">“멀티 레포 유저가 장기적으로 어떻게 변했지?”</span><span class="who">출발점</span></td><td>월별 actor 활동만으로 프로젝트의 생애를 알 수 없다.</td><td>Push actor와 repo 구성을 월 단위로 먼저 확인했다.</td><td><span class="tag user">사람</span></td></tr>
+      <tr><td><span class="num">2</span></td><td><span class="say">“작은 테스트 프로젝트가 늘어난 걸까?”</span><span class="who">가설 확장</span></td><td>한 repo actor와 한 actor repo를 곧바로 테스트로 부를 위험이 있었다.</td><td>목적을 단정하지 않고 활동 분산과 지속성을 보조 지표로 추가했다.</td><td><span class="tag user">사람</span></td></tr>
+      <tr><td><span class="num">3</span></td><td><span class="say">“Push로만 보자.”</span><span class="who">신뢰 이벤트 제한</span></td><td>Watch·Issue 등은 코드 작업과 의미가 다르다.</td><td>모든 lifecycle 계산을 PushEvent로 한정했다.</td><td><span class="tag data">데이터</span></td></tr>
+      <tr><td><span class="num">4</span></td><td><span class="say">“활성화 패턴을 entropy로 잡자.”</span><span class="who">지표 발상</span></td><td>총 Push만으로 첫날 집중과 장기 분산을 구분할 수 없다.</td><td>주별 Push 비중의 Shannon entropy를 도입했다.</td><td><span class="tag user">사람</span></td></tr>
+      <tr><td><span class="num">5</span></td><td><span class="say">“90일 전과 이후 8주를 보자.”</span><span class="who">첫 탐색 설계</span></td><td>동일 관찰창은 만들었지만 프로젝트 정의가 임의적이었다.</td><td>90일 재활성화와 고정 8주 관찰의 4개 유형을 만들었다.</td><td><span class="tag skill">스킬</span></td></tr>
+      <tr><td><span class="num">6</span></td><td><span class="say">“협업이냐 아니냐가 핵심이고 종료는 별개 축이야.”</span><span class="who">결정적 반박</span></td><td>처음부터 협업한 뒤 바로 끝난 경우와 혼자 오래 지속한 경우가 비교 불가능한 한 축에 놓였다.</td><td>4개 상호배타 유형을 폐기하고 협업·종료 원자 컬럼을 분리했다.</td><td><span class="tag user">사람</span></td></tr>
+      <tr><td><span class="num">7</span></td><td><span class="say">“8주가 아니라 28일 무활동이면 이탈이잖아.”</span><span class="who">운영 정의 복원</span></td><td>고정 8주는 실제 lifecycle 계약과 달랐다.</td><td>연속 Push 간격이 28일을 초과할 때 새 episode가 시작되도록 바꿨다.</td><td><span class="tag user">사람</span></td></tr>
+      <tr><td><span class="num">8</span></td><td><span class="say">“평균과 중앙값 둘 다. threshold는 dynamic.”</span><span class="who">소비 방식 결정</span></td><td>고정 0.25는 품질 기준처럼 굳을 수 있고 평균만 보면 긴 꼬리를 전형으로 오해한다.</td><td>raw/normalized entropy를 적재하고 평균·정확 중앙값을 함께 제공했다.</td><td><span class="tag user">사람</span></td></tr>
+      <tr><td><span class="num">9</span></td><td><span class="say">“mart로 만들자. 백필 비용도 보자.”</span><span class="who">분석의 제품화</span></td><td>세 분석 SQL에 episode 계산이 중복됐고 정의 변경 때마다 재스캔해야 했다.</td><td>episode fact와 시작·종료 월별 mart를 만들고 약 $0.18에 전체 refresh했다.</td><td><span class="tag skill">스킬</span></td></tr>
+      <tr><td><span class="num">10</span></td><td><span class="say">“1, 2번 문서도 갈아엎자.”</span><span class="who">전달 정의 교정</span></td><td>폐기된 86.7→84.6% 결론이 새 mart 결과처럼 남아 있었다.</td><td>기존 수치를 폐기된 탐색 결과로 격리하고 중앙값·긴 꼬리 중심으로 다시 썼다.</td><td><span class="tag caution">해석 교정</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2>2. 분석 구조의 변화</h2>
+  <div class="flow">
+    <article class="panel"><h3>탐색 SQL</h3><p class="quote">90일 비활성 → 8주 관찰</p><p class="evidence">질문을 빠르게 시험하기에는 유용했지만 정의가 고정돼 있었다.</p></article>
+    <div class="arrow">→</div>
+    <article class="panel"><h3>의미 반박</h3><p class="quote">협업 ≠ 종료</p><p class="evidence">서로 다른 현상을 상호배타 유형 하나로 압축한 문제가 드러났다.</p></article>
+    <div class="arrow">→</div>
+    <article class="panel"><h3>원자 mart</h3><p class="quote">repo × 28일 episode</p><p class="evidence">원자 컬럼을 저장해 분류와 threshold를 소비 시점에 바꿀 수 있게 했다.</p></article>
+  </div>
+
+  <h2>3. 폐기한 결론과 새 결론</h2>
+  <div class="split">
+    <article class="panel">
+      <h3 class="orange">폐기한 결론</h3>
+      <p class="quote">“초기 종료형이 86.7%에서 84.6%로 감소했다.”</p>
+      <ul>
+        <li>90일 재활성화와 고정 8주라는 탐색 정의에 의존</li>
+        <li>협업 여부가 종료 분류보다 우선되는 비대칭 case 문</li>
+        <li>현재 mart의 지표와 직접 연결할 수 없음</li>
+      </ul>
+    </article>
+    <article class="panel">
+      <h3 class="green">새 결론</h3>
+      <p class="quote">“새 활동은 늘었지만 첫 주 협업 비중은 조금 낮아졌다.”</p>
+      <ul>
+        <li>중앙 기간 1일, 중앙 entropy 0은 유지</li>
+        <li>시작 활동 535.2만 → 716.9만</li>
+        <li>30일 고정창 평균 기간 5.18일 → 5.63일(2025-08 → 2026-05)</li>
+        <li>종료 월 기준 이후 협업 증가는 왼쪽 검열 재검증 대상으로 보류</li>
+      </ul>
+    </article>
+  </div>
+
+  <h2>4. 사람·스킬·데이터의 역할</h2>
+  <div class="impact">
+    <article class="panel"><h3>사람</h3><p class="quote">질문의 의미를 바꿨다</p><p>협업과 종료 분리, 28일 이탈, 평균·중앙값, dynamic threshold를 결정했다.</p></article>
+    <article class="panel"><h3>분석 스킬</h3><p class="quote">변화를 실행 계약으로 만들었다</p><p>grain, 오른쪽 검열, lineage, dry-run, 테스트, 문서를 dbt 산출물로 고정했고 후속 리뷰에서 왼쪽 검열 규칙을 보강했다.</p></article>
+    <article class="panel"><h3>데이터</h3><p class="quote">결론의 크기를 제한했다</p><p>종료 월마다 최대 관찰 기간이 다르다는 사실이 과장된 기간 증가 해석을 막았다.</p></article>
+  </div>
+
+  <h2>5. 왜 episode mart가 필요했나</h2>
+  <div class="split">
+    <article class="panel"><h3>재사용성</h3><ul><li>threshold 변경 시 fact 재스캔 불필요</li><li>협업·종료·entropy를 자유롭게 교차</li><li>시작 cohort와 종료 month를 분리</li></ul></article>
+    <article class="panel"><h3>정확성</h3><ul><li>최근 783.9만 행 provisional 표시</li><li>왼쪽 28일 관측이 없는 시작일 제외</li><li>Push 807,459,224건 합계 보존</li></ul></article>
+  </div>
+  <div class="callout warn"><b>운영 함정:</b> 28일 규칙 아래에서 종료된 episode는 모두 churn이다. 따라서 “episode churn rate”는 시간이 지나면 100%로 수렴한다. 종료 건수는 churn month로 운영할 수 있지만 기간·분산·후속 협업의 시계열 비교는 동일한 시작 cohort 관찰창이나 왼쪽 절단 보정이 필요하다.</div>
+
+  <h2>6. 재현성과 비용</h2>
+  <div class="cards">
+    <article class="card"><div class="label">최종 refresh</div><div class="value green">32.22GB</div><div class="note">약 $0.18</div></article>
+    <article class="card"><div class="label">보존 테스트</div><div class="value blue">22.25GB</div><div class="note">경계 제외 적격 source ↔ mart 일치</div></article>
+    <article class="card"><div class="label">품질 오류</div><div class="value green">0건</div><div class="note">중복·불변식 위반</div></article>
+  </div>
+  <div class="callout">
+    <p><b>모델:</b> <code>fct_push_repo_episode.sql</code>, <code>metrics_push_repo_episode_started_monthly.sql</code>, <code>metrics_push_repo_episode_churned_monthly.sql</code></p>
+    <p><b>테스트:</b> <code>assert_push_repo_episode_invariants.sql</code>, <code>assert_push_repo_episode_event_count_conservation.sql</code></p>
+    <p><b>범위:</b> source 2025-05-01~2026-07-18, 신뢰 가능한 episode 시작 2025-05-29부터, UTC.</p>
+  </div>
+
+  <h2>7. 다음 분석 루프</h2>
+  <table>
+    <thead><tr><th>질문</th><th>바로 할 일</th><th>Go 조건</th><th>Stop 조건</th></tr></thead>
+    <tbody>
+      <tr><td><b>긴 꼬리는 사람의 활동인가?</b></td><td>이미 만든 자동화 actor 차원을 episode에 연결하고 30일 고정창 재집계</td><td>봇 제외 후에도 고정창 지속·entropy 방향 유지</td><td>상승분 대부분이 자동화 또는 관찰창 차이에서 발생</td></tr>
+      <tr><td><b>협업 전환 전에 보이는 신호가 있는가?</b></td><td>첫 7일 Push 수·활동일·첫 협업일까지의 분포 비교</td><td>월과 threshold를 바꿔도 같은 선행 신호 재현</td><td>효과 크기가 작거나 월별 방향이 불안정</td></tr>
+      <tr><td><b>개입으로 바꿀 수 있는가?</b></td><td>식별된 대상에 작은 통제 실험 설계</td><td>28일 재방문·협업 전환·P75 기간이 대조군 대비 상승</td><td>관찰 상관만 있고 실험 차이 없음</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <b>다음 한 번의 우선순위:</b> lifecycle 분석에서 만든 bot/automation 제외 차원을 저장소 episode에도 연결한다.
+    동시에 시작 월 기준 30일 고정 관찰창을 적용해야 제품·커뮤니티 액션으로 넘어갈 근거가 생긴다.
+  </div>
+
+  <h2>8. 남은 한계</h2>
+  <ul>
+    <li>PushEvent만으로 실제 저장소 생성, 프로젝트 목적, 완성도, 사업적 성공을 판별할 수 없다.</li>
+    <li>현재 episode mart에는 사람뿐 아니라 봇과 자동화가 포함된다. 별도로 만든 제외 차원은 아직 연결 전이다.</li>
+    <li>종료 월 기간 비교에는 왼쪽 검열이 있어, 고정 관찰창 결과만 핵심 결론에 사용한다.</li>
+    <li>2026-06 시작 episode의 45.3%, 2026-07의 100%는 기준일 현재 provisional이다.</li>
+    <li>기간·entropy·협업 전환의 동반 변화는 관찰이며 원인 효과가 아니다.</li>
+  </ul>
+
+  <footer>같이 보기: 20260719_repo_push_entropy_report.html · 본 문서는 정답보다 정의가 교정된 과정을 기록합니다.</footer>
+</main>
+</body>
+</html>

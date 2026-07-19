@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BDA 2 · Push 분석 강의</title>
+  <style>
+    :root{--navy:#13294e;--blue:#3867e8;--line:#dce3ee;--muted:#667386}
+    *{box-sizing:border-box}html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}
+    body{display:flex;flex-direction:column;background:#eef2f7;color:#172033}
+    header{background:#fff;border-bottom:1px solid var(--line);padding:12px 18px 0;position:sticky;top:0;z-index:5}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:10px}.title{font-weight:800}.title small{display:block;color:var(--muted);font-weight:500}
+    .actions{display:flex;gap:8px}.actions button,.actions a{border:1px solid var(--line);background:#fff;color:#324054;border-radius:9px;padding:8px 11px;text-decoration:none;cursor:pointer}
+    [role=tablist]{display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin}
+    [role=tab]{min-height:44px;white-space:nowrap;border:0;border-bottom:3px solid transparent;background:transparent;color:#526074;padding:9px 13px;cursor:pointer;font-weight:700}
+    [role=tab][aria-selected=true]{color:var(--blue);border-color:var(--blue)}[role=tab]:focus-visible{outline:3px solid #a9c2ff;outline-offset:-3px}
+    main{flex:1;min-height:0;padding:10px}iframe{display:block;width:100%;height:calc(100dvh - 118px);min-height:560px;border:1px solid var(--line);border-radius:12px;background:#fff}
+    noscript{padding:20px;background:#fff}noscript a{display:block;margin:8px}
+    @media(max-width:650px){header{padding-left:8px;padding-right:8px}.top{align-items:flex-start}.title small{display:none}.actions button{display:none}main{padding:5px}iframe{height:calc(100dvh - 112px);border-radius:8px}}
+    @media print{header{display:none}main{padding:0}iframe{height:100vh;border:0}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="top">
+      <div class="title">BDA 2 · AI 분석 강의<small>분석 계약 → repo → actor → 티키타카 → 데이터 제품 → AI 분석 원칙</small></div>
+      <div class="actions"><button id="print" type="button">현재 탭 인쇄</button><a id="open" target="_blank" rel="noopener">새 창에서 열기</a></div>
+    </div>
+    <div role="tablist" aria-label="강의 목차">
+      <button role="tab" id="tab-skill" aria-controls="course-panel" data-key="skill">1. 분석 안전장치</button>
+      <button role="tab" id="tab-repo" aria-controls="course-panel" data-key="repo">2. Repo 활동</button>
+      <button role="tab" id="tab-lifecycle" aria-controls="course-panel" data-key="lifecycle">3. Actor 생애주기</button>
+      <button role="tab" id="tab-tikitaka" aria-controls="course-panel" data-key="tikitaka">4. 티키타카</button>
+      <button role="tab" id="tab-product" aria-controls="course-panel" data-key="product">5. 데이터 제품</button>
+      <button role="tab" id="tab-bot" aria-controls="course-panel" data-key="bot">6. AI 분석 원칙</button>
+    </div>
+  </header>
+  <main id="course-panel" role="tabpanel" aria-labelledby="tab-skill">
+    <iframe id="content" title="강의 콘텐츠" loading="eager" referrerpolicy="no-referrer"></iframe>
+    <noscript>
+      JavaScript 없이 개별 문서를 열 수 있습니다.
+      <a href="20260719_analysis_skill_impact.html">1. 분석 안전장치</a>
+      <a href="20260719_repo_push_entropy_report.html">2. Repo 활동</a>
+      <a href="20260719_user_repo_lifecycle_survival_report.html">3. Actor 생애주기</a>
+      <a href="20260719_repo_push_entropy_process_walkthrough.html">4. 티키타카</a>
+      <a href="20260719_push_analysis_data_product.html">5. 데이터 제품</a>
+      <a href="20260719_ai_analytics_bot_lessons.html">6. AI 분석 원칙</a>
+    </noscript>
+  </main>
+  <script>
+    const pages = {
+      skill: ["분석 안전장치", "20260719_analysis_skill_impact.html"],
+      repo: ["Repo 활동", "20260719_repo_push_entropy_report.html"],
+      lifecycle: ["Actor 생애주기", "20260719_user_repo_lifecycle_survival_report.html"],
+      tikitaka: ["티키타카", "20260719_repo_push_entropy_process_walkthrough.html"],
+      product: ["데이터 제품", "20260719_push_analysis_data_product.html"],
+      bot: ["AI 분석 원칙", "20260719_ai_analytics_bot_lessons.html"]
+    };
+    const tabs = [...document.querySelectorAll("[role=tab]")];
+    const frame = document.querySelector("#content");
+    const panel = document.querySelector("#course-panel");
+    const openLink = document.querySelector("#open");
+    function activate(key, focus=false) {
+      if (!pages[key]) key = "skill";
+      tabs.forEach(tab => {
+        const active = tab.dataset.key === key;
+        tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
+        if (active && focus) tab.focus();
+      });
+      const tab = document.querySelector(`[data-key="${key}"]`);
+      panel.setAttribute("aria-labelledby", tab.id);
+      frame.src = pages[key][1];
+      frame.title = pages[key][0] + " 강의";
+      openLink.href = pages[key][1];
+      history.replaceState(null, "", "#" + key);
+    }
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => activate(tab.dataset.key));
+      tab.addEventListener("keydown", event => {
+        let next;
+        if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+        if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+        if (event.key === "Home") next = 0;
+        if (event.key === "End") next = tabs.length - 1;
+        if (next !== undefined) { event.preventDefault(); activate(tabs[next].dataset.key, true); }
+      });
+    });
+    document.querySelector("#print").addEventListener("click", () => {
+      try { frame.contentWindow.print(); } catch (_) { window.print(); }
+    });
+    window.addEventListener("hashchange", () => activate(location.hash.slice(1)));
+    activate(location.hash.slice(1) || "skill");
+  </script>
+</body>
+</html>

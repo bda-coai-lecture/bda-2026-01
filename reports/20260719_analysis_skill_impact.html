@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0. 분석 스킬 영향 분석</title>
+<style>
+  :root{--bg:#f4f5f8;--card:#fff;--ink:#18212b;--muted:#66717e;--line:#e2e6eb;
+    --purple:#7057c7;--blue:#3478f6;--green:#15956f;--orange:#d7651b}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    line-height:1.65;font-size:15px}.wrap{max-width:1040px;margin:auto;padding:24px 20px 64px}
+  header{background:linear-gradient(125deg,#29213f,#725ac8);color:#fff;border-radius:18px;padding:34px 36px;
+    box-shadow:0 12px 30px rgba(59,44,105,.2)}header .kicker{font-size:12px;letter-spacing:.13em;opacity:.8}
+  header h1{font-size:29px;line-height:1.3;margin:8px 0}header p{margin:5px 0;opacity:.9}
+  h2{font-size:20px;margin:35px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  h3{font-size:15px;margin:0 0 7px}.lead{color:var(--muted);margin-top:-4px}
+  .conclusion{background:#f1eefc;border:1px solid #dcd4f5;border-radius:13px;padding:17px 20px;margin:22px 0}
+  .conclusion b{color:#5e46ac}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+  .card,.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:17px 18px}
+  .card{border-top:4px solid var(--purple)}.label{font-size:12px;color:var(--muted)}
+  .value{font-size:23px;font-weight:780;margin:4px 0}.note{font-size:12.5px;color:var(--muted)}
+  .meter{height:8px;background:#eceef2;border-radius:8px;overflow:hidden;margin:11px 0 7px}
+  .meter i{display:block;height:100%;background:linear-gradient(90deg,var(--purple),#a18cde)}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;
+    overflow:hidden;font-size:13.5px}th{background:#edf0f4;text-align:left;padding:10px 12px;font-size:12px;
+    color:#46515e}td{padding:12px;border-top:1px solid var(--line);vertical-align:top}
+  .tag{display:inline-block;border-radius:18px;padding:2px 8px;font-size:11px;font-weight:700;white-space:nowrap}
+  .high{color:var(--green);background:#eaf8f2}.mid{color:var(--blue);background:#eaf2ff}
+  .low{color:var(--orange);background:#fff1e7}.split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  ul{margin:7px 0;padding-left:20px}li{margin:5px 0}.callout{border-radius:12px;padding:15px 18px;margin:14px 0;
+    background:#edf8f4;border:1px solid #cce9df}.warn{background:#fff4ea;border-color:#f1d6bf}
+  details.workflow{margin:18px 0;background:var(--card);border:1px solid var(--line);border-radius:13px}
+  details.workflow summary{padding:17px 19px;cursor:pointer;font-weight:800;color:#5e46ac;list-style:none}
+  details.workflow summary::-webkit-details-marker{display:none}
+  details.workflow summary::after{content:"＋";float:right;color:var(--purple);font-size:20px;line-height:1}
+  details.workflow[open] summary{border-bottom:1px solid var(--line)}
+  details.workflow[open] summary::after{content:"−"}
+  .workflow-body{padding:18px 19px}.workflow-steps{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
+  .workflow-step{padding:14px;border:1px solid var(--line);border-radius:10px;background:#f8f9fc}
+  .workflow-step b{display:block;margin-bottom:5px;color:var(--purple)}
+  .markdown-source{margin-top:13px}.markdown-source summary{color:#46515e;font-size:13px}
+  .markdown-source pre{margin:0;padding:18px;max-height:620px;overflow:auto;background:#172033;color:#e8edf6;
+    white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  code{background:#eef0f4;padding:2px 6px;border-radius:5px;font-size:12px}
+  footer{text-align:center;color:var(--muted);font-size:12px;margin-top:36px}
+  @media(max-width:760px){.grid,.split,.workflow-steps{grid-template-columns:1fr}header{padding:26px 22px}header h1{font-size:24px}
+    table{display:block;overflow-x:auto}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="kicker">0 · Skill Impact Audit</div>
+    <h1>분석 스킬이 결과를 바꿨을까?</h1>
+    <p>가설의 발상, 결론의 신뢰도, 전달 방식에 남은 영향을 분리해서 본 과정 감사</p>
+  </header>
+
+  <div class="conclusion">
+    <b>결론:</b> 스킬은 핵심 가설을 만든 주체라기보다, 대화에서 나온 아이디어를
+    <b>비용이 통제되고 재현 가능한 분석으로 바꾸는 가드레일</b> 역할을 했다.
+    영향은 결론의 발상보다 결론의 신뢰도에서 훨씬 크게 나타났다.
+    여러 AI 분석 사례도 같은 결론을 보인다. <b>AI 성능은 분석 난이도보다 데이터 계약의 명확성에 더 크게 좌우된다.</b>
+  </div>
+
+  <h2>0. AI 분석의 성패를 가르는 데이터 계약</h2>
+  <div class="split">
+    <article class="panel">
+      <h3 style="color:var(--green)">잘하는 구조</h3>
+      <p><b>정의가 있음 → 쿼리 가능 → raw·mart·code·log로 교차검증 → 반례 탐색</b></p>
+      <p class="note">단순 지표뿐 아니라 정합성 감사, 장애 원인 분해, 백테스트와 로그 분류까지 확장할 수 있다.</p>
+    </article>
+    <article class="panel">
+      <h3 style="color:var(--orange)">취약한 구조</h3>
+      <p><b>이름이 애매함 → grain·시간·식별자가 흔들림 → 계측 공백 → proxy 사용 → 인과·정책 판단 요구</b></p>
+      <p class="note">이 상태에서는 분석 난이도가 낮아 보여도 AI가 자신 있게 틀릴 수 있다.</p>
+    </article>
+  </div>
+  <div class="callout">
+    <b>시작 전 6개 확인:</b> 지표 정의 · grain · 시간대 · canonical 식별자 · 제외 조건 · 원천 신선도.
+    하나라도 비어 있으면 결과보다 먼저 데이터 계약을 보완한다.
+  </div>
+
+  <h2>1. 영향도 요약</h2>
+  <div class="grid">
+    <article class="card">
+      <div class="label">가설·지표 발상</div><div class="value" style="color:var(--orange)">중간 이하</div>
+      <div class="meter"><i style="width:38%"></i></div>
+      <div class="note">개인 프로젝트 가설, 엔트로피, 유형 비중은 대화에서 제안됐다.</div>
+    </article>
+    <article class="card">
+      <div class="label">분석 신뢰도</div><div class="value" style="color:var(--green)">높음</div>
+      <div class="meter"><i style="width:88%"></i></div>
+      <div class="note">관측 가능성, 미래 정보 누수 방지, 비용 통제, 재현 SQL에 흔적이 뚜렷하다.</div>
+    </article>
+    <article class="card">
+      <div class="label">전달 방식</div><div class="value" style="color:var(--blue)">중간</div>
+      <div class="meter"><i style="width:62%"></i></div>
+      <div class="note">결론 우선과 한계 명시에 기여했지만 쉬운 표현은 사용자 피드백 영향이 더 컸다.</div>
+    </article>
+  </div>
+  <p class="lead">막대는 실험으로 추정한 점수가 아니라, 규칙과 산출물 사이의 대응 정도를 시각화한 정성 평가다.</p>
+
+  <h2>2. 무엇을 근거로 판단했나</h2>
+  <table>
+    <thead><tr><th>스킬의 분석 규칙</th><th>실제 산출물에 남은 흔적</th><th>없었다면 생길 위험</th><th>영향</th></tr></thead>
+    <tbody>
+      <tr><td>질문을 대상·grain·기간·세그먼트로 명세</td><td>계정 관점과 프로젝트 관점을 분리하고, 월별 구성과 활성화 코호트를 다른 grain으로 계산</td><td>서로 다른 분모의 수치를 한 결론에 혼합</td><td><span class="tag high">높음</span></td></tr>
+      <tr><td>신뢰 가능한 데이터부터 사용</td><td>과거 비-Push 이벤트 유실 이슈를 반영해 이번 분석을 PushEvent로 제한</td><td>수집 감소를 사용자 행동 변화로 오인</td><td><span class="tag high">높음</span></td></tr>
+      <tr><td>동일한 시간 조건으로 비교</td><td>종료 월 평균의 왼쪽 검열을 발견한 뒤, 2025-08과 2026-05 시작 활동에 동일한 30일 관찰창을 적용</td><td>67일과 370일의 최대 관찰 길이를 같은 추세처럼 비교</td><td><span class="tag high">높음</span></td></tr>
+      <tr><td>미래 정보를 분류에 사용하지 않음</td><td>첫 7일의 계정 수로 시작 유형을 먼저 정하고, 이후 협업 전환을 별도 측정</td><td>결과를 보고 시작 유형을 나누는 정보 누수</td><td><span class="tag high">높음</span></td></tr>
+      <tr><td>작은 범위 검증과 dry-run</td><td>episode mart refresh 32.22GB, 자동화 제외 핵심 재실행 36.79GB 등 실행별 처리량을 기록</td><td>범위 없는 raw 스캔과 비용 증가</td><td><span class="tag high">높음</span></td></tr>
+      <tr><td>관찰과 인과를 구분</td><td>반복 repo·활동 주·협업을 처방이 아니라 이탈과 연결된 관찰 신호로 제한</td><td>Push 패턴만으로 행동 원인과 개입 효과를 단정</td><td><span class="tag mid">중간</span></td></tr>
+      <tr><td>결론 우선 보고</td><td>안전한 시작 cohort 지표를 상단에 두고, 종료 월 신호와 기술 정의는 참고 영역으로 이동</td><td>위험한 지표가 핵심 결론처럼 전달</td><td><span class="tag mid">중간</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. 사람의 질문과 스킬의 역할은 달랐다</h2>
+  <div class="split">
+    <article class="panel">
+      <h3>사람이 만든 방향</h3>
+      <ul>
+        <li>개인 테스트 프로젝트가 늘었다는 대안 가설</li>
+        <li>활동 분산을 엔트로피로 보자는 지표 발상</li>
+        <li>첫 달과 끝 달이 아니라 모든 월을 보자는 반박</li>
+        <li>비즈니스 맥락을 위로 올리자는 독자 관점</li>
+        <li>프로젝트 유형을 100% 비중으로 만들자는 KPI화</li>
+      </ul>
+    </article>
+    <article class="panel">
+      <h3>스킬이 만든 안전장치</h3>
+      <ul>
+        <li>PushEvent만 신뢰한다는 분석 전제 명시</li>
+        <li>시작 cohort별 동일 30일 관찰창과 검열 구분</li>
+        <li>첫 7일 기준 분류로 미래 정보 누수 방지</li>
+        <li>월별 전체 추세와 전환점 검증</li>
+        <li>재현 SQL, dry-run, 처리량과 비용 기록</li>
+      </ul>
+    </article>
+  </div>
+  <div class="callout">
+    <b>역할 분담:</b> 사람은 “무엇을 더 의심할지”를 정했고, 스킬은 “그 의심을 어떤 조건에서 믿을 수 있는 답으로 바꿀지”를 정했다.
+  </div>
+
+  <details class="workflow">
+    <summary>analysis 스킬의 전체 워크플로우 보기</summary>
+    <div class="workflow-body">
+      <p class="lead">숫자를 먼저 뽑지 않고, 무엇을 어떤 조건에서 믿을 수 있는지부터 고정한다.</p>
+      <div class="workflow-steps">
+        <div class="workflow-step"><b>1 · 질문을 분석 계약으로 바꾸기</b>분석 대상, 한 행의 단위(grain), 기준 시간, 검증·분석 기간, 세그먼트, 제외 조건, 성공 지표를 적는다.</div>
+        <div class="workflow-step"><b>2 · 가장 싼 신뢰 원천 찾기</b>기존 mart → staging/fact → 제한된 raw 순서로 lineage와 grain을 확인한다.</div>
+        <div class="workflow-step"><b>3 · 관측 가능성 확인</b>첫 7일·30일·28일 이탈처럼 지표에 필요한 후속 기간과 최신 데이터 완결성을 확인한다.</div>
+        <div class="workflow-step"><b>4 · 작은 범위에서 검증</b>완료된 UTC 1일, 필요하면 7일에서 중복·null·날짜·event count·값 분포를 검사한다.</div>
+        <div class="workflow-step"><b>5 · dry-run 후 범위 확장</b>처리량을 먼저 확인한다. 날짜별 raw table은 <code>_TABLE_SUFFIX</code>로 읽을 날짜를 제한한다.</div>
+        <div class="workflow-step"><b>6 · raw와 mart 대조</b>raw 이벤트 수는 fact 행 수가 아니라 <code>sum(event_count)</code>와 비교하고 양쪽 제외 조건을 맞춘다.</div>
+        <div class="workflow-step"><b>7 · 반복 분석을 제품화</b>재사용할 SQL은 model로 승격하고 grain 문서, unique·not_null·불변식·합계 보존 test를 붙인다.</div>
+        <div class="workflow-step"><b>8 · 한계까지 함께 보고</b>관찰과 인과를 구분하고 bot, 계측 공백, 검열, 결측, 선택 편향, 지연 도착을 명시한다.</div>
+      </div>
+      <div class="callout warn"><b>이 강의에서 드러난 실제 효과:</b> 스킬은 오른쪽 검열과 비용을 통제했지만 처음에는 종료 월의 왼쪽 검열을 놓쳤다. 후속 반례 검토를 통해 과장된 기간 지표를 폐기하고 동일 30일 관찰창으로 교체했다. 가드레일도 리뷰를 통해 개선되어야 한다.</div>
+      <p class="note">상세 실행 계약: <code>docs/bigquery_dbt_analysis_workflow.md</code></p>
+    </div>
+  </details>
+
+  <details class="workflow markdown-source">
+    <summary>analysis 스킬 전체 마크다운 보기</summary>
+    <pre>---
+name: analysis
+description: Perform cost-bounded, reproducible BigQuery and dbt analysis for the BDA 2 GitHub Archive repository. Use when Codex is asked to analyze GitHub activity, actors, repositories, events, DAU/WAU/MAU, retention, lifecycle, segments, metric changes, raw-versus-mart discrepancies, or to turn a repeated analysis into a dbt model, test, or documented mart in /Users/kakao/bda-2.
+---
+
+# BDA BigQuery Analysis
+
+Run GitHub Archive analysis from the smallest trustworthy scope and expand only after validating semantics, quality, and BigQuery scan size.
+
+## Establish repository context
+
+1. Find the repository root. Expect `/Users/kakao/bda-2`; if invoked elsewhere, locate the nearest root containing `dbt/gharchive_metrics/dbt_project.yml`.
+2. Read the root `AGENTS.md`.
+3. Read `docs/bigquery_dbt_analysis_workflow.md` completely before taking analysis actions. Treat it as the detailed execution contract and do not duplicate it from memory.
+4. Inspect `git status --short`. Preserve unrelated user changes.
+5. Use `uv run` for Python and repository tooling.
+
+## Translate the request
+
+State or infer these fields before querying:
+
+- question and decision the result supports
+- observation grain
+- time basis and timezone
+- validation range and intended analysis range
+- segments and exclusions
+- metric definition and expected output grain
+
+If an unresolved choice would materially alter the result, ask one concise question. Otherwise record the assumption and proceed.
+
+## Discover the cheapest trustworthy source
+
+1. Search dbt lineage with `dbt ls` and inspect matching SQL/YAML.
+2. Prefer existing mart, then staging/fact, then bounded raw.
+3. Confirm grain, keys, time column, partition or shard boundary, incremental strategy, and relevant tests.
+4. Compile only selected models or analyses and inspect rendered SQL.
+
+Use the repository commands from the workflow document. Do not run broad builds or scans merely to discover data.
+
+## Validate before expanding
+
+1. Start with the most recent completed UTC day; use seven days only when needed for distributions or late arrival.
+2. Check row count, distinct keys, nulls, grain duplicates, event counts, date boundaries, event-type distribution, and incomplete recent data.
+3. Dry-run every new or materially changed BigQuery query.
+4. Report bytes processed. If the scan is unexpectedly large, reduce columns, dates, event types, entities, or pre-aggregate before joining.
+5. Reconcile mart/fact against raw only when necessary. Compare raw `count(*)` with fact `sum(event_count)`, not fact row count.
+6. Expand to the requested period only after the small-range checks are coherent.
+
+For `githubarchive.day.20*`, always include a bounded `_TABLE_SUFFIX` predicate. A `created_at` date predicate alone is not a shard-cost boundary.
+
+## Execute according to requested scope
+
+- For an explanation or diagnosis, perform read-only inspection and querying; do not create models, modify dashboards, or write reports unless requested.
+- When reproducible SQL is requested, place temporary analysis SQL in `dbt/gharchive_metrics/analyses/` with the metadata header defined in the workflow document.
+- When promotion is requested or clearly part of a build request, add the narrowest dbt model plus grain documentation and appropriate `unique`, `not_null`, `relationships`, or reconciliation tests.
+- Build only the selected model and necessary graph neighbors. Do not run a full historical backfill without explicit authorization.
+
+## Report results
+
+Lead with the conclusion, then provide:
+
+1. core numbers and exact date range
+2. tables and dbt models used
+3. filters, exclusions, metric definition, timezone, and output grain
+4. quality checks, dry-run bytes, and reconciliation result
+5. caveats and the distinction between association and causation
+6. reproducible SQL or dbt model path, when an artifact was requested or created
+
+Never expose credentials or secret-file contents. Clearly distinguish observations from inferences.</pre>
+  </details>
+
+  <h2>4. 실제 결론에는 어떻게 반영됐나</h2>
+  <div class="split">
+    <article class="panel">
+      <h3>스킬 적용 전 나올 수 있던 빠른 결론</h3>
+      <p>“한 프로젝트만 쓰는 계정이 늘었으니, 일회성 개인 테스트 프로젝트가 늘었다.”</p>
+      <p class="note">프로젝트 목적을 직접 보지 못하고, 이후 활동도 확인하지 않은 해석이다.</p>
+    </article>
+    <article class="panel">
+      <h3>검증 후 남은 결론</h3>
+      <p>“새로 시작한 활동은 늘었지만 첫 주 협업 비중은 조금 낮아졌다. 장기 지속 신호는 동일 관찰창과 자동화 제외 조건에서 재검증한다.”</p>
+      <p class="note">관찰 가능한 Push 패턴까지만 말하고 실제 생성 목적, 품질, 개입 효과 판단은 남겨뒀다.</p>
+    </article>
+  </div>
+
+  <h2>5. 이 평가의 한계</h2>
+  <div class="callout warn">
+    같은 질문을 스킬 없이 다시 수행한 비교군이 없고, 작업 시간·오류율·비용을 A/B로 측정하지 않았다.
+    따라서 “스킬 때문에 결과가 좋아졌다”는 인과효과는 계산할 수 없다.
+    여기서 말하는 영향은 <b>스킬의 규칙과 최종 산출물 사이에 확인되는 흔적</b>이다.
+  </div>
+  <div class="panel">
+    <h3>다음에는 이렇게 측정할 수 있다</h3>
+    <ul>
+      <li>동일 질문을 스킬 사용·미사용 조건에서 독립적으로 수행</li>
+      <li>정의 누락, 비용 초과, 데이터 누수, 재현 실패를 사전 체크리스트로 채점</li>
+      <li>최종 결론의 차이뿐 아니라 수정 왕복 횟수와 분석 시간도 비교</li>
+      <li>리뷰어가 작성 조건을 모른 채 결과의 신뢰도와 이해도를 평가</li>
+    </ul>
+  </div>
+
+  <h2>6. 이 수업에서의 역할 배분</h2>
+  <div class="split">
+    <article class="panel">
+      <h3>AI에게 맡기기 좋은 일</h3>
+      <ul>
+        <li>정의된 지표 조회와 반복 SQL</li>
+        <li>raw-vs-mart, old-vs-new parity</li>
+        <li>로그 taxonomy와 대시보드 전수 점검</li>
+        <li>백테스트·시뮬레이션·반례 탐색</li>
+      </ul>
+    </article>
+    <article class="panel">
+      <h3>사람이 앞서야 하는 일</h3>
+      <ul>
+        <li>지표 정의와 proxy 허용 여부</li>
+        <li>제품·정책 의사결정</li>
+        <li>고객·임원용 메시지와 운영 커뮤니케이션</li>
+        <li>서로 충돌하는 원천의 최종 정본 결정</li>
+      </ul>
+    </article>
+  </div>
+  <p class="lead">일반화한 AI 분석 사례와 운영 가드레일은 통합 강의의 6번 꼭지에서 이어진다.</p>
+
+  <footer>0번: 스킬 영향 · 6번에서 AI 데이터 분석의 성공·실패 구조를 자세히 봅니다.</footer>
+</main>
+</body>
+</html>

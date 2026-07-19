@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>5. 분석을 데이터 제품으로 운영하기</title>
+  <style>
+    :root{--bg:#f4f6f9;--paper:#fff;--ink:#172033;--muted:#687386;--line:#e1e7ef;
+      --navy:#14284d;--blue:#3867e8;--green:#128765;--orange:#d86d25;--soft:#edf3ff}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,
+      BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;
+      line-height:1.65;font-size:15px}.wrap{max-width:1080px;margin:auto;padding:30px 22px 68px}
+    header{padding:38px 40px;border-radius:20px;color:#fff;background:linear-gradient(125deg,#14213b,#315ba5 58%,#16826f)}
+    .kicker{font-size:12px;letter-spacing:.14em;opacity:.78}h1{font-size:clamp(28px,4vw,40px);line-height:1.24;margin:8px 0}
+    header p{max-width:850px;margin:7px 0;opacity:.92}h2{font-size:21px;margin:38px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+    h3{font-size:16px;margin:0 0 8px}.answer,.callout{padding:19px 21px;margin:20px 0;border-radius:13px;background:var(--paper);border:1px solid var(--line)}
+    .answer{border-left:6px solid var(--green);font-size:17px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .card{padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:13px}.card b{color:var(--blue)}
+    table{width:100%;border-collapse:collapse;background:var(--paper);font-size:13px}th,td{padding:11px 12px;border:1px solid var(--line);vertical-align:top}
+    th{background:#edf1f7;text-align:left}.ok{color:var(--green);font-weight:750}.hold{color:var(--orange);font-weight:750}
+    code{padding:2px 6px;border-radius:5px;background:#edf1f7;font-size:12px}.muted{color:var(--muted)}
+    ul{margin:7px 0;padding-left:20px}.callout{background:var(--soft)}.landscape{width:100%;height:900px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    .open-link{display:inline-block;margin:0 0 12px;color:var(--blue);font-weight:700;text-decoration:none}footer{text-align:center;color:var(--muted);font-size:12px;margin-top:34px}
+    @media(max-width:760px){.grid{grid-template-columns:1fr}.wrap{padding:16px 12px 48px}header{padding:28px 24px}table{display:block;overflow-x:auto}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="kicker">BDA 2 · DATA PRODUCT</div>
+    <h1>분석을 한 번의 결론이 아니라<br>계속 교정되는 제품으로 만든다</h1>
+    <p>repo 활동 묶음과 actor 생애주기를 같은 28일 언어로 연결하되, 서로 다른 grain과 관측 가능성은 섞지 않는다.</p>
+  </header>
+
+  <div class="answer"><b>운영 원칙:</b> 자동화 actor를 먼저 분류하고, 그 뒤 repo episode와 actor episode를 각각 다시 계산한다. 시작 cohort는 동일 관찰창으로 비교하고, 종료 월은 종료량 운영에만 쓴다.</div>
+
+  <h2>1. 두 분석의 역할</h2>
+  <div class="grid">
+    <article class="card"><h3>Repo episode</h3><p><b>grain</b><br>repo_id × episode_start_date</p><p>새 활동, 첫 7일 참여, 이후 협업, Push 분산을 본다.</p></article>
+    <article class="card"><h3>Actor lifecycle</h3><p><b>grain</b><br>actor × 관측 시점/episode</p><p>14일 활성, 15~27일 위험, 28일 이탈, 이후 복귀를 본다.</p></article>
+    <article class="card"><h3>Automation dimension</h3><p><b>grain</b><br>actor.id</p><p><code>[bot]</code>과 분당 100건 이상의 기계 속도 활동을 공통 제외 축으로 제공한다.</p></article>
+  </div>
+
+  <h2>2. 지금 믿을 수 있는 것과 보류할 것</h2>
+  <table>
+    <thead><tr><th>판정</th><th>지표</th><th>이유</th><th>운영 사용</th></tr></thead>
+    <tbody>
+      <tr><td class="ok">사용</td><td>2025-08→2026-06 시작 활동 +34.0%</td><td>동일한 시작 월 grain</td><td>활동 유입 모니터링</td></tr>
+      <tr><td class="ok">사용</td><td>첫 7일 다계정 참여 −0.47%p</td><td>완료된 7일 진입창만 분모에 포함</td><td>초기 협업 건강 신호</td></tr>
+      <tr><td class="ok">사용</td><td>30일 고정창 평균 5.18→5.63일</td><td>2025-08과 2026-05 시작 cohort에 같은 후속 기간 적용</td><td>제한된 지속성 비교</td></tr>
+      <tr><td class="hold">보류</td><td>종료 월 평균 4.57→7.94일</td><td>최대 관찰 길이 67일 대 370일</td><td>핵심 결론에서 제거</td></tr>
+      <tr><td class="hold">재검증</td><td>종료 월 분산·후속 협업 변화</td><td>초기 장기 episode 누락 가능</td><td>방향성 신호로만 보관</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. 모델과 품질 계약</h2>
+  <table>
+    <thead><tr><th>산출물</th><th>현재 상태</th><th>필수 품질 계약</th><th>다음 운영 단계</th></tr></thead>
+    <tbody>
+      <tr><td><code>fct_push_repo_episode</code></td><td>BigQuery 백필 완료, automation 포함</td><td>episode ID 유일성, 불변식, 경계 제외 적격 Push 합계 보존</td><td>자동화 제외 후 날짜를 다시 분절한 별도 결과 제공</td></tr>
+      <tr><td><code>metrics_push_repo_episode_started_monthly</code></td><td>구현 완료</td><td>진입창 완료 분모, provisional/as-of 구분</td><td>시작량·첫 주 협업 운영</td></tr>
+      <tr><td><code>metrics_push_repo_episode_started_30d_monthly</code></td><td>신규 dbt model</td><td>완전한 30일 후속 관측 cohort만 포함</td><td>기간·30일 지속 비중의 공정한 월 비교</td></tr>
+      <tr><td><code>metrics_push_repo_episode_churned_monthly</code></td><td>구현 완료</td><td>종료 건수와 특성 비교를 분리</td><td>기간 열은 추세 KPI로 노출하지 않음</td></tr>
+      <tr><td><code>dim_push_automation_actor</code></td><td>dbt model 승격 완료, 정식 build 대기</td><td>actor 유일성, 근거 flag, 관측 범위</td><td>날짜별 raw 중간 모델 + 차원 집계로 정기 갱신</td></tr>
+      <tr><td><code>fct_push_actor_episode</code></td><td>설계 대상</td><td>28일 관측 가능성, first-observed 명명, bot 제외 scope</td><td>반복 분석 SQL을 원자 mart로 승격</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. 운영 순서</h2>
+  <div class="callout">
+    <ol>
+      <li>완료된 UTC shard만 읽어 automation actor 일별 근거를 갱신한다.</li>
+      <li>automation 제외 후 Push actor-day와 repo-day를 만든다.</li>
+      <li>repo와 actor episode를 각각 28일 규칙으로 처음부터 다시 분절한다.</li>
+      <li>1일 또는 7일 범위에서 grain·null·합계·관측 가능성을 검사한다.</li>
+      <li>선택 모델만 build하고, 리포트는 고정 관찰창과 as-of 날짜를 함께 표시한다.</li>
+    </ol>
+  </div>
+
+  <h2>5. 남은 의사결정</h2>
+  <ul>
+    <li>automation 탐지 차원의 갱신 주기와 과거 login 변경 재처리 범위</li>
+    <li>81M episode 전체 refresh 주기 또는 영향 repo만 다시 계산하는 전략</li>
+    <li>CRM 발송·클릭·복귀 데이터를 연결한 비교군 실험</li>
+    <li>낮은 속도의 일반 이름 자동화에 대한 민감도 분석</li>
+  </ul>
+  <p class="muted">관찰된 반복 repo·활동 주·협업 신호는 처방이 아니다. 개입 효과는 발송하지 않은 비교군과 함께 측정한다.</p>
+
+  <h2>6. 전체 dbt mart 구성</h2>
+  <p>기존 활동·retention mart와 이번 Push episode·automation 모델이 전체 lineage에서 어디에 놓이는지 확인한다.</p>
+  <a class="open-link" href="../docs/dbt_mart_landscape.html" target="_blank" rel="noopener">구성도를 새 창에서 크게 보기 ↗</a>
+  <iframe class="landscape" src="../docs/dbt_mart_landscape.html" title="BDA 2 전체 dbt mart 구성도" loading="lazy" referrerpolicy="no-referrer"></iframe>
+  <footer>BDA 2 · Push analysis data-product blueprint</footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,4 @@
+interface:
+  display_name: "BDA BigQuery 분석"
+  short_description: "GitHub Archive를 비용 안전하게 분석하는 dbt 워크플로우"
+  default_prompt: "Use $analysis to analyze a GitHub Archive metric with a bounded BigQuery and dbt workflow."

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>유저 생존의 핵심: 반복 활동에서 복귀까지</title>
+  <style>
+    :root{
+      --bg:#f3f5f8;--paper:#fff;--ink:#172033;--muted:#697487;--line:#e1e6ee;
+      --navy:#13294e;--blue:#3568e8;--green:#138667;--orange:#df762f;
+      --purple:#7356bf;--soft-blue:#edf3ff;--soft-green:#eaf8f3;
+      --soft-orange:#fff4e9;--shadow:0 10px 30px rgba(19,41,78,.08)
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,
+      BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",
+      sans-serif;line-height:1.65;font-size:15px}
+    .wrap{max-width:1080px;margin:0 auto;padding:30px 22px 70px}
+    .hero{padding:42px;border-radius:22px;color:#fff;
+      background:linear-gradient(125deg,#101d36,#21468a 58%,#178577);
+      box-shadow:0 16px 42px rgba(20,40,77,.2)}
+    .kicker{font-size:12px;font-weight:750;letter-spacing:.14em;opacity:.75}
+    h1{margin:8px 0 10px;font-size:clamp(29px,4vw,43px);line-height:1.22}
+    .hero p{max-width:820px;margin:0;font-size:16px;opacity:.92}
+    .meta{margin-top:18px;font-size:12px;opacity:.7}
+    h2{margin:38px 0 14px;padding-bottom:9px;border-bottom:2px solid var(--line);font-size:21px}
+    h3{margin:0 0 8px;font-size:16px}
+    p{margin:7px 0 13px}.muted{color:var(--muted)}
+    .answer{margin:24px 0;padding:24px 26px;background:var(--paper);
+      border:1px solid var(--line);border-left:6px solid var(--green);border-radius:15px;
+      box-shadow:var(--shadow);font-size:18px}
+    .answer b{color:var(--green)}
+    .journey{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;
+      gap:10px;align-items:center;margin:18px 0}
+    .state{padding:18px 12px;background:var(--paper);border:1px solid var(--line);
+      border-radius:13px;text-align:center;box-shadow:0 5px 16px rgba(19,41,78,.05)}
+    .state strong{display:block;font-size:17px}.state small{color:var(--muted)}
+    .state.churn{border-top:4px solid var(--orange)}.state.return{border-top:4px solid var(--purple)}
+    .state.active{border-top:4px solid var(--green)}.arrow{font-size:22px;color:var(--blue)}
+    .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
+    .card,.panel{padding:18px;background:var(--paper);border:1px solid var(--line);
+      border-radius:14px;box-shadow:0 6px 18px rgba(19,41,78,.05)}
+    .label{color:var(--muted);font-size:12px;font-weight:700}
+    .value{margin:7px 0 2px;font-size:26px;font-weight:850;line-height:1.15}
+    .note{color:var(--muted);font-size:11.5px}
+    .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+    .callout{margin:15px 0;padding:16px 18px;border-radius:12px;
+      background:var(--soft-blue);border:1px solid #d4e1ff}
+    .callout.good{background:var(--soft-green);border-color:#caeadc}
+    .callout.warn{background:var(--soft-orange);border-color:#f0d6b8}
+    .table-wrap{overflow-x:auto;border-radius:13px}
+    table{width:100%;min-width:720px;border-collapse:collapse;background:var(--paper);
+      border:1px solid var(--line);font-size:13px}
+    th{padding:10px 12px;background:#edf1f7;color:#3d495c;text-align:right;
+      border-bottom:1px solid var(--line);white-space:nowrap}
+    td{padding:11px 12px;text-align:right;border-bottom:1px solid var(--line);
+      font-variant-numeric:tabular-nums}
+    th:first-child,td:first-child{text-align:left}tbody tr:last-child td{border-bottom:0}
+    tr.key td{background:#eef8f4;font-weight:700}
+    .bar-row{display:grid;grid-template-columns:130px 1fr 65px;gap:10px;align-items:center;margin:13px 0}
+    .track{height:20px;background:#edf1f6;border-radius:12px;overflow:hidden}
+    .bar{height:100%;border-radius:12px;background:linear-gradient(90deg,var(--purple),#9a83dc)}
+    .bar-value{text-align:right;font-weight:800}
+    .step{padding:18px;background:var(--paper);border:1px solid var(--line);
+      border-top:4px solid var(--blue);border-radius:12px}
+    .step:nth-child(2){border-top-color:var(--green)}.step:nth-child(3){border-top-color:var(--purple)}
+    .n{display:inline-flex;width:25px;height:25px;align-items:center;justify-content:center;
+      margin-right:5px;border-radius:50%;background:var(--navy);color:#fff;font-size:12px;font-weight:800}
+    code{padding:2px 6px;border-radius:5px;background:#edf1f7;color:#344054;font-size:12px}
+    .foot{padding:18px 20px;background:#eceff4;border-radius:13px;color:var(--muted);font-size:12px}
+    ul{margin:7px 0 7px 19px;padding:0}li{margin:6px 0}
+    footer{margin-top:32px;text-align:center;color:var(--muted);font-size:11.5px}
+    @media(max-width:820px){.cards{grid-template-columns:repeat(2,1fr)}.two,.three{grid-template-columns:1fr}
+      .journey{grid-template-columns:1fr}.arrow{transform:rotate(90deg);text-align:center}}
+    @media(max-width:520px){.wrap{padding:15px 11px 45px}.hero{padding:30px 24px}
+      .cards{grid-template-columns:1fr}.bar-row{grid-template-columns:100px 1fr 55px}}
+    @media print{body{background:#fff}.wrap{max-width:none;padding:0}.hero,.card,.panel,.answer{box-shadow:none}
+      .card,.panel,.step,table{break-inside:avoid}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header class="hero">
+    <div class="kicker">BDA 2 · USER LIFECYCLE</div>
+    <h1>유저 생존의 핵심은<br>“이탈하지 않는 것”이 아니다</h1>
+    <p>28일 무활동을 이탈로 정의하면 대부분의 유저는 결국 이탈한다. 중요한 것은 첫 이탈을 늦추고, 이탈한 유저가 다시 돌아올 수 있는 레포 활동 루프를 만드는 것이다.</p>
+    <div class="meta">2026-07-19 · GitHub Archive PushEvent 기준 개발자 · UTC · 2025-05-01~2026-07-18</div>
+  </header>
+
+  <section>
+    <h2>1. 분석 결론 — 무엇이 중요한가</h2>
+    <div class="answer">
+      <b>핵심 결론:</b> 관찰상 개발자 생존과 가장 강하게 연결된 선행 신호는 멀티 repo나 협업보다
+      <b>4주 동안 같은 repo로 반복 복귀한 기록</b>이다.
+      여러 repo 활동과 공동 Push 경험은 그 다음의 추가 신호다. 이 관계가 원인인지는 실험으로 확인해야 한다.
+    </div>
+    <div class="three">
+      <article class="step">
+        <h3><span class="n">1</span>주기성이 1순위</h3>
+        <p>과거 4주 중 1주만 Push한 활성 개발자의 다음 28일 이탈률은 <b>52.2%</b>,
+          4주 모두 Push하면 <b>8.2%</b>다.</p>
+      </article>
+      <article class="step">
+        <h3><span class="n">2</span>반복 repo가 핵심</h3>
+        <p>2주 이상 Push한 repo가 없으면 이탈률 <b>47.5%</b>,
+          반복 repo가 2개 이상이면 <b>7.9%</b>다.</p>
+      </article>
+      <article class="step">
+        <h3><span class="n">3</span>이탈은 끝이 아님</h3>
+        <p>완전한 180일 후속 관측이 가능한 첫 관측 이탈자 중 <b>46.5%</b>는 다시 Push한다.
+          이탈 방지와 복귀를 별도 문제로 관리해야 한다.</p>
+      </article>
+    </div>
+    <div class="callout warn">
+      <b>하지 말아야 할 해석:</b> repo를 억지로 늘리거나 Push 횟수를 기계적으로 늘리면 수명이 길어진다는 뜻이 아니다.
+      관찰된 최우선 건강 신호는 “다음 주에도 실제 개발 작업을 이어갔는가”이며, 액션은 비교군이 있는 실험 후보일 뿐이다.
+    </div>
+  </section>
+
+  <section>
+    <h2>2. 액션 플랜 — 누구에게 무엇을 할 것인가</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>대상 개발자</th><th>현재 위험</th><th>우선 방향</th><th>왜 필요한가</th><th>확인할 지표</th></tr>
+        </thead>
+        <tbody>
+          <tr class="key"><td>최근 1주만 Push<br>반복 repo 0개</td><td>이탈률 47.5~52.2%</td><td>다음 주 같은 repo에서 이어질 작업 제공</td><td>가장 크고 위험한 초기 집단</td><td>다음 주 동일 repo 복귀율</td></tr>
+          <tr><td>2주 활동<br>반복 repo 1개</td><td>이탈률 22.4~33.5%</td><td>해당 repo의 다음 작업·이슈·배포 연결</td><td>습관 형성 중인 전환 구간</td><td>4주 중 3주 이상 Push 비율</td></tr>
+          <tr><td>3~4주 활동</td><td>이탈률 8.2~20.2%</td><td>두 번째 repo 또는 공동 작업 repo 경험 제안</td><td>기본 습관이 생긴 뒤 활동 범위 확대 효과 검증</td><td>여러 repo 활동 전환율과 28일 이탈률</td></tr>
+          <tr><td>28일 Push 없음</td><td>이탈</td><td>마지막 repo·미완료 작업 기반 복귀 실험</td><td>후속 관측 가능한 첫 관측 이탈자의 46.5%가 180일 내 복귀</td><td>28/84/180일 복귀율</td></tr>
+          <tr><td>복귀 개발자</td><td>재이탈 가능</td><td>복귀 직후 동일 repo의 다음 작업 연결</td><td>이탈자의 38.4%가 반복 이탈 경험</td><td>복귀 후 28일 유지율</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout good">
+      <b>실험 우선순위 가설:</b> 동일 repo 재방문 → 4주 반복 활동 → 여러 repo로 활동 확대 → 공동 작업 연결.
+      관찰 데이터가 이 순서의 인과효과를 증명하지는 않는다. 제품 실험은 Push 수가 아니라 다음 단계로 이동한 비율을 측정한다.
+    </div>
+    <div class="callout">
+      <b>가능한 CRM 예시:</b>
+      7일 동안 추가 Push가 없으면 최근 repo 이름과 함께 “지난 작업 이어보기” 알림을 한 번 보낸다.
+      15~21일 동안 Push가 없으면 마지막 repo나 열려 있는 작업을 다시 보여준다.
+      28일 이탈 후에는 “다시 시작하세요” 같은 일반 문구보다 마지막으로 활동한 repo를 중심으로 복귀 메시지를 보낸다.
+      이는 확정된 처방이 아니라 실험 가능한 예시이며, 알림을 받지 않은 비슷한 개발자와
+      다음 주 동일 repo Push율과 28일 복귀율을 비교해 효과를 확인해야 한다.
+    </div>
+  </section>
+
+  <section>
+    <h2>3. 근거 — 왜 이 액션 순서인가</h2>
+    <p class="muted">2026-02-01~04-19의 주간 기준일 12개에서, 기준일 직전 7일에 Push한 활성 개발자만 비교했다. 이전 28일 행동과 이후 28일 이탈, 이탈 후 56일 내 복귀를 시간상 분리했다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>과거 28일 행동</th><th>구간</th><th>28일 이탈률</th><th>이탈 판정 뒤 56일 내 복귀율</th><th>실험 가설</th></tr></thead>
+        <tbody>
+          <tr><td rowspan="4"><b>Push 활동 주</b></td><td>1주</td><td>52.2%</td><td>26.0%</td><td>다음 주 복귀가 최우선</td></tr>
+          <tr><td>2주</td><td>33.5%</td><td>38.5%</td><td>반복 작업 흐름 강화</td></tr>
+          <tr><td>3주</td><td>20.2%</td><td>46.1%</td><td>습관 안정화</td></tr>
+          <tr class="key"><td>4주 모두</td><td>8.2%</td><td>48.8%</td><td>두 번째 repo·공동 작업을 제안할 안정 개발자</td></tr>
+          <tr><td rowspan="3"><b>반복 사용 repo</b><br><span class="muted">2주 이상 Push</span></td><td>0개</td><td>47.5%</td><td>28.5%</td><td>동일 repo 재방문</td></tr>
+          <tr><td>1개</td><td>22.4%</td><td>40.6%</td><td>다음 작업 연결</td></tr>
+          <tr class="key"><td>2개+</td><td>7.9%</td><td>51.0%</td><td>안정 집단</td></tr>
+          <tr><td rowspan="2"><b>다른 개발자도 Push한 repo</b></td><td>없음</td><td>35.9%</td><td>31.3%</td><td>공동 작업 전 기준</td></tr>
+          <tr><td>1개+</td><td>20.9%</td><td>39.9%</td><td>협업 실험 후보</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="two" style="margin-top:16px">
+      <article class="panel">
+        <h3>여러 repo 활동은 초기 보조 신호</h3>
+        <p>같은 활동 주 수 안에서도 여러 repo에서 활동한 개발자의 이탈률이 낮았다.</p>
+        <ul>
+          <li>1주 활동: 1 repo <b>53.9%</b> vs 2+ repo <b>41.7%</b></li>
+          <li>2주 활동: <b>36.0%</b> vs <b>31.5%</b></li>
+          <li>3주 활동: <b>22.9%</b> vs <b>18.9%</b></li>
+          <li>4주 활동: <b>9.2%</b> vs <b>7.8%</b></li>
+        </ul>
+        <p class="muted">차이는 초기 집단에서 가장 크고, 이미 4주 내내 활동한 집단에서는 작다.</p>
+      </article>
+      <article class="panel">
+        <h3>이탈 뒤 복귀가 관측되는 집단</h3>
+        <div class="bar-row"><span>28일 내</span><div class="track"><div class="bar" style="width:37.8%"></div></div><span class="bar-value">17.6%</span></div>
+        <div class="bar-row"><span>84일 내</span><div class="track"><div class="bar" style="width:70%"></div></div><span class="bar-value">32.6%</span></div>
+        <div class="bar-row"><span>180일 내</span><div class="track"><div class="bar" style="width:100%"></div></div><span class="bar-value">46.5%</span></div>
+        <p class="muted">이 28/84/180일 지표는 완전한 각 후속 관측이 가능한 첫 관측 이탈 cohort 기준이며, 왼쪽 표의 기준일 표본·56일 복귀율과 분모가 다르다. 복귀자의 중앙 복귀 시점은 이탈 판정 후 43일이다.</p>
+      </article>
+    </div>
+    <div class="callout good">
+      <b>Create·Delete 추가 분석:</b> Create만 있었던 개발자는 같은 Push 활동 주와 repo 수를 맞추면
+      이탈률 차이가 거의 없었다. 반면 Delete가 있었거나 Create와 Delete가 모두 있었던 개발자는
+      대부분의 비교 구간에서 이탈률이 더 낮았다. 예를 들어 2주 활동 개발자의 이탈률은
+      둘 다 없을 때 35.0%, Delete만 있을 때 27.0%, Create와 Delete가 모두 있을 때 23.5%였다.
+      <b>Delete를 유도하자는 뜻이 아니라, 작업 정리 단계까지 간 개발자를 찾는 상태 신호로 사용한다.</b>
+    </div>
+  </section>
+
+  <section>
+    <h2>4. 운영 정의와 KPI</h2>
+    <div class="journey">
+      <div class="state active"><strong>활성</strong><small>최근 14일 내 Push</small></div>
+      <div class="arrow">→</div>
+      <div class="state"><strong>이탈 위험</strong><small>15~27일 Push 없음</small></div>
+      <div class="arrow">→</div>
+      <div class="state churn"><strong>이탈</strong><small>28일 Push 없음</small></div>
+      <div class="arrow">→</div>
+      <div class="state return"><strong>복귀</strong><small>이탈 후 다시 Push</small></div>
+    </div>
+    <div class="cards">
+      <article class="card"><div class="label">관측 Push 개발자</div><div class="value">2,286만</div><div class="note">bot·고속 자동화 제외</div></article>
+      <article class="card"><div class="label">첫 관측 이탈 경험</div><div class="value">96.9%</div><div class="note">최소 28일 후속 관측 가능한 actor</div></article>
+      <article class="card"><div class="label">첫 이탈까지 중앙값</div><div class="value">28일</div><div class="note">p75는 42일</div></article>
+      <article class="card"><div class="label">복귀까지 중앙값</div><div class="value">43일</div><div class="note">이탈 판정 이후</div></article>
+    </div>
+    <div class="callout">
+      <b>관리 지표:</b> 다음 주 동일 repo 복귀율 → 최근 4주 중 Push한 주 수 → 반복 사용 repo 수 →
+      28일 이탈률 → 28/84/180일 복귀율 → 복귀 후 28일 유지율.
+    </div>
+    <div class="callout warn">
+      <b>bot·자동화 제외:</b> 이 보고서의 최종 핵심 수치는 <code>exclude_push_automation: true</code>다.
+      로그인명이 <code>[bot]</code>으로 끝나는 계정과
+      1분에 Push 100건 이상 또는 repo 100개 이상을 기록한 계정을 제외했다.
+      제외 계정은 20,992개로 전체 Push 계정의 0.1% 미만이지만 전체 Push의 24.5%를 만들었다.
+      사람 계정으로 AI 도구를 함께 사용한 개발은 이 조건에 걸리지 않는 한 포함한다.
+    </div>
+  </section>
+
+  <section>
+    <h2>5. 비용과 재현성</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>쿼리</th><th>Processed bytes</th><th>역할</th><th>비용 통제</th></tr></thead>
+        <tbody>
+          <tr class="key"><td>Push 개발자 28일 이탈·복귀</td><td>16,912,793,009</td><td>Push 이탈과 28/84/180일 복귀</td><td>계정·날짜로 먼저 집계, 이벤트·날짜 제한</td></tr>
+          <tr class="key"><td>Push 이탈 요인 주간 비교</td><td>10,920,786,759</td><td>활동 주·repo별 이탈과 복귀</td><td>최근 7일 활성 개발자만 비교</td></tr>
+          <tr class="key"><td>Create·Delete 추가 비교</td><td>8,958,249,623</td><td>작업 시작·정리 신호 추가 확인</td><td>같은 활동 주·repo 수 안에서 비교</td></tr>
+          <tr class="key"><td>bot·자동화 전체 기간 탐색</td><td>83,113,823,007</td><td>제외 규모와 행동 기준 확인</td><td>raw에서 필요한 ID·로그인·시각·repo만 조회</td></tr>
+          <tr class="key"><td>재사용 제외 목록 생성</td><td>83,113,823,007</td><td>20,992개 제외 계정 저장</td><td>한 번 생성 후 작은 목록 재사용</td></tr>
+          <tr class="key"><td>자동화 제외 후 핵심 분석 재실행</td><td>36,792,333,199</td><td>수명주기·이탈 요인·Create/Delete 재검증</td><td>저장된 제외 목록 연결</td></tr>
+          <tr><td>전체 계정 28일 이탈·복귀</td><td>9,381,880,448</td><td>Push 기준 결과와 비교용</td><td>계정·날짜로 먼저 집계, 날짜 제한</td></tr>
+          <tr><td>28일 정의 검증</td><td>1,866,940,144</td><td>2026-04-01~06-30 작은 범위 검증</td><td>전체 확장 전 dry run·실행</td></tr>
+          <tr><td>기존 수명 기준선</td><td>9,196,810,272</td><td>4/12/26주차 활동 보조 근거</td><td>계정·주 단위로 먼저 집계</td></tr>
+          <tr><td>기존 시간순 비교</td><td>10,920,786,759</td><td>9~12주차 생존 보조 근거</td><td>이전 28일과 이후 84일 제한</td></tr>
+          <tr><td>repo·공동 작업 장기 비교</td><td>12,335,744,400</td><td>12/26주차 repo 신호</td><td>계정·repo 단위로 먼저 집계</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      자동화 제외 후 최종 핵심 분석 재실행은 약 <b>36.79GB processed</b>였다.
+      bot 탐색과 제외 목록 생성에서 raw 전체 기간을 두 번 읽어 약 <b>166.23GB</b>가 추가됐다.
+      이전 탐색까지 포함한 주요 실행 누계는 약 <b>281.65GB processed</b>다.
+      검증·수정 전 반복 실행은 이 누계와 별도로 발생했다. BigQuery 실제 금액은 on-demand/slot reservation,
+      리전, 무료 구간과 캐시 여부에 따라 달라져 bytes 기준으로 보고한다.
+      수명주기 분석은 fact를 사용했고, bot 제외 목록을 만들 때만 날짜 범위를 제한해 raw를 조회했다.
+    </div>
+    <p class="muted">사용 테이블: <code>mart.fact_user_repo_activity</code>, <code>mart.dim_push_automation_actor</code>. 재현 SQL은 아래 파일에 있다.</p>
+    <ul>
+      <li><code>dbt/gharchive_metrics/analyses/user_churn_resurrection_28d.sql</code></li>
+      <li><code>dbt/gharchive_metrics/analyses/push_developer_churn_predictors_28d.sql</code></li>
+      <li><code>dbt/gharchive_metrics/analyses/push_developer_create_delete_churn_28d.sql</code></li>
+      <li><code>dbt/gharchive_metrics/analyses/push_bot_automation_actor_candidates.sql</code></li>
+      <li><code>dbt/gharchive_metrics/analyses/push_bot_automation_actor_list.sql</code></li>
+      <li><code>dbt/gharchive_metrics/analyses/user_lifecycle_survival.sql</code></li>
+      <li><code>dbt/gharchive_metrics/analyses/user_survival_predictors.sql</code></li>
+      <li><code>dbt/gharchive_metrics/analyses/user_repo_collaboration_survival.sql</code></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>6. 해석 시 주의할 점</h2>
+    <div class="foot">
+      <ul>
+        <li><code>user_id</code>는 GitHub 이벤트를 만든 계정의 ID다. 명시적 bot과 기계 속도 계정은 제외했지만, 일반 이름을 쓰며 낮은 속도로 동작하는 자동화 계정은 남을 수 있다.</li>
+        <li>사람 계정으로 AI 도구를 함께 사용한 개발은 포함한다. 이 데이터만으로 사람의 AI 보조 사용 여부를 구분할 수 없다.</li>
+        <li>최초 관측은 가입일이 아니다. 데이터 시작 전 활동은 볼 수 없어 left-censoring이 있다.</li>
+        <li>28/84/180일 복귀율은 각 기간을 끝까지 관측할 수 있는 이탈 집단만 포함한다.</li>
+        <li>28일 이탈은 운영 정의다. 계정의 영구 이탈이나 GitHub 탈퇴를 의미하지 않는다.</li>
+        <li>활동 주기, 멀티 repo, 협업과 장기 활동의 관계는 예측적 연관성이며 인과효과가 아니다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>BDA 2 · 28-day churn and resurrection lifecycle report</footer>
+</main>
+</body>
+</html>

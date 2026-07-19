@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>BDA 2 · dbt Mart Landscape</title>
+  <style>
+    :root {
+      --ink: #17211b;
+      --muted: #667068;
+      --paper: #f7f6f0;
+      --card: #fffefa;
+      --line: #d9d8cf;
+      --green: #174c38;
+      --lime: #d8f47b;
+      --blue: #d9e9ff;
+      --peach: #ffddc6;
+      --lilac: #e7ddff;
+      --shadow: 0 16px 42px rgba(26, 38, 30, .08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 4%, rgba(216,244,123,.32), transparent 25rem),
+        var(--paper);
+      font-family: Inter, Pretendard, "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: inherit; }
+    .shell { width: min(1180px, calc(100% - 36px)); margin: 0 auto; }
+    header { padding: 28px 0 16px; display: flex; justify-content: space-between; align-items: center; }
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 800; letter-spacing: -.03em; }
+    .mark { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; color: white; background: var(--green); }
+    .stamp { color: var(--muted); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .hero {
+      padding: 70px 0 44px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 1.35fr .65fr;
+      gap: 42px;
+      align-items: end;
+    }
+    .eyebrow { margin: 0 0 18px; color: var(--green); font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { max-width: 800px; margin: 0; font-size: clamp(48px, 7.7vw, 94px); line-height: .92; letter-spacing: -.075em; }
+    h1 em { color: var(--green); font-style: normal; }
+    .lede { max-width: 440px; margin: 0 0 4px; color: var(--muted); font-size: 18px; line-height: 1.65; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 26px 0 76px; }
+    .metric { min-height: 150px; padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,254,250,.76); }
+    .metric:nth-child(2) { background: var(--lime); border-color: transparent; }
+    .metric .value { display: block; font-size: 52px; font-weight: 850; line-height: 1; letter-spacing: -.06em; }
+    .metric .label { display: block; margin-top: 28px; font-weight: 750; }
+    .metric .hint { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
+    section { margin: 0 0 84px; }
+    .section-head { display: flex; justify-content: space-between; align-items: end; gap: 30px; margin-bottom: 24px; }
+    h2 { margin: 0; font-size: 34px; letter-spacing: -.045em; }
+    .section-head p { max-width: 530px; margin: 0; color: var(--muted); line-height: 1.55; }
+    .lineage { overflow-x: auto; border: 1px solid var(--line); border-radius: 24px; background: var(--card); box-shadow: var(--shadow); }
+    .graph-toolbar { min-width: 1380px; padding: 15px 20px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+    .legend { display: flex; gap: 14px; }
+    .legend span::before { content: ""; width: 8px; height: 8px; margin-right: 6px; display: inline-block; border-radius: 50%; background: var(--green); }
+    .legend .lg-mart::before { background: #9270d8; }
+    .legend .lg-semantic::before { background: #e08b52; }
+    .graph-stage { width: 1380px; min-height: 1080px; padding: 34px 24px 46px; position: relative; }
+    .edges { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; pointer-events: none; }
+    .edges path { fill: none; stroke: #c4c9c4; stroke-width: 1.6; transition: opacity .18s, stroke .18s, stroke-width .18s; }
+    .edges path.hot { stroke: var(--green); stroke-width: 2.8; }
+    .edges path.dim { opacity: .1; }
+    .graph-grid { position: relative; z-index: 1; display: grid; grid-template-columns: 170px 180px 180px 280px 230px 180px; gap: 20px; }
+    .column { display: flex; flex-direction: column; gap: 9px; }
+    .column-title { height: 42px; padding: 0 4px; color: #8a918b; font-size: 10px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
+    .column-title b { display: block; margin-bottom: 3px; color: var(--ink); font-size: 12px; letter-spacing: 0; }
+    .graph-node {
+      width: 100%; min-height: 52px; padding: 9px 10px; position: relative; text-align: left;
+      border: 1px solid #ced2cd; border-radius: 10px; background: white;
+      font: 700 10.5px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+      box-shadow: 0 2px 5px rgba(20,35,25,.04); transition: opacity .18s, transform .18s, box-shadow .18s;
+    }
+    .graph-node::before { content: attr(data-type); display: block; margin-bottom: 4px; color: #8a918b; font: 800 8px/1 Inter, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+    .graph-node:hover, .graph-node.hot { color: var(--ink); border-color: var(--green); background: white; transform: translateY(-1px); box-shadow: 0 5px 16px rgba(23,76,56,.14); }
+    .graph-node.dim { opacity: .18; }
+    .graph-node.source, .graph-node.fact, .graph-node.staging { border-left: 5px solid var(--green); }
+    .graph-node.mart { border-left: 5px solid #9270d8; }
+    .graph-node.semantic { border-left: 5px solid #e08b52; }
+    .mart-grid { display: flex; flex-direction: column; gap: 9px; }
+    .branch-label { margin: 7px 2px -3px; color: #8a918b; font-size: 9px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 18px; }
+    button {
+      appearance: none; padding: 9px 14px; border: 1px solid var(--line); border-radius: 999px;
+      color: var(--ink); background: transparent; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer;
+    }
+    button:hover, button.active { color: white; background: var(--green); border-color: var(--green); }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card {
+      min-height: 220px; padding: 20px; display: flex; flex-direction: column;
+      border: 1px solid var(--line); border-radius: 18px; background: var(--card);
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+    .card[hidden] { display: none; }
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag { padding: 4px 8px; border-radius: 999px; background: #efeee8; color: #596159; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+    .card h3 { margin: 18px 0 10px; overflow-wrap: anywhere; font: 750 15px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .card footer { margin-top: auto; padding-top: 18px; color: var(--green); font-size: 11px; font-weight: 800; }
+    .note {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 28px; padding: 30px;
+      border-radius: 22px; color: white; background: var(--green);
+    }
+    .note h2 { font-size: 28px; }
+    .note p { margin: 0; color: rgba(255,255,255,.72); line-height: 1.65; }
+    .page-foot { padding: 24px 0 44px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; gap: 20px; }
+    @media (max-width: 860px) {
+      .hero { grid-template-columns: 1fr; padding-top: 44px; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .cards { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 560px) {
+      .stamp { display: none; }
+      h1 { font-size: 52px; }
+      .metrics, .cards, .note { grid-template-columns: 1fr; }
+      .section-head { display: block; }
+      .section-head p { margin-top: 10px; }
+      .page-foot { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand"><span class="mark">B2</span> BDA 2 · Analytics Engineering</div>
+      <div class="stamp">REPOSITORY SNAPSHOT · 2026-07-19</div>
+    </header>
+
+    <main>
+      <div class="hero">
+        <div>
+          <p class="eyebrow">dbt mart landscape</p>
+          <h1>마트는 <em>17개</em>.<br>retention에서 episode까지.</h1>
+        </div>
+        <p class="lede">GitHub Archive 활동을 일·주·월 단위로 요약하고, 사용자 생애주기·코호트 재방문·28일 Push 활동 묶음까지 분석하는 platform mart 묶음입니다.</p>
+      </div>
+
+      <div class="metrics" aria-label="mart summary">
+        <div class="metric"><span class="value">17</span><span class="label">Mart models</span><span class="hint">platform mart 전체</span></div>
+        <div class="metric"><span class="value">11</span><span class="label">Foundation → mart</span><span class="hint">staging·fact·intermediate 기반</span></div>
+        <div class="metric"><span class="value">6</span><span class="label">Mart-on-mart</span><span class="hint">summary·alias·episode metrics</span></div>
+        <div class="metric"><span class="value">125</span><span class="label">Project data tests</span><span class="hint">dbt parse 기준</span></div>
+      </div>
+
+      <section>
+        <div class="section-head">
+          <h2>Full dbt lineage</h2>
+          <p>source부터 semantic metrics까지 전체 DAG입니다. 노드를 누르면 연결된 upstream과 downstream만 강조됩니다.</p>
+        </div>
+        <div class="lineage">
+          <div class="graph-toolbar">
+            <span>CLICK A NODE TO TRACE · 빈 공간을 누르면 초기화</span>
+            <div class="legend"><span>source / foundation</span><span class="lg-mart">mart</span><span class="lg-semantic">semantic</span></div>
+          </div>
+          <div class="graph-stage" id="lineageGraph">
+            <svg class="edges" aria-hidden="true"></svg>
+            <div class="graph-grid">
+              <div class="column">
+                <div class="column-title"><b>Sources</b>external + raw</div>
+                <button class="graph-node source" data-id="githubarchive" data-type="external source">githubarchive.day.20*</button>
+                <button class="graph-node source" data-id="raw90d" data-type="view" data-upstream="githubarchive">raw_githubarchive_events_90d</button>
+              </div>
+              <div class="column">
+                <div class="column-title"><b>Foundation</b>facts</div>
+                <button class="graph-node fact" data-id="fact" data-type="incremental" data-upstream="githubarchive">fact_user_repo_activity</button>
+                <button class="graph-node fact" data-id="fact_ref" data-type="view" data-upstream="raw90d">fact_user_repo_activity_from_raw_reference</button>
+              </div>
+              <div class="column">
+                <div class="column-title"><b>Transform</b>staging</div>
+                <button class="graph-node staging" data-id="stg" data-type="view" data-upstream="fact">stg_user_repo_activity</button>
+                <button class="graph-node staging" data-id="automation_day" data-type="incremental" data-upstream="githubarchive">int_push_automation_actor_day</button>
+                <button class="graph-node semantic" data-id="spine" data-type="view">time_spine_daily</button>
+              </div>
+              <div class="column">
+                <div class="column-title"><b>Direct marts</b>11 from foundations</div>
+                <div class="mart-grid">
+                  <div class="branch-label">Core activity</div>
+                  <button class="graph-node mart" data-id="daily" data-type="table" data-upstream="stg">metrics_daily</button>
+                  <button class="graph-node mart" data-id="event_daily" data-type="table" data-upstream="stg">metrics_event_type_daily</button>
+                  <button class="graph-node mart" data-id="weekly" data-type="table" data-upstream="stg">metrics_weekly</button>
+                  <button class="graph-node mart" data-id="segments" data-type="table" data-upstream="stg">metrics_user_segments</button>
+                  <div class="branch-label">First-observed cohort</div>
+                  <button class="graph-node mart" data-id="retention_weekly" data-type="table" data-upstream="stg">metrics_retention_weekly</button>
+                  <div class="branch-label">Rolling cohort heatmaps</div>
+                  <button class="graph-node mart" data-id="heat_weekly" data-type="table" data-upstream="stg">metrics_cohort_retention_weekly_heatmap</button>
+                  <button class="graph-node mart" data-id="heat_monthly" data-type="table" data-upstream="stg">metrics_cohort_retention_monthly_heatmap</button>
+                  <div class="branch-label">Period lifecycle</div>
+                  <button class="graph-node mart" data-id="life_weekly" data-type="table" data-upstream="stg">metrics_user_lifecycle_weekly</button>
+                  <button class="graph-node mart" data-id="life_monthly" data-type="table" data-upstream="stg">metrics_user_lifecycle_monthly</button>
+                  <div class="branch-label">Push data product</div>
+                  <button class="graph-node mart" data-id="automation_dim" data-type="table" data-upstream="automation_day">dim_push_automation_actor</button>
+                  <button class="graph-node mart" data-id="repo_episode" data-type="table" data-upstream="fact">fct_push_repo_episode</button>
+                </div>
+              </div>
+              <div class="column">
+                <div class="column-title"><b>Derived marts</b>6 mart-on-mart</div>
+                <div class="mart-grid">
+                  <button class="graph-node mart" data-id="retention_summary" data-type="table" data-upstream="retention_weekly">metrics_retention_summary</button>
+                  <button class="graph-node mart" data-id="user_ret_weekly" data-type="table" data-upstream="life_weekly">metrics_user_retention_weekly</button>
+                  <button class="graph-node mart" data-id="user_ret_monthly" data-type="table" data-upstream="life_monthly">metrics_user_retention_monthly</button>
+                  <div class="branch-label">Episode metrics</div>
+                  <button class="graph-node mart" data-id="episode_started" data-type="table" data-upstream="repo_episode">metrics_push_repo_episode_started_monthly</button>
+                  <button class="graph-node mart" data-id="episode_started_30d" data-type="table" data-upstream="repo_episode fact">metrics_push_repo_episode_started_30d_monthly</button>
+                  <button class="graph-node mart" data-id="episode_churned" data-type="table" data-upstream="repo_episode">metrics_push_repo_episode_churned_monthly</button>
+                </div>
+              </div>
+              <div class="column">
+                <div class="column-title"><b>Semantic</b>MetricFlow</div>
+                <button class="graph-node semantic" data-id="semantic_activity" data-type="semantic model" data-upstream="stg">user_repo_activity</button>
+                <button class="graph-node semantic" data-id="semantic_metrics" data-type="10 metrics" data-upstream="semantic_activity">activity metrics</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>17개 모델 탐색</h2>
+          <p>버튼으로 관심 영역만 좁혀볼 수 있습니다. 모든 mart는 현재 BigQuery <b>table</b>로 materialize됩니다.</p>
+        </div>
+        <div class="toolbar" role="group" aria-label="mart category filters">
+          <button class="active" data-filter="all">전체 17</button>
+          <button data-filter="activity">활동 3</button>
+          <button data-filter="segment">세그먼트 1</button>
+          <button data-filter="cohort">코호트 4</button>
+          <button data-filter="lifecycle">생애주기 4</button>
+          <button data-filter="push">Push episode 5</button>
+        </div>
+        <div class="cards">
+          <article class="card" data-category="activity"><div class="tags"><span class="tag">daily</span><span class="tag">core</span></div><h3>metrics_daily</h3><p>DAU, 활성 repo, 이벤트 수와 주요 event type을 일별로 요약.</p><footer>GRAIN · activity_date</footer></article>
+          <article class="card" data-category="activity"><div class="tags"><span class="tag">daily</span><span class="tag">event type</span></div><h3>metrics_event_type_daily</h3><p>GitHub event type별 사용자·repo·이벤트 볼륨을 분해.</p><footer>GRAIN · activity_date × action</footer></article>
+          <article class="card" data-category="activity"><div class="tags"><span class="tag">weekly</span><span class="tag">core</span></div><h3>metrics_weekly</h3><p>WAU, 주간 활성 repo, 이벤트와 사용자당 이벤트 수.</p><footer>GRAIN · week_start</footer></article>
+          <article class="card" data-category="segment"><div class="tags"><span class="tag">window</span><span class="tag">segment</span></div><h3>metrics_user_segments</h3><p>활동일 수로 one-day부터 power user까지 네 그룹으로 분류.</p><footer>GRAIN · user_segment</footer></article>
+          <article class="card" data-category="cohort"><div class="tags"><span class="tag">weekly</span><span class="tag">first seen</span></div><h3>metrics_retention_weekly</h3><p>관측창에서 처음 보인 주를 cohort로 삼는 long-form retention.</p><footer>GRAIN · cohort_week × week_start</footer></article>
+          <article class="card" data-category="cohort"><div class="tags"><span class="tag">weekly</span><span class="tag">summary</span></div><h3>metrics_retention_summary</h3><p>weekly retention을 W0–W3 wide table로 압축한 파생 mart.</p><footer>GRAIN · cohort_week</footer></article>
+          <article class="card" data-category="cohort"><div class="tags"><span class="tag">weekly</span><span class="tag">heatmap</span></div><h3>metrics_cohort_retention_weekly_heatmap</h3><p>각 주의 active user가 이후 12주에 다시 활동한 비율.</p><footer>GRAIN · baseline week_start</footer></article>
+          <article class="card" data-category="cohort"><div class="tags"><span class="tag">monthly</span><span class="tag">heatmap</span></div><h3>metrics_cohort_retention_monthly_heatmap</h3><p>각 월의 active user가 이후 12개월에 다시 활동한 비율.</p><footer>GRAIN · baseline month_start</footer></article>
+          <article class="card" data-category="lifecycle"><div class="tags"><span class="tag">weekly</span><span class="tag">lifecycle</span></div><h3>metrics_user_lifecycle_weekly</h3><p>전주 대비 existing, returning/unknown, churned 사용자를 계산.</p><footer>GRAIN · week_start</footer></article>
+          <article class="card" data-category="lifecycle"><div class="tags"><span class="tag">monthly</span><span class="tag">lifecycle</span></div><h3>metrics_user_lifecycle_monthly</h3><p>전월 대비 사용자의 유지·복귀·이탈 상태를 계산.</p><footer>GRAIN · month_start</footer></article>
+          <article class="card" data-category="lifecycle"><div class="tags"><span class="tag">weekly</span><span class="tag">dashboard</span></div><h3>metrics_user_retention_weekly</h3><p>weekly lifecycle 결과를 dashboard용 이름으로 그대로 노출.</p><footer>UPSTREAM · lifecycle_weekly</footer></article>
+          <article class="card" data-category="lifecycle"><div class="tags"><span class="tag">monthly</span><span class="tag">dashboard</span></div><h3>metrics_user_retention_monthly</h3><p>monthly lifecycle 결과를 dashboard용 이름으로 그대로 노출.</p><footer>UPSTREAM · lifecycle_monthly</footer></article>
+          <article class="card" data-category="push"><div class="tags"><span class="tag">dimension</span><span class="tag">automation</span></div><h3>dim_push_automation_actor</h3><p>명시적 bot과 기계 속도 Push actor를 공통 제외 차원으로 제공.</p><footer>GRAIN · user_id(actor.id)</footer></article>
+          <article class="card" data-category="push"><div class="tags"><span class="tag">episode</span><span class="tag">fact</span></div><h3>fct_push_repo_episode</h3><p>28일을 초과한 Push 공백으로 저장소 활동 묶음을 구분하고 협업·종료·분산 원자를 보존.</p><footer>GRAIN · repo_id × episode_start_date</footer></article>
+          <article class="card" data-category="push"><div class="tags"><span class="tag">monthly</span><span class="tag">start cohort</span></div><h3>metrics_push_repo_episode_started_monthly</h3><p>월별 시작 활동 수와 첫 7일 협업, snapshot 상태를 요약.</p><footer>GRAIN · cohort_month</footer></article>
+          <article class="card" data-category="push"><div class="tags"><span class="tag">30-day</span><span class="tag">equal follow-up</span></div><h3>metrics_push_repo_episode_started_30d_monthly</h3><p>모든 시작 cohort에 동일한 30일 관찰창을 적용해 기간 비교의 경계 편향을 줄임.</p><footer>GRAIN · cohort_month</footer></article>
+          <article class="card" data-category="push"><div class="tags"><span class="tag">monthly</span><span class="tag">closures</span></div><h3>metrics_push_repo_episode_churned_monthly</h3><p>28일 무활동으로 확정된 종료 건수를 월별 요약. 기간 추세 비교에는 왼쪽 검열 주의.</p><footer>GRAIN · churn_month</footer></article>
+        </div>
+      </section>
+
+      <section class="note">
+        <h2>읽을 때 주의할 점</h2>
+        <p><b>user_id는 GitHub actor.id</b>이며 개인·bot·organization을 자동 구분하지 않습니다. 또한 “처음 관측” cohort는 전체 GitHub 생애 최초가 아니라 현재 fact 관측창에서의 최초입니다. lifecycle의 returning/unknown도 관측창 바깥 이력을 알 수 없어 진짜 신규 사용자와 구분할 수 없습니다.</p>
+      </section>
+    </main>
+
+    <footer class="page-foot">
+      <span>Source: dbt SQL, schema.yml, target/manifest.json</span>
+      <span>BigQuery scan: 0 B · repository structure only</span>
+    </footer>
+  </div>
+  <script>
+    const buttons = document.querySelectorAll('[data-filter]');
+    const cards = document.querySelectorAll('[data-category]');
+    buttons.forEach(button => button.addEventListener('click', () => {
+      buttons.forEach(item => item.classList.remove('active'));
+      button.classList.add('active');
+      const filter = button.dataset.filter;
+      cards.forEach(card => card.hidden = filter !== 'all' && card.dataset.category !== filter);
+    }));
+
+    const graph = document.querySelector('#lineageGraph');
+    const svg = graph.querySelector('.edges');
+    const graphNodes = [...graph.querySelectorAll('.graph-node')];
+    const nodeById = Object.fromEntries(graphNodes.map(node => [node.dataset.id, node]));
+    const edgeList = graphNodes.flatMap(node =>
+      (node.dataset.upstream || '').split(' ').filter(Boolean).map(source => ({ source, target: node.dataset.id }))
+    );
+
+    function drawGraph() {
+      const bounds = graph.getBoundingClientRect();
+      svg.setAttribute('viewBox', `0 0 ${bounds.width} ${bounds.height}`);
+      svg.innerHTML = edgeList.map(({ source, target }) => {
+        const a = nodeById[source].getBoundingClientRect();
+        const b = nodeById[target].getBoundingClientRect();
+        const x1 = a.right - bounds.left;
+        const y1 = a.top + a.height / 2 - bounds.top;
+        const x2 = b.left - bounds.left;
+        const y2 = b.top + b.height / 2 - bounds.top;
+        if (target === 'semantic_activity') {
+          const top = 22;
+          return `<path data-source="${source}" data-target="${target}" d="M ${x1} ${y1} C ${x1 + 24} ${y1}, ${x1 + 24} ${top}, ${x1 + 48} ${top} L ${x2 - 36} ${top} C ${x2 - 16} ${top}, ${x2 - 16} ${y2}, ${x2} ${y2}"/>`;
+        }
+        if (x2 <= x1) {
+          const outside = Math.max(x1, b.right - bounds.left) + 18;
+          return `<path data-source="${source}" data-target="${target}" d="M ${x1} ${y1} C ${outside} ${y1}, ${outside} ${y2}, ${x2} ${y2}"/>`;
+        }
+        const bend = Math.max(28, Math.abs(x2 - x1) * .42);
+        return `<path data-source="${source}" data-target="${target}" d="M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}"/>`;
+      }).join('');
+    }
+
+    function connectedTo(start) {
+      const upstream = new Set([start]);
+      const downstream = new Set([start]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        edgeList.forEach(edge => {
+          if (upstream.has(edge.target) && !upstream.has(edge.source)) {
+            upstream.add(edge.source); changed = true;
+          }
+          if (downstream.has(edge.source) && !downstream.has(edge.target)) {
+            downstream.add(edge.target); changed = true;
+          }
+        });
+      }
+      return new Set([...upstream, ...downstream]);
+    }
+
+    function resetGraph() {
+      graphNodes.forEach(node => node.classList.remove('hot', 'dim'));
+      svg.querySelectorAll('path').forEach(path => path.classList.remove('hot', 'dim'));
+    }
+
+    graphNodes.forEach(node => node.addEventListener('click', event => {
+      event.stopPropagation();
+      const connected = connectedTo(node.dataset.id);
+      graphNodes.forEach(item => {
+        item.classList.toggle('hot', connected.has(item.dataset.id));
+        item.classList.toggle('dim', !connected.has(item.dataset.id));
+      });
+      svg.querySelectorAll('path').forEach(path => {
+        const active = connected.has(path.dataset.source) && connected.has(path.dataset.target);
+        path.classList.toggle('hot', active);
+        path.classList.toggle('dim', !active);
+      });
+    }));
+    graph.addEventListener('click', resetGraph);
+    window.addEventListener('resize', drawGraph);
+    document.fonts.ready.then(drawGraph);
+  </script>
+</body>
+</html>
