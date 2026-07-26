@@ -161,7 +161,7 @@ Airflow metadata DAG는 매 실행마다 PyPI를 조회하지 않도록 Docker i
 uv run --no-project --with pandas --with requests --with duckdb --with google-cloud-bigquery --with google-cloud-bigquery-storage --with db-dtypes python scripts/refresh_repo_metadata.py --source bigquery --project bda-coai --dataset mart --fact-table fact_user_repo_activity --metadata-table repo_metadata --start "$(date -u -d '90 days ago' +%F)" --end "$(date -u -d 'yesterday' +%F)" --top-n 1000 --systematic-sample --sample-seed bda-repo-metadata-v1 --cache-tier warm --max-fetch 1000 --rate-limit-pause 0.2
 ```
 
-metric DAG는 매일 06:00 KST에 실행된다. 첫 태스크 `plan_metric_sync`는 `--plan-only`로 날짜 범위와 `--max-days` 방어선을 먼저 확인한다. 통과하면 `sync_metrics`가 fact table을 BigQuery에 적재하고 aggregate metric table도 BigQuery에 갱신한다.
+dbt metric DAG는 매일 09:30 KST에 실행된다. GitHub Archive의 UTC 일별 shard가 완전히 닫힌 뒤 전날까지의 최근 3일 partition을 다시 적재하므로, 지연 도착 데이터와 직전 실행 실패를 자동 복구한다. 첫 태스크 `plan_fact_sync`는 `--plan-only`로 날짜 범위와 `--max-days` 방어선을 먼저 확인한다. 통과하면 `sync_fact`가 fact table을 BigQuery에 적재하고 dbt가 aggregate metric table을 갱신한다.
 
 ```bash
 uv run --no-project --with pandas --with pyarrow --with duckdb --with google-cloud-bigquery --with google-cloud-bigquery-storage --with db-dtypes python scripts/sync_bq_metrics.py --project bda-coai --dataset mart --source bigquery --start "$(date -u -d '90 days ago' +%F)" --end "$(date -u -d 'yesterday' +%F)" --max-days 90 --mode replace-all --build-metrics
