@@ -5,6 +5,14 @@ description: Perform cost-bounded, reproducible BigQuery and dbt analysis for th
 
 # BDA BigQuery Analysis
 
+> **Procedure source of truth:** `.claude/skills/analysis/` (`SKILL.md` + `references/`).
+> That directory owns the mode taxonomy, the 9 required inputs, the health-check table,
+> and the report format. This file is the Codex-side entry point and covers the same
+> contract in prose; where the two disagree, `.claude/skills/analysis/` wins.
+> Read `.claude/skills/analysis/references/data_map.md` before quoting any number —
+> it lists the model grains and the known naming traps (notably the five retention
+> models with different definitions).
+
 Run GitHub Archive analysis from the smallest trustworthy scope and expand only after validating semantics, quality, and BigQuery scan size.
 
 ## Establish repository context

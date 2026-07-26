@@ -13,6 +13,10 @@ wheels/
 data/
 gcp-key.json
 
+# Analyst-bot credentials (secrets/analyst-bq-key.json). The `gcp-key.json`
+# pattern above does not cover this filename, and no other rule does either.
+secrets/
+
 # Local orchestration state
 logs/
 plugins/

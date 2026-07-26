@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slack 분석 봇 설계 — 스레드 1개 = 세션 1개</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef2f5;
+        --paper: #ffffff;
+        --ink: #172033;
+        --muted: #64748b;
+        --line: #d6dee8;
+        --soft: #f4f7fa;
+        --slack: #6d28d9;
+        --session: #2563eb;
+        --data: #0f766e;
+        --guard: #b45309;
+        --bad: #b91c1c;
+        --ok: #15803d;
+      }
+
+      * { box-sizing: border-box; min-width: 0; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+
+      .deck { width: min(1180px, calc(100% - 28px)); margin: 0 auto; padding: 22px 0 72px; }
+
+      .topbar {
+        position: sticky; top: 0; z-index: 10;
+        display: flex; align-items: baseline; justify-content: space-between;
+        gap: 14px; padding: 12px 0;
+        background: linear-gradient(var(--bg) 74%, rgb(238 242 245 / 0));
+      }
+      .brand { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; font-weight: 750; }
+      .dot { width: 11px; height: 11px; border-radius: 999px; background: var(--session); }
+      .stamp { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+      h1 { font-size: 27px; line-height: 1.25; margin: 10px 0 6px; letter-spacing: -0.4px; }
+      .lede { color: var(--muted); font-size: 15px; margin: 0 0 22px; max-width: 74ch; }
+
+      section { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; margin: 0 0 18px; }
+      section > h2 { font-size: 13px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+      section > h2 + .sub { margin: 0 0 16px; font-size: 19px; font-weight: 720; letter-spacing: -0.2px; }
+
+      h3 { font-size: 15px; margin: 22px 0 8px; }
+      h3:first-of-type { margin-top: 4px; }
+      p { margin: 0 0 12px; }
+      ul { margin: 0 0 12px; padding-left: 20px; }
+      li { margin: 4px 0; }
+
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em; background: var(--soft); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+      pre { background: var(--soft); border: 1px solid var(--line); border-radius: 9px; padding: 13px 15px; overflow-x: auto; margin: 0 0 14px; }
+      pre code { background: none; border: 0; padding: 0; font-size: 12.5px; line-height: 1.62; }
+
+      .tw { overflow-x: auto; margin: 0 0 14px; }
+      table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+      th, td { text-align: left; padding: 8px 11px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700; white-space: nowrap; }
+      tbody tr:last-child td { border-bottom: 0; }
+      td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+      .flow { display: grid; gap: 10px; margin: 4px 0 16px; }
+      .row { display: grid; grid-template-columns: 132px 1fr; gap: 12px; align-items: start; }
+      .row > .k { font-size: 12px; font-weight: 750; color: var(--muted); padding-top: 9px; text-transform: uppercase; letter-spacing: 0.05em; }
+      .box { border: 1px solid var(--line); border-left: 3px solid var(--session); border-radius: 9px; background: var(--soft); padding: 10px 13px; font-size: 13.5px; }
+      .box.slack { border-left-color: var(--slack); }
+      .box.data { border-left-color: var(--data); }
+      .box.guard { border-left-color: var(--guard); }
+      .box b { display: block; font-size: 13px; margin-bottom: 2px; }
+      .box span { color: var(--muted); font-size: 12.5px; }
+
+      .layers { display: grid; gap: 9px; margin: 6px 0 14px; }
+      .layer { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; grid-template-columns: 26px 1fr; gap: 12px; }
+      .layer .n { width: 24px; height: 24px; border-radius: 999px; display: grid; place-items: center; font-size: 12px; font-weight: 750; color: #fff; background: var(--guard); }
+      .layer b { font-size: 14px; }
+      .layer p { margin: 3px 0 0; font-size: 13px; color: var(--muted); }
+
+      .tag { display: inline-block; font-size: 11px; font-weight: 750; padding: 2px 7px; border-radius: 999px; letter-spacing: 0.03em; white-space: nowrap; }
+      .tag.ok { background: #dcfce7; color: #14532d; }
+      .tag.bad { background: #fee2e2; color: #7f1d1d; }
+      .tag.warn { background: #fef3c7; color: #78350f; }
+
+      .callout { border: 1px solid var(--line); border-left: 3px solid var(--bad); background: #fef7f7; border-radius: 9px; padding: 12px 15px; margin: 0 0 14px; font-size: 13.5px; }
+      .callout.ok { border-left-color: var(--ok); background: #f5fdf7; }
+      .callout b { display: block; margin-bottom: 3px; }
+
+      .foot { color: var(--muted); font-size: 12.5px; padding: 6px 2px 0; }
+      .foot code { font-size: 11.5px; }
+
+      @media (max-width: 640px) {
+        .row { grid-template-columns: 1fr; }
+        .row > .k { padding-top: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="deck">
+      <div class="topbar">
+        <div class="brand"><span class="dot"></span>BDA · 분석 자동화 설계</div>
+        <div class="stamp">2026-07-26</div>
+      </div>
+
+      <h1>Slack 스레드 1개 = Claude Code 세션 1개</h1>
+      <p class="lede">
+        수강생이 Slack에 데이터 질문을 던지면, 스레드마다 독립된 분석 세션이 붙어
+        BigQuery를 읽고 검증된 형식으로 답한다. 이 문서는 그 구조와, 실측으로 확인한
+        신뢰 경계를 정리한 설계 기록이다.
+      </p>
+
+      <section>
+        <h2>Overview</h2>
+        <div class="sub">요청 하나가 흐르는 경로</div>
+
+        <div class="flow">
+          <div class="row">
+            <div class="k">1 · 접수</div>
+            <div class="box slack">
+              <b>Slack Socket Mode</b>
+              <span>멘션 또는 스레드 답글 수신. 스레드 키 = <code>(channel, thread_ts)</code>.
+              핸들러는 즉시 ack하고 작업은 워커로 넘긴다 — 미응답 이벤트는 Slack이 재전송하므로 중복 세션이 생긴다.</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="k">2 · 세션 결정</div>
+            <div class="box">
+              <b>결정론적 세션 ID</b>
+              <span><code>uuid5(NAMESPACE_URL, "slack://team/channel/thread_ts")</code>.
+              봇을 재시작해도 같은 스레드가 같은 세션으로 되돌아온다.</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="k">3 · 실행</div>
+            <div class="box">
+              <b>턴 1은 생성, 턴 2부터는 재개</b>
+              <span><code>--session-id</code>는 생성 전용이고 재사용하면 <code>already in use</code>로 죽는다.
+              이후 턴은 <code>--resume</code>. cwd는 매번 고정한다.</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="k">4 · 분석</div>
+            <div class="box data">
+              <b>analysis 스킬</b>
+              <span>모드 분류 → 인풋 9종 → 가장 싼 소스 선택 → 1일/7일 건강성 검증 → dry run → 본 분석.</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="k">5 · 응답</div>
+            <div class="box slack">
+              <b>진행 추적 + 최종 답변</b>
+              <span>placeholder 메시지를 <code>chat.update</code>로 갱신(1.5초 스로틀)하고,
+              최종 답변은 별도 게시. 2,800자 단위로 줄 경계에서 분할.</span>
+            </div>
+          </div>
+        </div>
+
+        <h3>왜 스레드마다 세션인가</h3>
+        <p>
+          분석은 한 번에 끝나지 않는다. "그럼 봇 제외하면?" 같은 후속 질문이 앞선 검증과 정의를
+          그대로 물려받아야 한다. 스레드는 사람이 이미 대화 단위로 쓰고 있으므로, 세션 경계를
+          스레드에 맞추면 별도 상태 관리가 필요 없다.
+        </p>
+      </section>
+
+      <section>
+        <h2>Concurrency</h2>
+        <div class="sub">직렬화가 선택이 아닌 이유</div>
+
+        <div class="callout">
+          <b>같은 세션에 동시 실행하면 에러 없이 조용히 갈라진다</b>
+          같은 세션 ID로 <code>--resume</code>을 둘 동시에 띄우면 둘 다 exit 0으로 성공하고,
+          transcript가 분기되며 <b>한쪽 턴이 유실</b>된다. 다음 <code>--resume</code>은 한쪽 가지만 본다.
+          Slack Bolt 기본값이 <code>concurrency=10</code>이라 방치하면 반드시 발생한다.
+        </div>
+
+        <p>그래서 스레드 키별 락을 둔다. 다만 <code>threading.Lock</code>은 FIFO가 아니라서
+        같은 스레드에 연속으로 들어온 두 질문의 <b>응답 순서가 뒤집힐 수 있다</b>. 턴이 수 분씩
+        걸리는 작업이므로 실제로 도달 가능한 경로다 — 스레드별 큐 + 전용 소비자 스레드로 바꿔야 한다.
+        (미해결)</p>
+
+        <div class="tw">
+          <table>
+            <thead><tr><th>항목</th><th>현재</th><th>상태</th></tr></thead>
+            <tbody>
+              <tr><td>스레드별 상호배제</td><td>키별 <code>threading.Lock</code></td><td><span class="tag ok">적용</span></td></tr>
+              <tr><td>중복 이벤트 제거</td><td><code>event_id</code>/<code>client_msg_id</code>, 2000건 상한</td><td><span class="tag ok">적용</span></td></tr>
+              <tr><td>자기 메시지 무시</td><td><code>bot_id</code> + <code>subtype</code> + 자기 user_id</td><td><span class="tag ok">적용</span></td></tr>
+              <tr><td>응답 순서 보장</td><td>없음 (Lock은 FIFO 아님)</td><td><span class="tag warn">미해결</span></td></tr>
+              <tr><td>동시 세션 수 상한</td><td>없음 — 질문 N개 = 지출 N배</td><td><span class="tag warn">미해결</span></td></tr>
+              <tr><td>재시작 후 스레드 소유권</td><td>메모리에만 존재 → 재시작 시 유실</td><td><span class="tag warn">미해결</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>Trust boundary</h2>
+        <div class="sub">아무나 실행할 수 있으므로, 막는 층을 셋으로 나눈다</div>
+
+        <p>
+          봇은 워크스페이스 누구나 트리거할 수 있고 답변은 Slack에 그대로 게시된다.
+          즉 <b>세션이 읽을 수 있는 모든 것은 사실상 공개된다.</b>
+          도구 권한만으로는 부족하다는 것을 실측으로 확인했으므로 경계를 3층으로 세운다.
+        </p>
+
+        <div class="layers">
+          <div class="layer">
+            <div class="n">1</div>
+            <div>
+              <b>컨테이너 — 무엇이 존재하는가</b>
+              <p>프로젝트와 read-only BigQuery 키만 마운트한다. 호스트 홈은 없다.
+              세션이 절대경로를 훑어도 <code>~/.ssh</code>, <code>~/.aws</code>,
+              <code>~/.claude.json</code>, 운영자 키가 애초에 파일시스템에 없다.
+              이것이 유일한 진짜 격리 경계다.</p>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="n">2</div>
+            <div>
+              <b>IAM — 데이터에 무엇을 할 수 있는가</b>
+              <p>전용 서비스 계정에 <code>bigquery.jobUser</code> + <code>mart</code> 데이터셋
+              <code>dataViewer</code>만 부여한다. <code>dataEditor</code>는 주지 않는다.
+              <code>bq query</code>는 DDL/DML을 실행하고 명령 문자열 매칭으로 SQL을 통제할 방법이
+              없으므로, 읽기 전용은 IAM에서만 강제된다.</p>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="n">3</div>
+            <div>
+              <b>도구 권한 — 무엇을 시도할 수 있는가</b>
+              <p><code>--permission-mode manual</code> + 허용목록 + 금지목록.
+              위 두 층이 실패했을 때의 방어선이자, 실수를 <code>permission_denials[]</code>로
+              가시화하는 장치다. 단독으로는 신뢰하지 않는다.</p>
+            </div>
+          </div>
+        </div>
+
+        <h3>실측으로 확인한 것</h3>
+        <p>추측이 아니라 실제로 실행해서 확인한 결과다. 권한 목록을 넓히기 전에 다시 측정할 것.</p>
+
+        <div class="tw">
+          <table>
+            <thead><tr><th>시도</th><th>결과</th><th>의미</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><code>--allowedTools</code> 위반 도구를 <code>auto</code> 모드에서 실행</td>
+                <td><span class="tag bad">허용됨</span></td>
+                <td>거부가 기록된 뒤 재시도가 자동 승인된다. 허용목록은 <code>manual</code>에서만 구속력이 있다.</td>
+              </tr>
+              <tr>
+                <td><code>--disallowedTools</code> 위반을 <code>auto</code> 모드에서 실행</td>
+                <td><span class="tag ok">차단됨</span></td>
+                <td>금지목록은 모든 모드에서 하드 거부다.</td>
+              </tr>
+              <tr>
+                <td><code>uv run python -c "open('gcp-key.json').read()"</code></td>
+                <td><span class="tag bad">허용됐음 → 지금은 차단</span></td>
+                <td>deny는 <b>Bash 명령 문자열</b>을 본다. 인터프리터 한 번이면 모든 deny가 무력화된다. <code>uv run dbt</code>만 허용으로 축소.</td>
+              </tr>
+              <tr>
+                <td><code>echo hi; touch pwn</code> / <code>$(...)</code></td>
+                <td><span class="tag ok">차단됨</span></td>
+                <td>매처가 <code>;</code>/<code>&amp;&amp;</code>/<code>|</code>를 분해하고 정적 분석 불가한 치환을 거부한다. 방어 불필요.</td>
+              </tr>
+              <tr>
+                <td><code>Read</code>로 <code>/etc/hosts</code> 읽기</td>
+                <td><span class="tag bad">막을 수 없음</span></td>
+                <td><code>Read(/etc/**)</code>, <code>Read(//etc/**)</code>, <code>Read(**/hosts)</code>, <code>Read(/etc/*)</code> <b>네 형태 모두 실패</b>. 읽기 전용 도구는 기본 허용이라 allowlist로도 좁혀지지 않는다.</td>
+              </tr>
+              <tr>
+                <td><code>--tools</code>로 Read/Grep/Glob 제거 후 <code>cat /etc/hosts</code></td>
+                <td><span class="tag ok">차단됨</span></td>
+                <td>Bash는 cwd 밖 읽기를 기본 거부한다. 파일 접근을 Bash로 내리면 통제권에 들어온다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout ok">
+          <b>컨테이너로 옮기면 3번 항목이 무의미해진다</b>
+          호스트 홈이 없으므로 <code>Read</code>가 절대경로를 읽어도 볼 것이 없다.
+          컨테이너 실행 시에는 Read/Grep/Glob을 되돌려도 안전하다
+          (<code>SESSION_TOOLS</code> 상수 한 줄).
+        </div>
+
+        <h3>여전히 못 막는 것</h3>
+        <ul>
+          <li><b><code>bq query</code>의 DDL/DML.</b> 명령 문자열로 SQL을 통제할 수 없다. IAM으로만 해결된다.</li>
+          <li><b>스캔 비용.</b> <code>--max-budget-usd</code>는 Claude 지출만 막는다.
+          BigQuery는 <code>BIGQUERY_MAXIMUM_BYTES_BILLED</code>(쿼리당 기본 200 GiB)로 별도 상한을 건다.
+          스킬의 "raw를 함부로 스캔하지 않는다"는 규칙은 산문이지 강제가 아니다.</li>
+          <li><b>프롬프트 인젝션.</b> Slack 원문이 프롬프트에 들어간다. 위 3층이 피해 범위를 제한하는 방식으로 대응한다.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Analysis contract</h2>
+        <div class="sub">숫자보다 데이터를 먼저 의심하는 절차</div>
+
+        <p>
+          외부에서 받아온 오픈 데이터셋 워크플로우를 우리 환경에 맞게 재판정한 결과다.
+          원문은 "구조를 모르는 데이터셋을 처음 연다"를 전제하지만 우리는 반대다 —
+          구조를 dbt로 이미 소유하고 있고, 대신 <b>원천이 크고 과금된다</b>.
+        </p>
+
+        <div class="tw">
+          <table>
+            <thead><tr><th>원문</th><th>판정</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>AB 테스트 모드</td><td><span class="tag bad">삭제</span></td><td>GH Archive에 variant 배정이 없다. 흉내내면 원문이 금지한 "해시로 임의 배정"을 하게 된다.</td></tr>
+              <tr><td>퍼널 모드</td><td><span class="tag warn">개명</span></td><td>fact가 <code>payload</code>를 버려 제품 퍼널 단계가 없다. 있는 건 에피소드 생존 단계 → <b>라이프사이클 단계 분석</b>.</td></tr>
+              <tr><td>"결측/중복이 좀 있으면 좋다"</td><td><span class="tag warn">교체</span></td><td>fact는 <code>not_null</code> 테스트로 막혀 있어 null 검증이 항상 PASS. 진짜 위험은 좌·우측 절단과 자동화 actor 혼입.</td></tr>
+              <tr><td>가드레일 = 에러율/환불률</td><td><span class="tag warn">교체</span></td><td>우리 가드레일은 스캔 바이트와 shard 완결성. 인풋 7종 → 9종.</td></tr>
+              <tr><td>"데이터 구조를 읽는다"</td><td><span class="tag warn">순서 교체</span></td><td>매번 읽으면 raw로 직행한다. lineage에서 <b>선택</b>하는 단계로.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>모드 7종</h3>
+        <p>질문을 하나로 분류하면 필요한 검증과 산출물이 정해진다. 두 모드에 걸치면 분해해서 순서대로 처리한다.</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th>모드</th><th>주 소스</th></tr></thead>
+            <tbody>
+              <tr><td>활동량</td><td><code>metrics_daily</code>, <code>metrics_event_type_daily</code></td></tr>
+              <tr><td>라이프사이클 단계</td><td><code>fct_push_repo_episode</code>, <code>metrics_retention_weekly</code></td></tr>
+              <tr><td>전후 비교</td><td><code>metrics_daily</code> + 요일 분해</td></tr>
+              <tr><td>세그먼트 비교</td><td><code>stg_user_repo_activity</code>에서 직접 구성</td></tr>
+              <tr><td>리텐션/코호트</td><td>정의를 먼저 고른다 — 아래 함정 참조</td></tr>
+              <tr><td>데이터 품질 진단</td><td>fact ↔ <code>githubarchive.day.20*</code> reconciliation</td></tr>
+              <tr><td>계측 공백 판정</td><td>fact에 없으면 raw 비용 견적부터</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>인풋 9종</h3>
+        <p>모르는 항목은 <code>미확인</code>, 데이터에 없는 항목은 <code>계측 공백</code>.
+        <b>비워둘 수 없고</b>, 각 항목에 근거를 붙인다. 근거 없는 "확인됨"은 반증 불가능한 주장이다.</p>
+        <pre><code>1 분석 대상        2 분석 단위(grain)   3 기간(검증/본분석)
+4 기준 시간        5 대상 조건·세그먼트  6 제외 조건 ← automation_actor 필수
+7 핵심 지표 1개    8 가드레일 지표       9 스캔 예산</code></pre>
+        <p>7번은 <b>쿼리 실행 전에 선언하고 이후 바꾸지 않는다</b>. 8번(분석적 반대 지표)과
+        9번(비용 상한)은 서로 다른 것이다.</p>
+
+        <h3>계측 공백은 "없다"로 끝내지 않는다</h3>
+        <p>fact에 없어도 raw에는 대개 있다. 대신 돈이 든다. 그래서 정답 형식은
+        <b>"fact에는 없음 / raw에서 N GB 스캔하면 가능"</b>이다.</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th>필요한 것</th><th>fact</th><th class="num">raw 1일 dry run</th></tr></thead>
+            <tbody>
+              <tr><td>요일</td><td><span class="tag ok">파생 가능</span></td><td class="num">—</td></tr>
+              <tr><td>시각(hour)</td><td><span class="tag bad">없음</span></td><td class="num">71 MB</td></tr>
+              <tr><td>커밋 수</td><td><span class="tag bad">없음 (event 수만)</span></td><td class="num">1.03 GB</td></tr>
+              <tr><td>PR open/merge 상태</td><td><span class="tag bad">없음 (<code>type</code>만)</span></td><td class="num">payload 필요</td></tr>
+              <tr><td>repo 언어·스타</td><td><span class="tag bad">없음</span></td><td class="num">raw에도 없음</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>Data traps</h2>
+        <div class="sub">설계에 반영된, 실재하는 함정</div>
+
+        <h3>리텐션 계열 mart가 정의가 다른 채로 5개 공존한다</h3>
+        <p>이름이 닮았고, 다섯 다 값이 나오고, 다섯 다 <code>cohort</code> 또는
+        <code>retention</code>이라는 단어를 쓴다. 잘못 집으면 <b>조용히 틀린다</b>.</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th>모델</th><th>실제 의미</th></tr></thead>
+            <tbody>
+              <tr><td><code>metrics_retention_weekly</code></td><td>최초 관측 코호트 — "신규 유저 리텐션"이 맞음</td></tr>
+              <tr><td><code>metrics_cohort_retention_weekly_heatmap</code></td><td>활동주 롤링 코호트 — 신규가 아님</td></tr>
+              <tr><td><code>metrics_retention_summary</code></td><td>최초 관측 코호트의 W0~W3 요약</td></tr>
+              <tr><td><code>metrics_user_lifecycle_weekly</code></td><td>직전 기간 라이프사이클 회계</td></tr>
+              <tr><td><code>metrics_user_retention_weekly</code></td><td>위 모델의 <code>select *</code> 별칭 — 쓰지 말 것</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout">
+          <b>같은 주, 같은 "W1 리텐션", 2배 차이</b>
+          2026-03-02 코호트: 최초 관측 기준 <b>23.8%</b>(분모 520,770) vs
+          활동주 롤링 기준 <b>45.6%</b>(분모 2,625,588).
+          그래서 규칙은 <b>"이름이 겹치는 모델이 둘 이상이면 SQL을 열어 정의를 확인하기 전에 숫자를 인용하지 않는다"</b>다.
+        </div>
+
+        <h3>actor의 0.27%가 event의 15.94%를 만든다</h3>
+        <p>2026-07-01~07-07 PushEvent 기준. <code>dim_push_automation_actor</code>가 존재하는데도
+        <code>fct_push_repo_episode</code>와 <code>metrics_daily</code>는 이들을 제외하지 않는다.
+        즉 제외 여부가 모델마다 다르므로 <b>분석마다 선택해야 하는 입력</b>이다. 인풋 6번을 비워둘 수 없게 만든 이유다.</p>
+        <p>actor 기준 지표는 거의 안 흔들리고 event 기준 지표는 6분의 1이 날아간다. 둘을 나눠 보고한다.</p>
+
+        <h3>mart 커버리지 ≠ fact 커버리지</h3>
+        <p><code>metrics_daily</code>는 2025-09-01부터, fact는 2025-05-01부터다.
+        2025-06-15를 조회하면 mart는 <b>0행</b>, fact는 <b>1,148,747행</b>이다.
+        백필 경계이지 버그가 아니다 — 그래서 정상 운영 중에도 상시 존재한다.
+        <b>"mart 0행 = 데이터 없음"이라는 추론은 앞으로도 계속 틀린다.</b>
+        건강성 검증표에 <code>mart 커버리지</code> 항목을 신설한 이유다.</p>
+
+        <h3>as-of 없는 이탈률은 무효</h3>
+        <p><code>fct_push_repo_episode</code>의 <code>data_through_date</code>는 2026-07-18로
+        fact보다 7일 뒤처져 있다. 에피소드의 9.65%는 아직 이탈 판정이 불가한
+        <code>is_provisional</code>이고, 93.51%는 생애 기여자가 1명뿐이다.
+        같은 쿼리를 일주일 뒤에 돌리면 이탈률이 바뀐다.</p>
+      </section>
+
+      <section>
+        <h2>Deployment</h2>
+        <div class="sub">컨테이너 · 자격증명 · 상한</div>
+
+        <div class="tw">
+          <table>
+            <thead><tr><th>항목</th><th>값</th><th>비고</th></tr></thead>
+            <tbody>
+              <tr><td>실행 형태</td><td>compose 서비스 <code>analyst-bot</code></td><td><code>restart: unless-stopped</code>, 비root</td></tr>
+              <tr><td>마운트</td><td>프로젝트 + read-only BQ 키</td><td>호스트 홈·docker 소켓 미마운트</td></tr>
+              <tr><td>세션 영속</td><td><code>~/.claude</code> named volume</td><td>재시작 후 스레드 재개용</td></tr>
+              <tr><td>Slack 자격증명</td><td><code>SLACK_ANALYST_BOT_TOKEN</code> / <code>SLACK_ANALYST_APP_TOKEN</code></td><td>알림 앱과 <b>별개 앱</b></td></tr>
+              <tr><td>BigQuery 자격증명</td><td><code>secrets/analyst-bq-key.json</code></td><td>전용 read-only 서비스 계정</td></tr>
+              <tr><td>Claude 자격증명</td><td><code>ANTHROPIC_API_KEY</code></td><td>구독 로그인은 컨테이너로 넘어가지 않음</td></tr>
+              <tr><td>턴당 Claude 상한</td><td><code>--max-budget-usd 5</code></td><td>하드 캡</td></tr>
+              <tr><td>쿼리당 스캔 상한</td><td><code>--max-scan-gib 200</code></td><td><code>BIGQUERY_MAXIMUM_BYTES_BILLED</code>로 강제</td></tr>
+              <tr><td>턴 타임아웃</td><td>900초</td><td>프로세스 그룹 단위 kill</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout">
+          <b>Slack 앱을 새로 만드는 이유</b>
+          기존 "Airflow Alerts" 앱은 <code>chat:write</code>만 가지고 있어 이벤트를 받을 수 없다.
+          스코프를 추가하려면 재설치가 필요하고, 그 과정에서 <code>xoxb</code> 토큰이 회전하면
+          <b>Airflow 알림이 조용히 멎는다</b> — <code>slack_alert._post()</code>가 실패를 삼키기 때문에
+          티도 안 난다. 그래서 봇 전용 앱을 따로 만든다.
+        </div>
+
+        <p>Socket Mode에는 <code>xapp-</code> 앱 레벨 토큰이 필요하다.
+        <code>xoxb-</code>로는 <code>apps.connections.open</code>이
+        <code>not_allowed_token_type</code>으로 거부되므로, 스코프를 아무리 추가해도 대체되지 않는다.</p>
+      </section>
+
+      <section>
+        <h2>Open items</h2>
+        <div class="sub">알고 남긴 것</div>
+        <ul>
+          <li><b>응답 순서</b> — 같은 스레드 연속 질문이 뒤집힐 수 있다. 스레드별 큐로 교체 필요.</li>
+          <li><b>동시 세션 상한</b> — 없다. 질문 N개 = 지출 N배. 워커 풀 도입 필요.</li>
+          <li><b>재시작 후 스레드 소유권</b> — 메모리에만 있어 멘션 없는 후속 질문이 무시된다. transcript 존재 여부로 판정하도록 변경 필요.</li>
+          <li><b>실연결 미검증</b> — Bolt 핸들러, <code>chat.update</code> 스로틀, 청킹은 문서 스펙대로 작성했으나 실제 워크스페이스에서 돌린 적이 없다.</li>
+          <li><b>actor 급감</b> — 최근 2주 actor·repo가 급감하는데 event는 평평하다(event/actor 6.27 → 12.16). 드리프트 알림이 이걸 정확히 가리키고 있다. 별도 진단 진행 중.</li>
+        </ul>
+      </section>
+
+      <div class="foot">
+        관련 문서 —
+        <code>docs/analysis_workflow_review.md</code> (판정 근거) ·
+        <code>docs/analysis_testset.md</code> (채점 문제집) ·
+        <code>.claude/skills/analysis/</code> (실행 절차) ·
+        <code>docs/bigquery_dbt_analysis_workflow.md</code> (비용·lineage 계약) ·
+        <code>scripts/slack_analyst_bot.py</code> (러너)
+      </div>
+    </div>
+  </body>
+</html>
