@@ -10,7 +10,7 @@ Slack 스레드에서 받은 데이터 질문을 GitHub Archive/BigQuery로 분�
 ```bash
 cd /Users/kakao/bda-2
 set -a && source ./.env && set +a
-uv run --with slack-bolt python scripts/slack_analyst_bot.py
+uv run --with slack-bolt --with google-cloud-bigquery python scripts/slack_analyst_bot.py
 ```
 
 `⚡️ Bolt app is running!` 이 뜨면 붙은 것이다. 채널에서 `@<봇> 질문` 으로 호출한다.
@@ -19,8 +19,8 @@ uv run --with slack-bolt python scripts/slack_analyst_bot.py
 붙기 전에 설정을 점검만 하려면:
 
 ```bash
-uv run --with slack-bolt python scripts/slack_analyst_bot.py --dry-run   # 설정 출력 후 종료
-uv run --with slack-bolt python scripts/slack_analyst_bot.py --self-test # 세션 생성→재개 검증
+uv run --with slack-bolt --with google-cloud-bigquery python scripts/slack_analyst_bot.py --dry-run   # 설정 출력 후 종료
+uv run --with slack-bolt --with google-cloud-bigquery python scripts/slack_analyst_bot.py --self-test # 세션 생성→재개 검증
 ```
 
 주요 플래그: `--channel-allowlist`(쉼표 구분 채널 ID, 비우면 전체) ·

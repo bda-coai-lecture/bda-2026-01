@@ -213,16 +213,37 @@ IAM은 쓰기를 막지만 스캔 비용은 막지 못한다. 읽기 전용 키�
 
 ### 5.1 쿼리별 상한 (이미 적용됨)
 
-봇은 자식 프로세스 환경에 `BIGQUERY_MAXIMUM_BYTES_BILLED`를 주입한다
-(`scripts/slack_analyst_bot.py` `child_env()`). 기본값 200 GiB = 온디맨드
-$6.25/TiB 기준 쿼리당 최대 약 $1.25다. `bq`와 클라이언트 라이브러리가 이 값을 읽어
-추정치가 넘으면 **실행 전에 job을 실패시킨다. 이때 과금은 0이다.**
+기본값은 **10 GiB** = 온디맨드 $6.25/TiB 기준 쿼리당 최대 약 $0.06다.
+추정치가 넘으면 **실행 전에 job이 실패하고, 이때 과금은 0이다.**
 
-조정:
+**경로가 둘이고 장치도 둘이다.** 하나로 되지 않는다 — 2026-07-26 실측이다.
+
+| 경로 | 무엇이 읽히나 |
+|---|---|
+| Python 클라이언트 (dbt, `verify_bq_readonly.py`) | `BIGQUERY_MAXIMUM_BYTES_BILLED` 환경변수 |
+| `bq` CLI (**세션이 실제로 쓰는 것**) | `--maximum_bytes_billed` 플래그. 환경변수는 **무시한다** |
+
+`bq`가 환경변수를 무시한다는 사실 때문에, 10 GiB 상한 아래에서 dry run 18.4 GB짜리
+raw 쿼리가 그대로 완주했다. `verify_bq_readonly.py`의 `cost_ceiling_bites`가 PASS인데도
+그랬다 — 그 스크립트는 Python 클라이언트 경로를 재기 때문이다.
+**테스트가 실제 사용 경로를 지나가지 않으면 그 PASS는 안심의 원인일 뿐이다.**
+
+그래서 봇은 기동할 때마다 `secrets/gcloud-analyst/.bigqueryrc`를 다시 쓰고
+`BIGQUERYRC`를 주입한다. rc의 `[query]` 항목이 세션 대신 플래그를 공급한다.
+환경변수도 계속 주입한다 — dbt에는 그쪽이 유효하기 때문이다.
+
+**이건 기본값이지 하드 상한이 아니다.** 세션이 명령줄에 `--maximum_bytes_billed`를
+직접 붙이면 그쪽이 이기고, 도구 권한 규칙은 명령 접두만 봐서 중간 인자를 못 잡는다.
+남은 방어는 스킬의 금지 규칙과 턴 종료 시 실지출 보고(사후 발견)뿐이다.
+**하드 상한은 프로젝트 수준 "사용자당 일일 쿼리 사용량" 할당량뿐이고 아직 미설정이다.**
+
+조정(= 승인 절차. 세션은 스스로 못 올린다):
 
 ```bash
 python scripts/slack_analyst_bot.py --max-scan-gib 50   # 쿼리당 약 $0.31
 ```
+
+`--dry-run`이 적용값을 `bq_scan_ceiling = 10 GiB via .bigqueryrc`로 출력한다.
 
 수동 확인:
 
