@@ -29,6 +29,7 @@
         color: var(--ink);
         font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
         line-height: 1.58;
+        overflow-x: hidden;
       }
 
       .deck {
@@ -38,11 +39,7 @@
       }
 
       .topbar {
-        position: sticky;
-        top: 0;
-        z-index: 10;
         padding: 12px 0 0;
-        background: linear-gradient(var(--bg) 86%, rgb(244 246 248 / 0));
       }
 
       .brandrow {
@@ -88,7 +85,7 @@
         font-size: 15px;
       }
 
-      .tablist {
+      .toc {
         display: flex;
         gap: 6px;
         overflow-x: auto;
@@ -96,41 +93,37 @@
         scrollbar-width: none;
       }
 
-      .tablist::-webkit-scrollbar { display: none; }
+      .toc::-webkit-scrollbar { display: none; }
 
-      .tab {
-        appearance: none;
-        cursor: pointer;
+      .toc a {
         white-space: nowrap;
         background: var(--paper);
         color: var(--muted);
         border: 1px solid var(--line);
         border-radius: 999px;
         padding: 7px 15px;
-        font: inherit;
         font-size: 13px;
         font-weight: 720;
         display: flex;
         align-items: center;
         gap: 8px;
+        text-decoration: none;
       }
 
-      .tab:hover { color: var(--ink); }
-      .tab:focus-visible { outline: 2px solid var(--ops); outline-offset: 2px; }
-      .tab .idx {
+      .toc a:hover { color: var(--ink); }
+      .toc a:focus-visible { outline: 2px solid var(--ops); outline-offset: 2px; }
+      .toc .idx {
         font-size: 11px;
         font-variant-numeric: tabular-nums;
         color: #94a3b8;
         font-weight: 780;
       }
-      .tab[aria-selected="true"] {
+      .toc a.primary {
         background: var(--ops);
         border-color: var(--ops);
         color: #fff;
       }
-      .tab[aria-selected="true"] .idx { color: rgb(255 255 255 / 0.72); }
-
-      .panel[hidden] { display: none; }
+      .toc a.primary .idx { color: rgb(255 255 255 / 0.72); }
 
       section {
         background: var(--paper);
@@ -161,6 +154,7 @@
       p { margin: 0 0 12px; }
       ul, ol { margin: 0 0 12px; padding-left: 20px; }
       li { margin: 4px 0; }
+      p, li, td, .role, .d, .bubble, .pipe-val, .dock-node span { overflow-wrap: anywhere; }
 
       code {
         background: var(--soft);
@@ -169,6 +163,7 @@
         padding: 1px 5px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font-size: 0.88em;
+        overflow-wrap: anywhere;
       }
 
       pre {
@@ -193,7 +188,7 @@
       .snapshot {
         display: grid;
         gap: 10px;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
         margin: 0 0 18px;
       }
 
@@ -367,6 +362,322 @@
 
       .col ul { margin-bottom: 0; }
 
+      .change-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 10px;
+        margin: 0 0 14px;
+      }
+
+      .change-card {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 13px 15px;
+        background: var(--paper);
+      }
+
+      .change-card .tagline {
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 820;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .change-card .title {
+        margin: 5px 0 7px;
+        font-size: 15px;
+        font-weight: 760;
+      }
+
+      .change-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .arch {
+        display: grid;
+        grid-template-columns: 1fr 26px 1.1fr 26px 1.1fr 26px 1fr;
+        gap: 8px;
+        align-items: stretch;
+        margin: 0 0 14px;
+      }
+
+      .arch-node {
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--ops);
+        border-radius: 10px;
+        padding: 13px 14px;
+        background: var(--paper);
+        min-height: 112px;
+      }
+
+      .arch-node.slack { border-top-color: var(--slack); background: #faf7ff; }
+      .arch-node.data { border-top-color: var(--data); background: #f4fbfa; }
+      .arch-node.guard { border-top-color: var(--guard); background: #fdfaf5; }
+      .arch-node .sys { font-size: 15px; font-weight: 780; margin-bottom: 4px; }
+      .arch-node .role { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+
+      .arch-arrow {
+        display: grid;
+        place-items: center;
+        color: #94a3b8;
+        font-size: 20px;
+        font-weight: 780;
+      }
+
+      .arch-lower {
+        grid-column: 3 / 8;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .mini-node {
+        border: 1px dashed var(--line);
+        border-radius: 10px;
+        padding: 11px 13px;
+        background: #fbfcfe;
+      }
+
+      .mini-node b { display: block; font-size: 13.5px; margin-bottom: 3px; }
+      .mini-node span { color: var(--muted); font-size: 12.5px; }
+
+      .message-pair {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin: 0 0 14px;
+      }
+
+      .slack-msg {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fbfcfe;
+        padding: 14px 15px;
+      }
+
+      .slack-msg.bad { border-top: 3px solid var(--bad); }
+      .slack-msg.good { border-top: 3px solid var(--ok); }
+      .slack-msg .hdr {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 780;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .slack-msg .bubble {
+        white-space: pre-wrap;
+        color: var(--ink);
+        font-size: 13.5px;
+        line-height: 1.55;
+      }
+
+      .pipeline {
+        display: grid;
+        gap: 8px;
+        margin: 0 0 14px;
+      }
+
+      .pipe-row {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        gap: 12px;
+        align-items: start;
+      }
+
+      .pipe-key {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 820;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        padding-top: 10px;
+      }
+
+      .pipe-val {
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--ops);
+        border-radius: 9px;
+        background: var(--soft);
+        padding: 10px 13px;
+      }
+
+      .pipe-val b { display: block; font-size: 14px; margin-bottom: 3px; }
+      .pipe-val span { color: var(--muted); font-size: 12.5px; }
+
+      .docker-map {
+        display: grid;
+        grid-template-columns: 1fr 1.45fr 1fr;
+        gap: 12px;
+        align-items: stretch;
+        margin: 0 0 14px;
+      }
+
+      .compare-flow {
+        display: grid;
+        gap: 10px;
+        margin: 0 0 14px;
+      }
+
+      .compare-row {
+        display: grid;
+        grid-template-columns: 118px 1fr;
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .compare-label {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 820;
+        color: var(--muted);
+        background: var(--soft);
+      }
+
+      .compare-chain {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
+        align-items: stretch;
+      }
+
+      .chain-node {
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--ops);
+        border-radius: 9px;
+        padding: 10px 11px;
+        background: var(--paper);
+        font-size: 12.5px;
+      }
+
+      .chain-node.bad { border-top-color: var(--bad); background: #fff8f8; }
+      .chain-node.ok { border-top-color: var(--ok); background: #f7fcf8; }
+      .chain-node.slack { border-top-color: var(--slack); background: #fbf8ff; }
+      .chain-node.muted { border-style: dashed; color: var(--muted); }
+      .chain-node b { display: block; margin-bottom: 3px; font-size: 13.5px; color: var(--ink); }
+
+      .timeline {
+        display: grid;
+        gap: 10px;
+        margin: 0 0 14px;
+      }
+
+      .timeline-item {
+        display: grid;
+        grid-template-columns: 34px 1fr;
+        gap: 12px;
+        align-items: start;
+      }
+
+      .timeline-no {
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: var(--ops);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 820;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .timeline-card {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 13px 15px;
+        background: var(--paper);
+      }
+
+      .timeline-card h4 {
+        margin: 0 0 8px;
+        font-size: 15px;
+      }
+
+      .timeline-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .timeline-grid div {
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        padding: 9px 10px;
+        background: #fbfcfe;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+
+      .timeline-grid b {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--ink);
+        font-size: 12px;
+      }
+
+      .boundary {
+        border: 2px solid var(--ops);
+        border-radius: 13px;
+        padding: 13px;
+        background: #f7fbff;
+      }
+
+      .boundary .caption {
+        color: var(--ops);
+        font-size: 12px;
+        font-weight: 820;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+      }
+
+      .boundary-grid {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .dock-node {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 10px 11px;
+        background: var(--paper);
+      }
+
+      .dock-node b { display: block; font-size: 13.5px; }
+      .dock-node span { color: var(--muted); font-size: 12px; }
+
+      .side-list {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 13px 15px;
+        background: var(--paper);
+      }
+
+      .side-list h3 {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 820;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .side-list ul { margin-bottom: 0; }
+
       .status {
         display: inline-block;
         border: 1px solid;
@@ -389,13 +700,28 @@
 
       @media (max-width: 900px) {
         .snapshot { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .change-grid { grid-template-columns: 1fr; }
+        .arch { grid-template-columns: 1fr; }
+        .arch-arrow { transform: rotate(90deg); min-height: 24px; }
+        .arch-lower { grid-column: 1; grid-template-columns: 1fr; }
+        .message-pair { grid-template-columns: 1fr; }
+        .pipe-row { grid-template-columns: 1fr; }
+        .pipe-key { padding-top: 0; }
+        .docker-map { grid-template-columns: 1fr; }
+        .boundary-grid { grid-template-columns: 1fr; }
+        .compare-row { grid-template-columns: 1fr; }
+        .compare-chain { grid-template-columns: 1fr; }
+        .timeline-grid { grid-template-columns: 1fr; }
         .flow { grid-template-columns: 1fr; }
         .step { min-height: auto; }
       }
 
       @media (max-width: 540px) {
-        .deck { width: min(100% - 20px, 1120px); padding-bottom: 48px; }
+        .deck { width: calc(100vw - 48px); max-width: calc(100vw - 48px); margin-left: 10px; margin-right: auto; padding-bottom: 48px; }
         section { padding: 17px 16px; }
+        .toc { flex-wrap: wrap; overflow-x: visible; }
+        .toc a { flex: 0 0 100%; justify-content: center; max-width: 100%; padding: 7px 9px; font-size: 12.5px; }
+        .toc .idx { display: none; }
         .snapshot { grid-template-columns: 1fr; }
       }
     </style>
@@ -410,13 +736,16 @@
         <h1>Slack 분석 봇 변경 요약</h1>
         <p class="lede">
           이번 변경은 봇이 “분석을 할 수 있음”에서 “Slack에서 실제로 맡겨도 되는 동료처럼 움직임”으로 넘어가는 작업이다.
-          핵심 기준은 간단하다. <b>Slack은 의사결정 화면, 근거는 로그</b>다.
+          이 문서만 읽어도 무엇이 바뀌었고, 왜 바뀌었고, Docker 안에서 어떻게 돌아가는지 파악할 수 있게 정리했다.
+          핵심 기준은 <b>Slack은 의사결정 화면, 근거는 로그</b>다.
         </p>
-        <div class="tablist" role="tablist" aria-label="변경 요약 구획">
-          <button class="tab" role="tab" id="t1" aria-controls="p1" aria-selected="true"><span class="idx">01</span>햄찌 워크플로우와 UX</button>
-          <button class="tab" role="tab" id="t2" aria-controls="p2" aria-selected="false" tabindex="-1"><span class="idx">02</span>기술 변경사항</button>
-          <button class="tab" role="tab" id="t3" aria-controls="p3" aria-selected="false" tabindex="-1"><span class="idx">03</span>Docker 컨테이너화</button>
-        </div>
+        <nav class="toc" aria-label="문서 목차">
+          <a class="primary" href="#summary"><span class="idx">01</span>한 장 요약</a>
+          <a href="#workflow"><span class="idx">02</span>답변과 UX</a>
+          <a href="#implementation"><span class="idx">03</span>기술 변경</a>
+          <a href="#docker"><span class="idx">04</span>Docker 실행</a>
+          <a href="#status"><span class="idx">05</span>현재 상태</a>
+        </nav>
       </div>
 
       <div class="snapshot" aria-label="현재 상태">
@@ -428,23 +757,131 @@
         <div class="metric">
           <div class="k">회귀 테스트</div>
           <div class="v">29 passed</div>
-          <div class="d">답변 후처리와 MCP wiring 포함</div>
+          <div class="d">Slack 답변 정리와 Metabase 연결 설정 포함</div>
         </div>
         <div class="metric">
           <div class="k">Docker</div>
-          <div class="v">headless 연결 확인</div>
-          <div class="d">Socket Mode 로그에 Bolt running 확인</div>
+          <div class="v">백그라운드 실행 확인</div>
+          <div class="d">터미널을 붙잡지 않고 Slack 연결 유지</div>
+        </div>
+        <div class="metric">
+          <div class="k">피드백 루프</div>
+          <div class="v">실제 답변 보며 수정</div>
+          <div class="d">검증/재현 제거, 용어, 말투, 짧은 답변 규칙 반영</div>
         </div>
         <div class="metric">
           <div class="k">다음 확인</div>
-          <div class="v">톤 재-canary</div>
-          <div class="d">기능은 통과, 말투 검수만 남음</div>
+          <div class="v">실제 Slack 말투 확인</div>
+          <div class="d">기능은 통과, 쉬운 답변으로 보이는지 재확인</div>
         </div>
       </div>
 
-      <div class="panel" id="p1" role="tabpanel" aria-labelledby="t1" tabindex="0">
+      <section id="summary">
+        <h2>한 장 요약</h2>
+        <p class="sub">바뀐 구조를 한 장으로 보면 이렇다</p>
+        <p>
+          이번 변경의 중심은 “Claude가 분석한 모든 내용을 Slack에 그대로 흘리지 않는다”는 점이다.
+          봇 러너가 중간에서 세션 순서를 잡고, 실행 근거를 로그로 보내고, 마지막 답변만 Slack용으로 다시 다듬는다.
+        </p>
+
+        <div class="arch" aria-label="Slack 분석 봇 전체 아키텍처">
+          <div class="arch-node slack">
+            <div class="sys">Slack</div>
+            <div class="role">사용자는 멘션/DM으로 질문한다. 진행 중에는 읽기 쉬운 상태와 중단 버튼만 본다.</div>
+          </div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node">
+            <div class="sys">봇 실행기</div>
+            <div class="role"><code>scripts/slack_analyst_bot.py</code>. Slack 스레드별 작업 대기열, 시간 제한, 중단 요청, 피드백, 실행 기록 저장을 담당한다.</div>
+          </div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node">
+            <div class="sys">Claude 분석 세션</div>
+            <div class="role">스레드 하나가 분석 세션 하나다. 첫 질문은 새 세션을 만들고, 이후 질문은 같은 세션에서 이어서 실행한다.</div>
+          </div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node data">
+            <div class="sys">데이터 도구</div>
+            <div class="role">분석 절차, dbt SQL 컴파일, BigQuery 읽기 전용 조회, 선택적인 Metabase 카드 생성을 쓴다.</div>
+          </div>
+
+          <div class="arch-lower">
+            <div class="mini-node">
+              <b>Slack 최종 답변</b>
+              <span>결론, 핵심 숫자, 기준일/기간, 한계만 남긴다.</span>
+            </div>
+            <div class="mini-node">
+              <b>실행 기록</b>
+              <span>검증, 재현 SQL, 실행 전 비용 점검, Claude 사용 기록, BigQuery 사용량은 여기에 남긴다.</span>
+            </div>
+            <div class="mini-node">
+              <b>Docker 경계</b>
+              <span>컨테이너에는 필요한 레포 조각과 좁은 BQ 키만 넣는다.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="change-grid">
+          <div class="change-card">
+            <div class="tagline">변경 전</div>
+            <div class="title">분석 로그가 Slack에 섞임</div>
+            <p>검증표, 재현 경로, 실행 전 점검값, 도구명까지 답변에 같이 들어와서 PO가 바로 읽기 어려웠다.</p>
+          </div>
+          <div class="change-card">
+            <div class="tagline">변경 후</div>
+            <div class="title">Slack은 결정용 요약</div>
+            <p>최종 메시지는 사람이 판단하는 데 필요한 숫자와 한계만 남기고 나머지는 로그로 보낸다.</p>
+          </div>
+          <div class="change-card">
+            <div class="tagline">의도</div>
+            <div class="title">운영 증거는 버리지 않음</div>
+            <p>자세한 근거는 숨긴 게 아니라 <code>logs/analyst-bot/</code>의 실행 기록으로 위치를 옮긴 것이다.</p>
+          </div>
+        </div>
+
+        <h3>변경 전/후 구조 차이</h3>
+        <div class="compare-flow" aria-label="변경 전후 Slack 답변 구조 비교">
+          <div class="compare-row">
+            <div class="compare-label">변경 전</div>
+            <div class="compare-chain">
+              <div class="chain-node"><b>Claude 원문</b>분석 과정과 답변이 한 덩어리로 생성됨</div>
+              <div class="chain-node bad"><b>그대로 게시</b>검증표, 재현 경로, 명령줄이 섞임</div>
+              <div class="chain-node slack"><b>Slack</b>질문자는 결론보다 과정부터 읽게 됨</div>
+              <div class="chain-node muted"><b>로그</b>일부 기록만 보조로 남음</div>
+              <div class="chain-node muted"><b>문제</b>정확해도 기술 문서처럼 보임</div>
+            </div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-label">변경 후</div>
+            <div class="compare-chain">
+              <div class="chain-node"><b>Claude 원문</b>분석과 검증은 계속 수행</div>
+              <div class="chain-node ok"><b>후처리 관문</b>운영 상세와 민감값 패턴 제거</div>
+              <div class="chain-node slack"><b>Slack</b>결론, 숫자, 기간, 한계만 표시</div>
+              <div class="chain-node ok"><b>실행 기록</b>검증, 재현 SQL, 비용 점검을 보관</div>
+              <div class="chain-node ok"><b>결과</b>읽는 사람과 운영자가 보는 화면을 분리</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout">
+          <span class="label">문서 안 용어</span>
+          <p>
+            <b>분석 세션</b>은 Slack 스레드 하나에 붙는 이어지는 분석 대화다. <b>dbt</b>는 SQL을 정리하고 컴파일하는 도구,
+            <b>BigQuery</b>는 실제 데이터를 조회하는 저장소, <b>Metabase</b>는 결과를 카드나 대시보드로 보는 화면이다.
+            <b>Docker 마운트</b>는 호스트 파일 일부를 컨테이너 안에 보여주는 설정이고, <b>도구 허용 목록(permission list)</b>은 Claude가 쓸 수 있는 도구 목록이다.
+            <b>macOS 로그인 보관소(Keychain)</b>는 macOS가 로그인 정보를 보관하는 곳이다.
+          </p>
+          <p>
+            <b>실행 기록</b>은 봇이 남기는 자세한 근거 파일이다. Slack에는 숨긴 검증, 재현 SQL, 실행 전 점검값,
+            도구 실행 원문이 여기에 들어간다. <b>실행 전 점검</b>은 실제 쿼리를 돌리기 전에 비용과 범위를 확인하는 단계다.
+            명령 이름에는 <code>--dry-run</code>이라는 표현이 남아 있지만, 이 문서에서는 “설정 점검” 또는 “실행 전 점검”으로 풀어 쓴다.
+          </p>
+        </div>
+      </section>
+
+      <div class="panel" id="workflow">
         <section>
-          <h2>Workflow</h2>
+          <h2>답변 흐름</h2>
           <p class="sub">햄찌에서 가져온 건 코드보다 운영 감각이다</p>
           <p>
             오래 돌던 <code>hamji-portable-20260801</code>을 보면서 그대로 베끼기보다,
@@ -487,31 +924,115 @@
               햄찌를 너무 딱딱한 감사자가 아니라, Slack에서 옆자리 동료처럼 말하는 분석 파트너로 두자는 쪽으로 톤을 맞췄다.
             </p>
           </div>
+
+          <h3>오늘 작업은 결과를 보면서 계속 고친 루프였다</h3>
+          <div class="timeline" aria-label="피드백 반영 타임라인">
+            <div class="timeline-item">
+              <div class="timeline-no">1</div>
+              <div class="timeline-card">
+                <h4>검증/재현 라인이 Slack에 남았다</h4>
+                <div class="timeline-grid">
+                  <div><b>본 답변</b><code>검증:</code>, <code>재현:</code>, SQL 경로가 최종 답변에 보였다.</div>
+                  <div><b>판단</b>질문자는 결론을 보려는 것이지, 분석자가 재현할 로그를 읽으려는 것이 아니다.</div>
+                  <div><b>수정</b>검증/재현/운영 상세 라인을 제거하고 실행 기록으로 보냈다.</div>
+                </div>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-no">2</div>
+              <div class="timeline-card">
+                <h4>Docker 안에서는 호스트 Claude 로그인이 넘어오지 않았다</h4>
+                <div class="timeline-grid">
+                  <div><b>본 결과</b>컨테이너에서 Claude 인증이 없어 실행이 막혔다.</div>
+                  <div><b>판단</b>호스트 <code>~/.claude</code>를 마운트하면 격리 목적이 깨진다.</div>
+                  <div><b>수정</b>컨테이너 안에서 Claude 로그인을 한 번 수행하고 Docker 저장 공간에 보관했다.</div>
+                </div>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-no">3</div>
+              <div class="timeline-card">
+                <h4>첫 실제 Slack 테스트 답변이 너무 기술적으로 읽혔다</h4>
+                <div class="timeline-grid">
+                  <div><b>본 답변</b><code>active actor</code>, <code>actor.id</code>, <code>UTC</code>가 앞에 나왔다.</div>
+                  <div><b>판단</b>정확한 지표명보다 먼저 사람이 이해하는 말이 나와야 한다.</div>
+                  <div><b>수정</b><code>활동 계정</code>, <code>계정 ID</code>, <code>데이터 기준</code>으로 바꾸는 용어표를 넣었다.</div>
+                </div>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-no">4</div>
+              <div class="timeline-card">
+                <h4>“간단히”라는 요청에도 답이 길어질 수 있었다</h4>
+                <div class="timeline-grid">
+                  <div><b>본 답변</b>비교표와 추가 진단이 따라붙을 수 있었다.</div>
+                  <div><b>판단</b>짧게 물은 질문에는 짧게 답하는 것도 기능이다.</div>
+                  <div><b>수정</b><code>간단히</code>, <code>짧게</code>, <code>quickly</code>, <code>tl;dr</code>는 2-4문장 + 한계 한 줄로 제한했다.</div>
+                </div>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-no">5</div>
+              <div class="timeline-card">
+                <h4>말투가 아직 감사 노트처럼 느껴졌다</h4>
+                <div class="timeline-grid">
+                  <div><b>본 느낌</b>기능은 되지만 Slack 동료가 말하는 느낌은 약했다.</div>
+                  <div><b>판단</b>햄찌의 장점은 친근한 톤이었다. 다만 캐릭터 놀이가 아니라 일하는 동료 톤이어야 한다.</div>
+                  <div><b>수정</b><code>APPEND_SYSTEM_PROMPT</code>에 “Slack에서 도와주는 동료처럼 답하기” 기준을 넣었다.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h3>같은 질문이 Slack에서 이렇게 달라진다</h3>
+          <div class="callout">
+            <span class="label">실제 테스트 질문</span>
+            <p>
+              Docker로 띄운 뒤 Slack에서 <b>“최근 완료된 1일 active actor 수 간단히 봐줘”</b>라고 물었다.
+              기능은 성공했다. 봇은 Slack 이벤트를 받고, BigQuery를 조회하고, 답변까지 게시했다.
+              하지만 답변이 <code>active actor</code>, <code>actor.id</code>, <code>UTC</code>, 토요일 비교표까지 포함해
+              “간단히”라는 요청에 비해 너무 기술적으로 읽혔다. 그래서 아래처럼 목표 답변 형태를 다시 잡았다.
+            </p>
+          </div>
+          <div class="message-pair" aria-label="Slack 답변 before after">
+            <div class="slack-msg bad">
+              <div class="hdr"><span>변경 전 · 분석자 노트처럼 보임</span><span>노출 금지</span></div>
+              <div class="bubble">분석 완료.
+
+모드: 활동량
+관측 grain: activity_date × actor.id
+
+2026-08-01(UTC) active actor는 305,409명입니다.
+
+검증: shard 마감, mart 커버리지, grain 유일성, raw 원천 데이터 대조를 모두 통과했습니다.
+재현: dbt/gharchive_metrics/analyses/daily_active_actor.sql
+dry run(실행 전 점검): Query successfully validated. BigQuery 1.50 GiB.
+Claude 4턴.</div>
+            </div>
+            <div class="slack-msg good">
+              <div class="hdr"><span>변경 후 · 목표 Slack 답변</span><span>노출 OK</span></div>
+              <div class="bubble">2026-08-01 데이터 기준 활동 계정은 305,409개입니다.
+
+이 값은 최신 완료일 기준으로 본 고유 계정 수예요. 짧게 물어본 경우라 추가 표나 긴 진단은 붙이지 않습니다.
+
+한계: 계정 ID 기준이라 한 사람이 여러 계정을 쓰는 경우까지 합치지는 못합니다.</div>
+            </div>
+          </div>
+
+          <p>
+            숫자는 예시다. 중요한 변화는 형식이다. Slack에는 결론이 먼저 오고,
+            검증과 재현 방법은 사라지는 대신 실행 기록에 남는다.
+          </p>
         </section>
 
         <section>
           <h2>Slack UX</h2>
-          <p class="sub">답변이 보고서가 아니라 대화처럼 읽히게 바꿨다</p>
-          <div class="split">
-            <div class="col">
-              <h3>이전 느낌</h3>
-              <ul>
-                <li><code>검증:</code>, <code>재현:</code> 같은 분석자용 라인이 보였다.</li>
-                <li><code>dry run</code>, <code>bq query</code>, <code>Claude N턴</code> 같은 운영 흔적이 섞였다.</li>
-                <li><code>active actor</code>, <code>actor.id</code>, <code>UTC</code>가 그대로 나와 답변이 기술 문서처럼 보였다.</li>
-                <li>사용자가 “간단히”라고 해도 표와 추가 비교가 붙을 수 있었다.</li>
-              </ul>
-            </div>
-            <div class="col">
-              <h3>바뀐 느낌</h3>
-              <ul>
-                <li>첫 줄은 결론으로 시작한다.</li>
-                <li>핵심 숫자와 기준일/기간을 바로 보이게 둔다.</li>
-                <li>한계는 한 줄로 분리한다.</li>
-                <li>짧게 물으면 2-4문장 안에서 끝낸다.</li>
-              </ul>
-            </div>
-          </div>
+          <p class="sub">스키마 용어를 먼저 내세우지 않고, 사람이 읽는 말로 바꿨다</p>
+          <p>
+            Slack 답변은 데이터 모델을 설명하는 문서가 아니다. 그래서 지표명은 유지하되,
+            첫 표현은 질문자가 바로 이해할 수 있는 말로 바꾼다. 원래 스키마 기준이 꼭 필요하면
+            한계 문장이나 괄호 안에서 보충한다.
+          </p>
 
           <div class="table-wrap">
             <table>
@@ -554,51 +1075,147 @@
         </section>
       </div>
 
-      <div class="panel" id="p2" role="tabpanel" aria-labelledby="t2" tabindex="0" hidden>
+      <div class="panel" id="implementation">
         <section>
-          <h2>Implementation</h2>
+          <h2>기술 변경</h2>
           <p class="sub">Docker를 빼면 변경은 다섯 가지 축으로 정리된다</p>
           <p>
             2번 꼭지는 자칫 구현 목록처럼 보이기 쉬워서, “무슨 문제를 줄였는가” 기준으로 묶었다.
             핵심 파일은 거의 <code>scripts/slack_analyst_bot.py</code>에 모여 있다.
           </p>
+          <p>
+            여기서 중요한 점은 Claude의 분석 능력을 줄인 것이 아니라, <b>분석 과정과 사용자 답변 사이에
+            제품용 정리 단계가 생겼다</b>는 것이다. 모델은 여전히 검증하고, 쿼리를 실행하기 전에 비용을 확인하고,
+            필요한 SQL을 저장한다. 다만 그 과정 전체를 Slack에 그대로 보여주지 않는다.
+          </p>
 
           <div class="cards">
             <div class="card">
-              <div class="cat">Final answer</div>
+              <div class="cat">최종 답변</div>
               <div class="claim">게시 직전 후처리</div>
-              <p><code>format_final_answer_for_slack()</code>에서 메타 서문, 내부 라벨, 운영 상세, secret 패턴을 정리한다.</p>
+              <p><code>format_final_answer_for_slack()</code>에서 메타 서문, 내부 라벨, 운영 상세, 토큰/키처럼 보이는 민감값 패턴을 정리한다.</p>
             </div>
             <div class="card">
-              <div class="cat">Session</div>
+              <div class="cat">분석 세션</div>
               <div class="claim">스레드별 순서 보장</div>
-              <p>Slack thread 하나를 Claude session 하나로 묶고, 같은 thread는 FIFO로만 실행한다.</p>
+              <p>Slack 스레드 하나를 Claude 분석 세션 하나로 묶고, 같은 스레드의 질문은 들어온 순서대로만 실행한다.</p>
             </div>
             <div class="card">
-              <div class="cat">Control</div>
-              <div class="claim">중단과 heartbeat</div>
+              <div class="cat">실행 제어</div>
+              <div class="claim">중단과 무응답 방지 상태 갱신</div>
               <p>긴 작업 중 멈춘 것처럼 보이지 않게 진행 메시지를 갱신하고, 사용자가 중단할 수 있게 했다.</p>
             </div>
             <div class="card">
-              <div class="cat">Audit</div>
+              <div class="cat">실행 기록</div>
               <div class="claim">근거는 로그로 이동</div>
-              <p>질문, 상태, Claude turn, BigQuery 사용량, raw trace, 피드백을 <code>logs/analyst-bot/</code>에 남긴다.</p>
+              <p>질문, 실행 상태, Claude 사용 기록, BigQuery 사용량, 도구 실행 원문, 피드백을 <code>logs/analyst-bot/</code>에 남긴다.</p>
             </div>
             <div class="card">
               <div class="cat">Metabase</div>
               <div class="claim">선택 기능으로 연결</div>
-              <p>API key가 있을 때만 MCP config를 주입하고, Slack에는 카드/대시보드 링크만 노출한다.</p>
+              <p>Metabase 접속 키가 있을 때만 카드 생성 도구를 붙이고, Slack에는 카드/대시보드 링크만 노출한다.</p>
             </div>
             <div class="card">
-              <div class="cat">Cost guard</div>
+              <div class="cat">비용 경계</div>
               <div class="claim">비용 경계 명확화</div>
               <p><code>.bigqueryrc</code>로 기본 스캔 상한을 넣고, 하드 quota는 콘솔 설정이 필요하다고 문서화했다.</p>
             </div>
           </div>
+
+          <h3>최종 답변 처리 파이프라인</h3>
+          <div class="pipeline" aria-label="Slack 최종 답변 후처리 파이프라인">
+            <div class="pipe-row">
+              <div class="pipe-key">1 · Claude 원문 답변</div>
+              <div class="pipe-val">
+                <b>모델은 분석 절차를 모두 수행한다</b>
+                <span>검증, 실행 전 비용 점검, 재현 SQL 저장 같은 작업은 계속 한다. 바뀐 것은 그 세부를 Slack에 그대로 내보내지 않는다는 점이다.</span>
+              </div>
+            </div>
+            <div class="pipe-row">
+              <div class="pipe-key">2 · 불필요한 머리말 제거</div>
+              <div class="pipe-val">
+                <b>답변 위에 붙은 자기소개와 구분선을 제거</b>
+                <span><code>분석 완료</code>, <code>아래가 답변입니다</code>, <code>---</code>처럼 사용자가 볼 필요 없는 머리말을 걷어낸다.</span>
+              </div>
+            </div>
+            <div class="pipe-row">
+              <div class="pipe-key">3 · 내부 라벨 제거</div>
+              <div class="pipe-val">
+                <b>내부 체크리스트 라벨 제거</b>
+                <span><code>모드</code>, <code>인풋</code>, <code>관측 grain</code>, <code>세그먼트</code>, <code>성공 지표</code>는 분석자에게만 의미가 있다.</span>
+              </div>
+            </div>
+            <div class="pipe-row">
+              <div class="pipe-key">4 · 운영 상세 제거</div>
+              <div class="pipe-val">
+                <b>운영 증거를 Slack에서 제거</b>
+                <span><code>dry run</code>(실행 전 점검), <code>bq query</code>, <code>dbt compile</code>, <code>Claude N턴</code>, <code>BigQuery N GiB</code>, SQL 파일 경로는 실행 기록으로 간다.</span>
+              </div>
+            </div>
+            <div class="pipe-row">
+              <div class="pipe-key">5 · 쉬운 용어로 치환</div>
+              <div class="pipe-val">
+                <b>스키마 말을 Slack 말로 바꿈</b>
+                <span><code>active actor</code>는 <code>활동 계정</code>, <code>actor.id</code>는 <code>계정 ID</code>, <code>event</code>는 <code>활동 기록</code>처럼 바꾼다.</span>
+              </div>
+            </div>
+            <div class="pipe-row">
+              <div class="pipe-key">6 · 길이 줄이기</div>
+              <div class="pipe-val">
+                <b>2,500자 안에 결론과 한계만 남김</b>
+                <span>긴 답변이 나오면 첫 결론과 핵심 문단, 한계 문단을 보존하고 나머지는 줄인다.</span>
+              </div>
+            </div>
+          </div>
+
+          <h3>코드에서 보는 위치</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>위치</th>
+                  <th>맡은 일</th>
+                  <th>문서에서 설명한 변화</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>APPEND_SYSTEM_PROMPT</code></td>
+                  <td>Claude에게 Slack 최종 답변 계약을 먼저 지시한다.</td>
+                  <td>“동료처럼 짧게”, “기술 감사 노트 금지”, “간단히면 2-4문장”</td>
+                </tr>
+                <tr>
+                  <td><code>OPERATIONAL_DETAIL_LINE_PATTERNS</code></td>
+                  <td>Slack에 남기면 안 되는 운영 라인을 패턴으로 제거한다.</td>
+                  <td>실행 전 점검값, bq/dbt 명령, 비용 상세, Metabase 도구 내부값 은닉</td>
+                </tr>
+                <tr>
+                  <td><code>casualize_slack_terms()</code></td>
+                  <td>스키마 용어를 Slack 친화 표현으로 바꾼다.</td>
+                  <td><code>active actor</code> → 활동 계정, <code>event</code> → 활동 기록</td>
+                </tr>
+                <tr>
+                  <td><code>format_final_answer_for_slack()</code></td>
+                  <td>최종 게시 직전의 전체 후처리 관문이다.</td>
+                  <td>민감값 가리기, 불필요한 머리말 제거, Slack 문법 변환, 길이 제한</td>
+                </tr>
+                <tr>
+                  <td><code>slack_progress_line()</code></td>
+                  <td>Claude 도구 실행 원문을 사람이 읽는 진행 상태로 바꾼다.</td>
+                  <td>도구명 대신 “데이터를 조회하고 있습니다” 같은 문구 노출</td>
+                </tr>
+                <tr>
+                  <td><code>build_command()</code> / 세션 관리 객체</td>
+                  <td>스레드별 Claude 분석 세션 생성·이어가기와 실행 순서를 관리한다.</td>
+                  <td>같은 스레드에서 답변 순서가 꼬이지 않게 제어</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section>
-          <h2>Contract</h2>
+          <h2>답변 계약</h2>
           <p class="sub">Slack에 보이면 안 되는 것들을 계약으로 박았다</p>
           <div class="table-wrap">
             <table>
@@ -615,15 +1232,15 @@
                 </tr>
                 <tr>
                   <td>판단에 필요한 한계</td>
-                  <td><code>dry run</code>, <code>bq query</code>, <code>dbt compile</code></td>
+                  <td>실행 전 비용 점검, BigQuery/dbt 명령줄</td>
                 </tr>
                 <tr>
                   <td>Metabase 카드/대시보드 링크</td>
-                  <td>MCP 이름, API key, collection id, permission 내부값</td>
+                  <td>Metabase 도구 이름, 접속 키, 저장 위치 id, 권한 내부값</td>
                 </tr>
                 <tr>
                   <td>실행이 길어질 때의 진행 상태</td>
-                  <td>Claude turn 수, BigQuery GiB, raw trace</td>
+                  <td>Claude 사용 횟수, BigQuery 처리량, 도구 실행 원문</td>
                 </tr>
               </tbody>
             </table>
@@ -633,38 +1250,73 @@
             <span class="label">검증</span>
             <p>
               <code>uv run pytest tests/test_slack_analyst_bot.py</code> 기준 <b>29 passed</b>.
-              답변 후처리, 캐주얼 용어 치환, Metabase MCP config, 중단 버튼, 피드백 버튼, Slack raw error 은닉을 회귀에 포함했다.
+              답변 후처리, 쉬운 용어 치환, Metabase 연결 설정, 중단 버튼, 피드백 버튼, Slack 오류 원문 은닉을 회귀에 포함했다.
             </p>
           </div>
         </section>
       </div>
 
-      <div class="panel" id="p3" role="tabpanel" aria-labelledby="t3" tabindex="0" hidden>
+      <div class="panel" id="docker">
         <section>
-          <h2>Container</h2>
+          <h2>Docker</h2>
           <p class="sub">Docker는 배포 편의보다 권한 경계 때문에 넣었다</p>
           <p>
             로컬 세션 도구는 레포 밖 파일을 읽을 수 있었다. 이름 기반 deny만으로는 충분하지 않아서,
-            실제 운영 경계는 Claude permission list가 아니라 컨테이너 마운트로 잡았다.
+            실제 운영 경계는 Claude 도구 허용 목록이 아니라 컨테이너에 어떤 폴더를 보여줄지 정하는 마운트 설정으로 잡았다.
+          </p>
+          <p>
+            여기서 Docker의 역할은 “어디서나 쉽게 실행”보다 “볼 수 있는 파일을 줄이기”에 가깝다.
+            컨테이너 안에는 분석에 필요한 레포 조각과 읽기 전용 BigQuery 키만 넣고,
+            운영자 개인 키나 호스트의 Claude 로그인 파일은 넣지 않는다. 그래서 컨테이너 안에서
+            파일 읽기 권한이 넓더라도 실제로 볼 수 있는 민감 파일이 없다.
           </p>
 
-          <div class="split">
-            <div class="col">
-              <h3>컨테이너 안에 넣는 것</h3>
+          <div class="docker-map" aria-label="Docker 권한 경계">
+            <div class="side-list">
+              <h3>호스트</h3>
               <ul>
-                <li>필요한 레포 경로를 읽기 전용으로 mount</li>
-                <li>read-only BigQuery 서비스 계정 키</li>
-                <li>ad-hoc SQL을 쓸 <code>dbt/gharchive_metrics/analyses/</code></li>
-                <li>dbt target, Claude credential, audit state용 named volume</li>
+                <li>운영자 키와 개인 설정</li>
+                <li><code>~/.claude</code>, macOS 로그인 보관소(Keychain)</li>
+                <li><code>gcp-key.json</code>, <code>secrets/</code></li>
+                <li>레포 전체 쓰기 권한</li>
               </ul>
             </div>
-            <div class="col">
-              <h3>컨테이너 밖에 두는 것</h3>
+            <div class="boundary">
+              <div class="caption">analyst-bot container</div>
+              <div class="boundary-grid">
+                <div class="dock-node">
+                  <b>비root 사용자</b>
+                  <span><code>analyst</code>라는 낮은 권한 사용자로 실행</span>
+                </div>
+                <div class="dock-node">
+                  <b>읽기 전용 레포</b>
+                  <span>필요한 경로만 <code>/app</code>에 연결</span>
+                </div>
+                <div class="dock-node">
+                  <b>좁은 BQ 키</b>
+                  <span><code>/secrets/analyst-bq-key.json</code></span>
+                </div>
+                <div class="dock-node">
+                  <b>쓰기 허용 구역</b>
+                  <span>SQL 저장, dbt 결과, 실행 기록만 쓰기 허용</span>
+                </div>
+                <div class="dock-node">
+                  <b>Claude 로그인</b>
+                  <span>컨테이너 안에서 한 번 로그인 후 Docker 저장 공간에 보관</span>
+                </div>
+                <div class="dock-node">
+                  <b>백그라운드 로그</b>
+                  <span><code>docker compose logs -f</code></span>
+                </div>
+              </div>
+            </div>
+            <div class="side-list">
+              <h3>외부 연결</h3>
               <ul>
-                <li>호스트 <code>~/.claude</code> 전체</li>
-                <li>운영자 GCP 키</li>
-                <li><code>/app/secrets</code>, <code>/app/gcp-key.json</code></li>
-                <li>레포 전체 쓰기 권한</li>
+                <li>Slack 실시간 연결</li>
+                <li>BigQuery 읽기 전용 조회</li>
+                <li>선택: Metabase API</li>
+                <li>실행 기록은 Docker 저장 공간에 저장</li>
               </ul>
             </div>
           </div>
@@ -672,17 +1324,18 @@
           <div class="callout warn">
             <span class="label">로그인 방식</span>
             <p>
-              호스트 로그인을 그대로 넘기지 않는다. 컨테이너 안에서 한 번 OAuth 로그인하고,
-              결과는 <code>analyst-claude</code> named volume에 저장한다.
+              호스트 로그인을 그대로 넘기지 않는다. 컨테이너 안에서 한 번 Claude 계정 로그인을 하고,
+              결과는 <code>analyst-claude</code>라는 Docker 저장 공간에 저장한다. 이후에는 컨테이너를 껐다 켜도
+              같은 로그인을 재사용한다.
             </p>
           </div>
 
           <pre><code>docker compose run --rm -it --entrypoint claude analyst-bot auth login</code></pre>
         </section>
 
-        <section>
-          <h2>Runbook</h2>
-          <p class="sub">headless 실행은 확인됐고, 다음은 톤 재-canary다</p>
+        <section id="status">
+          <h2>현재 상태</h2>
+          <p class="sub">백그라운드 실행은 확인됐고, 다음은 실제 Slack에서 쉬운 말투를 다시 확인하는 것이다</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -694,37 +1347,37 @@
               </thead>
               <tbody>
                 <tr>
-                  <td><span class="status s-ok">완료</span> build</td>
+                  <td><span class="status s-ok">완료</span> 이미지 빌드</td>
                   <td><code>docker compose build analyst-bot</code> 통과</td>
-                  <td>entrypoint, gcloud, dbt, bq 경로 확인</td>
+                  <td>컨테이너 시작 스크립트, gcloud, dbt, BigQuery CLI 경로 확인</td>
                 </tr>
                 <tr>
-                  <td><span class="status s-ok">완료</span> dry-run</td>
+                  <td><span class="status s-ok">완료</span> 설정 점검</td>
                   <td><code>docker compose run --rm analyst-bot --dry-run</code> 통과</td>
-                  <td>repo/state/gcloud 위치와 scan ceiling 확인</td>
+                  <td>실제 분석은 하지 않고 레포, 실행 기록 저장 위치, gcloud 위치, 쿼리 스캔 기본 상한을 확인</td>
                 </tr>
                 <tr>
-                  <td><span class="status s-ok">완료</span> self-test</td>
+                  <td><span class="status s-ok">완료</span> 세션 이어가기 자체 점검</td>
                   <td><code>docker compose run --rm analyst-bot --self-test</code> 통과</td>
-                  <td>session 생성과 <code>--resume</code> 동작 확인</td>
+                  <td>첫 질문 뒤 같은 Slack 스레드의 후속 질문을 이어서 처리할 수 있는지 확인</td>
                 </tr>
                 <tr>
-                  <td><span class="status s-ok">완료</span> headless</td>
-                  <td><code>docker compose up -d analyst-bot</code> 후 Socket Mode 연결</td>
+                  <td><span class="status s-ok">완료</span> 백그라운드 실행</td>
+                  <td><code>docker compose up -d analyst-bot</code> 후 Slack 실시간 연결</td>
                   <td>로그에 <code>Bolt app is running!</code> 표시</td>
                 </tr>
                 <tr>
-                  <td><span class="status s-warn">남음</span> Slack tone canary</td>
-                  <td>첫 canary는 기능 통과, 말투가 기술적으로 읽힘</td>
-                  <td>용어와 짧은 답변 규칙 보강 후 재확인 필요</td>
+                  <td><span class="status s-warn">남음</span> 실제 Slack 말투 확인</td>
+                  <td>첫 실제 Slack 테스트는 기능 통과, 말투가 기술적으로 읽힘</td>
+                  <td>용어와 짧은 답변 규칙을 보강했으므로 같은 질문을 다시 던져 쉬운 답변으로 보이는지 확인</td>
                 </tr>
                 <tr>
-                  <td><span class="status s-warn">남음</span> Metabase canary</td>
+                  <td><span class="status s-warn">남음</span> Metabase 카드 생성 확인</td>
                   <td><code>METABASE_API_KEY</code> 필요</td>
                   <td>카드 생성과 Slack 버튼 노출 확인</td>
                 </tr>
                 <tr>
-                  <td><span class="status s-warn">남음</span> BigQuery hard quota</td>
+                  <td><span class="status s-warn">남음</span> BigQuery 강제 사용량 제한</td>
                   <td>콘솔 설정 필요</td>
                   <td><code>.bigqueryrc</code>는 기본값이지 완전한 하드 상한은 아님</td>
                 </tr>
@@ -741,50 +1394,24 @@ docker compose up -d analyst-bot</code></pre>
       </div>
 
       <section>
-        <h2>References</h2>
-        <p class="sub">더 자세한 문서는 역할별로 나눠 둔다</p>
+        <h2>참고 문서</h2>
+        <p class="sub">브라우저에서 읽을 문서와 레포 원문을 분리한다</p>
+        <p>
+          이 변경 요약은 발표·공유용 HTML을 정본으로 본다. 운영 런북 원문은 레포 안의 Markdown에 남아 있지만,
+          핵심 흐름과 명령은 위 섹션에 흡수해 두었다.
+        </p>
         <ul>
-          <li>운영 인수인계: <a href="./analyst_bot_handoff.md">docs/analyst_bot_handoff.md</a></li>
-          <li>짧은 시연 절차: <a href="./analyst_bot_demo_runbook.md">docs/analyst_bot_demo_runbook.md</a></li>
-          <li>Docker 운영 경로: <a href="./analyst_bot_docker.md">docs/analyst_bot_docker.md</a></li>
+          <li>전체 설계 HTML: <a href="./analyst_bot_design.html">docs/analyst_bot_design.html</a></li>
+          <li>강의용 개요 HTML: <a href="./analyst_bot_overview.html">docs/analyst_bot_overview.html</a></li>
           <li>hamji 적용 상세: <a href="../reports/20260801_slack_analyst_bot_hamji_adaptation.html">reports/20260801_slack_analyst_bot_hamji_adaptation.html</a></li>
+          <li>운영 원문 파일명: <code>docs/analyst_bot_handoff.md</code>, <code>docs/analyst_bot_demo_runbook.md</code>, <code>docs/analyst_bot_docker.md</code></li>
         </ul>
       </section>
 
       <footer>
-        작성 기준: 2026-08-02. 기능 canary는 통과했고, Slack 말투 보강 후 재-canary가 다음 단계다.
+        작성 기준: 2026-08-02. Docker에서 실제 Slack 질문 처리까지는 확인했고, 쉬운 말투로 다시 답하는지 확인하는 단계가 남아 있다.
       </footer>
     </main>
 
-    <script>
-      const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
-      const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
-
-      function selectTab(tab) {
-        tabs.forEach((item) => {
-          const selected = item === tab;
-          item.setAttribute('aria-selected', String(selected));
-          item.tabIndex = selected ? 0 : -1;
-        });
-        panels.forEach((panel) => {
-          panel.hidden = panel.id !== tab.getAttribute('aria-controls');
-        });
-      }
-
-      tabs.forEach((tab, index) => {
-        tab.addEventListener('click', () => selectTab(tab));
-        tab.addEventListener('keydown', (event) => {
-          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-          event.preventDefault();
-          let nextIndex = index;
-          if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
-          if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
-          if (event.key === 'Home') nextIndex = 0;
-          if (event.key === 'End') nextIndex = tabs.length - 1;
-          tabs[nextIndex].focus();
-          selectTab(tabs[nextIndex]);
-        });
-      });
-    </script>
   </body>
 </html>
