@@ -95,7 +95,9 @@
 
       .toc::-webkit-scrollbar { display: none; }
 
-      .toc a {
+      .tab {
+        appearance: none;
+        cursor: pointer;
         white-space: nowrap;
         background: var(--paper);
         color: var(--muted);
@@ -107,23 +109,24 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        text-decoration: none;
       }
 
-      .toc a:hover { color: var(--ink); }
-      .toc a:focus-visible { outline: 2px solid var(--ops); outline-offset: 2px; }
+      .tab:hover { color: var(--ink); }
+      .tab:focus-visible { outline: 2px solid var(--ops); outline-offset: 2px; }
       .toc .idx {
         font-size: 11px;
         font-variant-numeric: tabular-nums;
         color: #94a3b8;
         font-weight: 780;
       }
-      .toc a.primary {
+      .tab[aria-selected="true"] {
         background: var(--ops);
         border-color: var(--ops);
         color: #fff;
       }
-      .toc a.primary .idx { color: rgb(255 255 255 / 0.72); }
+      .tab[aria-selected="true"] .idx { color: rgb(255 255 255 / 0.72); }
+
+      .panel[hidden] { display: none; }
 
       section {
         background: var(--paper);
@@ -720,7 +723,7 @@
         .deck { width: calc(100vw - 48px); max-width: calc(100vw - 48px); margin-left: 10px; margin-right: auto; padding-bottom: 48px; }
         section { padding: 17px 16px; }
         .toc { flex-wrap: wrap; overflow-x: visible; }
-        .toc a { flex: 0 0 100%; justify-content: center; max-width: 100%; padding: 7px 9px; font-size: 12.5px; }
+        .tab { flex: 0 0 100%; justify-content: center; max-width: 100%; padding: 7px 9px; font-size: 12.5px; }
         .toc .idx { display: none; }
         .snapshot { grid-template-columns: 1fr; }
       }
@@ -739,13 +742,13 @@
           이 문서만 읽어도 무엇이 바뀌었고, 왜 바뀌었고, Docker 안에서 어떻게 돌아가는지 파악할 수 있게 정리했다.
           핵심 기준은 <b>Slack은 의사결정 화면, 근거는 로그</b>다.
         </p>
-        <nav class="toc" aria-label="문서 목차">
-          <a class="primary" href="#summary"><span class="idx">01</span>한 장 요약</a>
-          <a href="#workflow"><span class="idx">02</span>답변과 UX</a>
-          <a href="#implementation"><span class="idx">03</span>기술 변경</a>
-          <a href="#docker"><span class="idx">04</span>Docker 실행</a>
-          <a href="#status"><span class="idx">05</span>현재 상태</a>
-        </nav>
+        <div class="toc" role="tablist" aria-label="문서 구획">
+          <button class="tab" type="button" role="tab" id="t-summary" aria-controls="summary" aria-selected="true"><span class="idx">01</span>한 장 요약</button>
+          <button class="tab" type="button" role="tab" id="t-workflow" aria-controls="workflow" aria-selected="false" tabindex="-1"><span class="idx">02</span>답변과 UX</button>
+          <button class="tab" type="button" role="tab" id="t-implementation" aria-controls="implementation" aria-selected="false" tabindex="-1"><span class="idx">03</span>기술 변경</button>
+          <button class="tab" type="button" role="tab" id="t-docker" aria-controls="docker" aria-selected="false" tabindex="-1"><span class="idx">04</span>Docker 실행</button>
+          <button class="tab" type="button" role="tab" id="t-status" aria-controls="status" aria-selected="false" tabindex="-1"><span class="idx">05</span>현재 상태</button>
+        </div>
       </div>
 
       <div class="snapshot" aria-label="현재 상태">
@@ -776,7 +779,7 @@
         </div>
       </div>
 
-      <section id="summary">
+      <section class="panel" id="summary" role="tabpanel" aria-labelledby="t-summary" tabindex="0">
         <h2>한 장 요약</h2>
         <p class="sub">바뀐 구조를 한 장으로 보면 이렇다</p>
         <p>
@@ -879,7 +882,7 @@
         </div>
       </section>
 
-      <div class="panel" id="workflow">
+      <div class="panel" id="workflow" role="tabpanel" aria-labelledby="t-workflow" tabindex="0" hidden>
         <section>
           <h2>답변 흐름</h2>
           <p class="sub">햄찌에서 가져온 건 코드보다 운영 감각이다</p>
@@ -1075,7 +1078,7 @@ Claude 4턴.</div>
         </section>
       </div>
 
-      <div class="panel" id="implementation">
+      <div class="panel" id="implementation" role="tabpanel" aria-labelledby="t-implementation" tabindex="0" hidden>
         <section>
           <h2>기술 변경</h2>
           <p class="sub">Docker를 빼면 변경은 다섯 가지 축으로 정리된다</p>
@@ -1256,7 +1259,7 @@ Claude 4턴.</div>
         </section>
       </div>
 
-      <div class="panel" id="docker">
+      <div class="panel" id="docker" role="tabpanel" aria-labelledby="t-docker" tabindex="0" hidden>
         <section>
           <h2>Docker</h2>
           <p class="sub">Docker는 배포 편의보다 권한 경계 때문에 넣었다</p>
@@ -1333,7 +1336,9 @@ Claude 4턴.</div>
           <pre><code>docker compose run --rm -it --entrypoint claude analyst-bot auth login</code></pre>
         </section>
 
-        <section id="status">
+      </div>
+
+      <section class="panel" id="status" role="tabpanel" aria-labelledby="t-status" tabindex="0" hidden>
           <h2>현재 상태</h2>
           <p class="sub">백그라운드 실행은 확인됐고, 다음은 실제 Slack에서 쉬운 말투를 다시 확인하는 것이다</p>
           <div class="table-wrap">
@@ -1390,8 +1395,7 @@ Claude 4턴.</div>
 docker compose run --rm analyst-bot --dry-run
 docker compose run --rm analyst-bot --self-test
 docker compose up -d analyst-bot</code></pre>
-        </section>
-      </div>
+      </section>
 
       <section>
         <h2>참고 문서</h2>
@@ -1413,5 +1417,35 @@ docker compose up -d analyst-bot</code></pre>
       </footer>
     </main>
 
+    <script>
+      const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+      const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+
+      function selectTab(tab) {
+        tabs.forEach((item) => {
+          const selected = item === tab;
+          item.setAttribute("aria-selected", String(selected));
+          item.tabIndex = selected ? 0 : -1;
+        });
+        panels.forEach((panel) => {
+          panel.hidden = panel.id !== tab.getAttribute("aria-controls");
+        });
+      }
+
+      tabs.forEach((tab, index) => {
+        tab.addEventListener("click", () => selectTab(tab));
+        tab.addEventListener("keydown", (event) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          let nextIndex = index;
+          if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+          if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+          if (event.key === "Home") nextIndex = 0;
+          if (event.key === "End") nextIndex = tabs.length - 1;
+          tabs[nextIndex].focus();
+          selectTab(tabs[nextIndex]);
+        });
+      });
+    </script>
   </body>
 </html>
