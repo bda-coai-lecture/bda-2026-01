@@ -28,6 +28,17 @@ export METABASE_PUBLIC_URL=http://localhost:3001
 export METABASE_API_KEY=...
 ```
 
+Docker Compose로 실행하는 봇은 Metabase 접속 URL이 다르다. 컨테이너 안에서
+`localhost:3001`은 Metabase가 아니라 봇 컨테이너 자신이므로, Docker에서는 아래 `.env`
+설정을 쓴다.
+
+```bash
+ANALYST_ENABLE_METABASE_MCP=1
+ANALYST_METABASE_INTERNAL_URL=http://metabase:3000
+ANALYST_METABASE_PUBLIC_URL=http://localhost:3001
+METABASE_API_KEY=...
+```
+
 ## 2. 봇 켜기
 
 ```bash
@@ -156,15 +167,6 @@ docker compose logs -f analyst-bot
 Docker 기본값은 headless지만 `ANALYST_LOG_LEVEL=INFO`라서 `docker compose logs`에 진행 로그가 남아야 한다.
 `--dry-run`에서 gcloud config 경로가 `/home/analyst/.config/gcloud`, state dir이 `/home/analyst/state`로 보이면 맞다.
 
-Docker에서 Metabase MCP를 켜려면 `.env`에 아래를 둔다.
-
-```bash
-ANALYST_ENABLE_METABASE_MCP=1
-ANALYST_METABASE_INTERNAL_URL=http://metabase:3000
-ANALYST_METABASE_PUBLIC_URL=http://localhost:3001
-METABASE_API_KEY=...
-```
-
 ## 8. 비용/실행 상세 읽는 법
 
 Slack 최종 답변에는 비용·스캔 상세를 표시하지 않는다. 완료 후 실제 사용량은
@@ -185,4 +187,5 @@ Slack 최종 답변에는 비용·스캔 상세를 표시하지 않는다. 완�
 | 진행 메시지가 내부 로그처럼 보임 | `scripts/slack_analyst_bot.py` 최신 변경으로 실행 중인지 확인 |
 | 중단 후 성공 답변이 올라옴 | 취소 처리 회귀. `tests/test_slack_analyst_bot.py`를 먼저 실행 |
 | BigQuery 권한 오류 | `--dry-run`에서 `bq_identity`가 `bda-analyst-ro@...`인지 확인 |
-| Metabase 카드가 안 만들어짐 | `ANALYST_ENABLE_METABASE_MCP=1`, `METABASE_URL`, `METABASE_API_KEY` 확인 |
+| Metabase 카드가 안 만들어짐 | `ANALYST_ENABLE_METABASE_MCP=1`, `METABASE_API_KEY` 확인. Docker Compose에서는 내부 URL이 `http://metabase:3000`이어야 함 |
+| 카드 생성 요청이 10분 이상 걸림 | `docker compose logs --tail=200 analyst-bot`에서 `bq` 120초 timeout, Metabase `execute_query` 500, `mcp__metabase__create_card` 시각을 확인. 이미 검증된 SQL/기존 카드 요청을 재분석 없이 처리하는 fast path는 아직 없음 |

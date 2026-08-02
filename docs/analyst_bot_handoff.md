@@ -204,19 +204,27 @@ Docker/headless에서도 기본 `--log-level INFO`로 기동·턴 trace가 `dock
 `Bash(uv run ... dbt:*)`가 `compile`과 `build`를 구분 못 하는 구조 자체는 남아 있다.
 같은 한계가 6번(명령 중간 플래그)에서 다시 나타난다 — **접두 매칭은 인자를 못 본다.**
 
-**11. Metabase MCP 실제 카드 생성 canary가 남았다.** 코드/CLI/Docker wiring과 API key 비노출 회귀는 통과했다.
-다만 현재 로컬 환경에는 `METABASE_URL`/`METABASE_API_KEY`가 없어 실제 `create_card` 호출은 확인하지 못했다.
-시연 전에 `ANALYST_ENABLE_METABASE_MCP=1`로 켠 뒤 추이/Top-N 질문에서 카드 URL과 Slack 버튼까지 확인한다.
+**11. Metabase MCP 실제 카드 생성 canary — 통과.** `ANALYST_ENABLE_METABASE_MCP=1`,
+`ANALYST_METABASE_INTERNAL_URL=http://metabase:3000`, `ANALYST_METABASE_PUBLIC_URL=http://localhost:3001`,
+`METABASE_API_KEY` 설정으로 Docker 봇을 재기동했고, 로그에서 `metabase_mcp=enabled`와
+runtime MCP config 0600을 확인했다. 실제 Slack 요청에서 `mcp__metabase__create_card`가
+카드 1023을 만들고 `execute_card`도 성공했다. Slack 답변에는 public URL만 노출됐다.
+
+**12. 카드 생성만 요청해도 전체 분석 루틴을 타서 느리다.** 2026-08-02 canary에서 카드 생성 자체는
+약 2초였지만, 최종 답변까지 약 12분 걸렸다. 원인은 (a) 분석 스킬/건강성 검증 강제,
+(b) `bq` dry run 120초 timeout 후 백그라운드 대기, (c) Metabase `execute_query` 500 2회였다.
+이미 검증된 SQL/기존 카드 링크만 요청하는 경우에는 재분석 없이 `list/search/create_card`만 수행하는
+fast path가 필요하다.
 
 ### 데이터 쪽 후속 과제
 
-**12. `dim_push_automation_actor`가 자동화를 거의 못 잡는다.**
+**13. `dim_push_automation_actor`가 자동화를 거의 못 잡는다.**
 등재 20,992명 중 `explicit_bot`(로그인이 `[bot]`으로 끝남)이 20,706명(98.6%),
 `machine_rate_suspect`는 **305명(1.5%)**. 분당 100건 문턱이 너무 높아 거의 발화하지 않는다.
 사실상 "자기 이름에 `[bot]`을 붙인 계정 목록"이다.
-→ **일당 기준 velocity로 재설계 필요.** 이것 때문에 리포트 결론 하나를 철회했다(12번).
+→ **일당 기준 velocity로 재설계 필요.** 이것 때문에 리포트 결론 하나를 철회했다.
 
-**13. 요일별 역전의 원인은 미규명.** `reports/20260726_weekday_push_divergence.md`.
+**14. 요일별 역전의 원인은 미규명.** `reports/20260726_weekday_push_divergence.md`.
 주말에 actor는 26% 줄고 event는 8.7% 늘며 1인당 event가 47% 오른다(raw 대조로 확인된 사실).
 최초에 "자동화 봇 가설 반증"이라 결론했으나 11번 때문에 **철회**했다.
 검정 도구가 무효였으므로 원인은 여전히 열려 있다.

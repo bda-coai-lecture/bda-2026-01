@@ -178,6 +178,7 @@ services:
     volumes:
       - ./.claude:/app/.claude:ro
       - ./.git:/app/.git:ro
+      - ./docker-compose.yml:/app/docker-compose.yml:ro
       - ./AGENTS.md:/app/AGENTS.md:ro
       - ./README.md:/app/README.md:ro
       - ./config:/app/config:ro

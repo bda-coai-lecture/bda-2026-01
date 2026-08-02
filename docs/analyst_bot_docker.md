@@ -86,6 +86,11 @@ Metabase MCP는 기본 꺼짐이다. 켜려면 `METABASE_API_KEY`가 필요하�
 API key는 CLI 인자로 넘기지 않고 runtime MCP config에만 기록한다. config 파일명은
 `metabase-credentials-mcp.json`이고, 파일 권한은 0600이며, 세션 Read 차단 목록에도 들어간다.
 
+Docker Compose로 띄운 봇에서 Metabase에 붙을 때는 `localhost:3001`을 쓰지 않는다.
+컨테이너 내부의 `localhost`는 봇 컨테이너 자신이므로 MCP 접속 URL은
+`http://metabase:3000`이어야 한다. Slack에 노출할 링크만 브라우저용
+`http://localhost:3001`로 둔다.
+
 ## Anthropic 인증 — 반드시 읽을 것
 
 **컨테이너 안의 CLI는 운영자의 호스트 로그인을 쓸 수 없다.**
@@ -265,10 +270,11 @@ docker compose run --rm --entrypoint bash analyst-bot          # 셸로 들어�
 전체 레포를 `/app`에 마운트하지 않는다. 특히 `secrets/`는 `/app` 아래에 두지 않고,
 BigQuery 키만 `/secrets/analyst-bq-key.json`으로 별도 read-only 마운트한다.
 코드에도 `analyst-bq-key.json`과 `/secrets` file-reading 명령 deny, 최종 Slack 답변 redaction을 추가했다.
-실행되기 때문에 되살리려면 컨테이너 여부로 분기해야 하고(예: 환경변수 게이트),
-그건 코드 변경 승인이 필요한 별도 결정이다. 되살릴 때도 `DISALLOWED_TOOLS`의
-`Read(**/gcp-key.json)`류 규칙은 그대로 두는 것이 좋다 — 마운트된 BQ 키 자체를
-세션이 출력하는 것은 여전히 막을 이유가 있다.
+`docker-compose.yml`은 예외적으로 `/app/docker-compose.yml`에 read-only 마운트한다.
+이 파일이 없으면 컨테이너 안 `git status`가 compose 파일을 삭제된 파일로 오진하고,
+봇이 Metabase 스택 상태를 잘못 판단할 수 있다.
+이 마운트 경계를 바꿀 때도 `DISALLOWED_TOOLS`의 `Read(**/gcp-key.json)`류 규칙은
+그대로 둔다. 마운트된 BQ 키 자체를 세션이 출력하는 것은 여전히 막을 이유가 있다.
 
 ## 트러블슈팅
 
@@ -284,6 +290,7 @@ BigQuery 키만 `/secrets/analyst-bq-key.json`으로 별도 read-only 마운트�
 | Slack에 답이 안 온다 | 채널에 봇 초대(`/invite`), `ANALYST_CHANNEL_ALLOWLIST` 확인, Socket Mode/이벤트 구독 확인 |
 | Metabase 카드가 안 만들어진다 | `ANALYST_ENABLE_METABASE_MCP=1`, `METABASE_API_KEY`, `ANALYST_METABASE_INTERNAL_URL` 확인. compose 내부 URL은 보통 `http://metabase:3000` |
 | Slack의 Metabase 버튼이 안 열린다 | `ANALYST_METABASE_PUBLIC_URL` 확인. Docker 내부 URL(`http://metabase:3000`)이 Slack에 노출되면 브라우저에서 열리지 않는다 |
+| 카드 생성 요청이 10분 이상 걸린다 | 현재 프롬프트는 카드 생성만 요청해도 분석 스킬과 건강성 검증을 다시 탄다. 로그에서 `bq` 120초 timeout, Metabase `execute_query` 500, `mcp__metabase__create_card` 시각을 확인한다. 이미 검증된 SQL/기존 카드 링크 요청에는 fast path 코드가 아직 없다 |
 
 ## 검증 상태 (2026-08-02)
 
@@ -295,7 +302,8 @@ BigQuery 키만 `/secrets/analyst-bq-key.json`으로 별도 read-only 마운트�
 - `docker compose config --services` 통과, 서비스 목록에 `analyst-bot` 포함.
 - Metabase MCP on/off 명령 구성, `--strict-mcp-config`, `--mcp-config` 생성, API key argv 비노출, internal/public URL 분리 단위 테스트 통과.
 - `docker compose config` 렌더 기준으로 `analyst-bot`은 전체 레포가 아니라 필요한 경로만 `/app`에 마운트하고,
-  BQ 키는 `/secrets/analyst-bq-key.json`으로 별도 마운트한다.
+  BQ 키는 `/secrets/analyst-bq-key.json`으로 별도 마운트한다. `docker-compose.yml`은
+  컨테이너 내부 `git status` 오진 방지를 위해 read-only로 별도 마운트한다.
 - `docker compose build analyst-bot` 통과. 봇 프로세스 이미지에 `google-cloud-bigquery` 포함.
 - 컨테이너 격리 점검 통과: `/app/secrets`와 `/app/gcp-key.json` 없음, `/app` root는 쓰기 불가,
   `/home/analyst/state`, `/home/analyst/.config/gcloud`, `analyses/`, `target/`만 쓰기 가능.
@@ -317,9 +325,14 @@ BigQuery 키만 `/secrets/analyst-bq-key.json`으로 별도 read-only 마운트�
 - 컨테이너 안에서 `uv run --no-project --with dbt-bigquery dbt compile ... --select metrics_daily` 통과.
 - compile된 `metrics_daily.sql`을 `bq --dry_run`으로 검증해 bq CLI 경로가 동작하는 것을 확인했다
   (예상 스캔이 10 GiB를 넘는 쿼리는 실행하지 않는다).
+- Metabase API key를 로컬 Metabase에서 생성해 `.env`에만 저장하고, 값이 argv/log에 노출되지 않는 상태로
+  `analyst-bot`을 재기동했다. 로그에서 `metabase_mcp=enabled`, MCP runtime config 0600,
+  컨테이너 내부 `http://metabase:3000/api/health` 200을 확인했다.
+- Metabase MCP 실제 카드 생성 canary 통과. `BDA 데이터 플랫폼` 컬렉션에 native SQL 카드가 생성되고
+  Slack 답변에는 public URL(`http://localhost:3001/question/...`)이 노출됨을 확인했다.
 
 확인하지 못한 것:
 
 - 톤/용어 보강 후 Slack end-to-end 턴 재확인은 아직 남아 있다.
-- Metabase MCP 실제 카드 생성은 `METABASE_API_KEY` 미설정 상태라 아직 미검증이다.
+- 이미 검증된 SQL/기존 카드 링크 요청을 재분석 없이 처리하는 fast path는 아직 없다.
 - `docker build --check`는 호스트 buildx 버전에 따라 사용 불가할 수 있다.
