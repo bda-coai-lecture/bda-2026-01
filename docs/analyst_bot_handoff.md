@@ -1,6 +1,11 @@
 # 분석 자동화 핸드오프
 
 작성: 2026-07-26
+업데이트: 2026-08-02 — `hamji-portable-20260801` 운영 패턴을 참고해 Slack 표면/실행 제어/audit을 정리했고,
+PO가 읽는 최종 답변에서는 dry run/Claude 턴/BigQuery GiB 같은 운영 세부값을 숨긴다. Metabase MCP 연결 옵션도 추가했다.
+변경점 요약은 `reports/20260801_slack_analyst_bot_hamji_adaptation.html`을 본다.
+공유용 3단 구성 요약은 `docs/analyst_bot_change_summary.md`를 본다.
+짧게 켜고 시연하는 절차는 `docs/analyst_bot_demo_runbook.md`를 먼저 본다.
 
 Slack 스레드에서 받은 데이터 질문을 GitHub Archive/BigQuery로 분석해 답하는 봇과,
 그 봇이 따르는 분석 절차를 구축한 기록이다. 이 문서만 읽고 이어받을 수 있게 썼다.
@@ -13,8 +18,9 @@ set -a && source ./.env && set +a
 uv run --with slack-bolt --with google-cloud-bigquery python scripts/slack_analyst_bot.py
 ```
 
-`⚡️ Bolt app is running!` 이 뜨면 붙은 것이다. 채널에서 `@<봇> 질문` 으로 호출한다.
-**후속 질문도 멘션이 필요하다.** 멘션 없는 스레드 답글은 무시된다(비용 방어).
+`⚡️ Bolt app is running!` 이 뜨면 붙은 것이다. 채널에서는 `@<봇> 질문` 으로 호출한다.
+DM에서는 멘션 없이 질문해도 된다.
+채널 후속 질문은 멘션이 필요하다. 멘션 없는 채널 스레드 답글은 무시된다(비용 방어).
 
 붙기 전에 설정을 점검만 하려면:
 
@@ -27,11 +33,17 @@ uv run --with slack-bolt --with google-cloud-bigquery python scripts/slack_analy
 `--max-budget-usd`(기본 5, **달러 상한이 아니다** — 아래 2절 끝의 비용 구조 참조. 턴당 작업량 상한으로만 유효) ·
 `--max-scan-gib`(**기본 10**, 쿼리당 BigQuery 스캔 상한. `.bigqueryrc`로 적용된다 —
 환경변수만으로는 `bq`에 안 먹는다, 6절. 초과하면 세션이 멈추고 운영자가 이 값을 올려 재기동하는 것이 승인 절차다) ·
-`--timeout`(기본 900초) · `--headless`(로그 최소화, **현재 비권장** — 아래 5절)
+`--timeout`(기본 900초) · `--max-workers`(기본 1, 동시에 실행할 Slack 분석 턴 수) ·
+`--state-dir`(기본 `logs/analyst-bot`, audit/trace/feedback JSONL 저장) ·
+`--headless`(TTY 없는 실행 모드 표시) · `--log-level`(기본 INFO, Docker/headless에서도 로그 유지) ·
+`--enable-metabase-mcp`(선택, `METABASE_URL`/`METABASE_API_KEY` 필요) ·
+`--metabase-public-url`(선택, Docker 내부 URL 대신 Slack에 노출할 브라우저 URL) ·
+`--metabase-collection-name`(기본 `BDA 데이터 플랫폼`)
 
 ## 2. 검증된 현재 상태
 
-전부 2026-07-26에 실제로 실행해 확인한 것이다. 추측 없음.
+초기 BigQuery/Slack 연결 검증은 2026-07-26, Slack UX/Docker wiring 회귀 검증은 2026-08-01,
+PO-facing 후처리/Metabase MCP wiring 로컬 회귀 검증은 2026-08-02에 수행했다.
 
 | 항목 | 상태 | 근거 |
 |---|---|---|
@@ -51,13 +63,14 @@ uv run --with slack-bolt --with google-cloud-bigquery python scripts/slack_analy
 | dbt compile 호환 | 정상 | read-only 키로 compile + dry run 성공 |
 | dbt run 차단 | 의도대로 실패 | `Permission bigquery.tables.create denied` |
 | **실전 분석 턴 완주** | **성공** | 24턴. dry run → 본쿼리 → 재현용 SQL 2개 작성까지 진행. 답변은 raw↔mart 41일 전수 대조로 diff 0 확인, 급감 시작일이 07-06이 아니라 **07-09**임을 정정, 06-18~06-24 저빈도 6개 type 결손을 추가로 찾아냈다 |
-| 사용량/실지출 분리 푸터 | 구현 완료 | 턴 종료 시 `Claude 24턴 · 96초 · 환산 $0.94 (구독, 청구 없음)  \|  BigQuery 4.39 GiB · $0.03 (실지출, 24건)` |
-| 진행 추적 한 줄 요약 | 구현 완료 | 도구 40줄짜리 진행 메시지를 턴 종료 시 위 푸터 한 줄로 덮어쓴다 |
+| 사용량/실지출 분리 | 구현 완료 | Claude 턴 수·BigQuery GiB·dry run 결과는 `logs/analyst-bot/` audit/trace에만 남긴다. Slack 최종 답변 푸터는 실행 시간과 “상세 실행 내역은 로그에 저장됨”만 표시한다 |
+| 진행 메시지 정리 | 구현 완료 | 실행 중에는 사람이 읽는 상태만 표시하고 raw trace는 `logs/analyst-bot/traces/`에 남긴다. 턴 종료 시 진행 메시지는 완료/중단 상태로 접힌다 |
+| Metabase MCP 선택 연결 | 구현 완료, 실카드 canary 미검증 | `--enable-metabase-mcp` + `METABASE_URL` + `METABASE_API_KEY`가 있을 때 `--strict-mcp-config --mcp-config`로 `@easecloudio/mcp-metabase-server`를 주입한다. 답변에는 public 카드/대시보드 URL과 버튼만 노출한다 |
 
 수정 전 첫 실전 턴은 쿼리 4건이 전부 차단돼 봇이 기존 리포트만 읽고 답했다(18턴). 위 24턴은 그 뒤 재실행이다.
 
 **아직 미검증**: 채점 문제집 8문제(`docs/analysis_testset.md`) 통과 여부, 여러 사람이 동시에 쓰는 상황,
-응답 시간·재질문율 같은 효과 지표. 전부 측정 전이다.
+Metabase 실제 카드 생성 canary, 응답 시간·재질문율 같은 효과 지표. 전부 측정 전이다.
 
 ### 비용 구조 — 두 종류의 돈을 섞지 말 것
 
@@ -71,7 +84,7 @@ uv run --with slack-bolt --with google-cloud-bigquery python scripts/slack_analy
 
 둘을 합산하면 실지출을 **30배쯤 과대평가**한다. 리포트나 보고에 숫자를 옮길 때 반드시 분리해서 적을 것.
 
-턴이 끝나면 푸터가 둘을 나눠 찍는다. BigQuery 쪽 숫자는 추정이 아니라 **실측**이다 —
+턴이 끝나면 audit 로그가 둘을 나눠 기록한다. BigQuery 쪽 숫자는 추정이 아니라 **실측**이다 —
 봇 프로세스가 **운영자 키로** `INFORMATION_SCHEMA.JOBS`를 조회해 해당 턴 구간의
 `total_bytes_billed`를 합산한다. 세션 계정은 `bigquery.jobs.list`가 없어 자기 지출을 못 읽는다.
 **집계는 실행 주체가 아니라 권한 있는 쪽에서 한다** — 경계를 좁게 잡았으면 계측은 밖에서 해야 한다.
@@ -87,6 +100,7 @@ uv run --with slack-bolt --with google-cloud-bigquery python scripts/slack_analy
 | `secrets/gcloud-analyst/` | `bq` 경로 전용 gcloud 설정 | 읽기 전용 SA만 활성화. `child_env()`가 `CLOUDSDK_CONFIG`로 **강제 주입**. 재생성 명령은 6절 |
 | `gcp-key.json` (심볼릭 링크) | 운영자·Airflow | `dane-gcp@...`, **`roles/owner` 보유**. 봇은 쓰지 않는다 |
 | Anthropic | 호스트 로그인 | `dane@clobe.com`, Max 구독 |
+| `METABASE_URL` / `METABASE_PUBLIC_URL` / `METABASE_API_KEY` | 선택: Metabase MCP | `ANALYST_ENABLE_METABASE_MCP=1`일 때만 사용. `METABASE_URL`은 MCP 접속용, public URL은 Slack 링크용이다. API key 값은 CLI 인자·Slack 답변·audit에 출력하지 않는다 |
 
 **경고 — 앱을 공유한 대가.** 알림용 `SLACK_BOT_TOKEN`이 분석 봇 스코프를 전부 물려받았다.
 원래 `chat:write,incoming-webhook`만 있던 토큰이 지금은 채널 히스토리 읽기와
@@ -105,7 +119,8 @@ Slack 멘션 → 스레드 키 (channel, thread_ts)
            → session_id = uuid5("slack://team/channel/thread_ts")   ← 결정론적
            → 턴 1: claude -p --session-id / 턴 2+: --resume         ← cwd 고정 필수
            → analysis 스킬 (모드 7종 → 인풋 9종 → 건강성 → dry run → 분석)
-           → 진행 추적(chat.update 1.5초 스로틀) + 최종 답변 게시
+           → 필요 시 Metabase MCP 카드/대시보드 생성
+           → 진행 추적(chat.update 1.5초 스로틀) + PO용 최종 답변 게시
 ```
 
 **절대 건드리면 안 되는 세 가지.** 전부 실측으로 확인한 함정이다.
@@ -119,8 +134,9 @@ Slack 멘션 → 스레드 키 (channel, thread_ts)
 
 | 경로 | 역할 |
 |---|---|
-| `scripts/slack_analyst_bot.py` | 러너 (약 1,000줄) |
+| `scripts/slack_analyst_bot.py` | Slack Socket Mode 러너 |
 | `.claude/skills/analysis/` | 분석 절차 정본 (SKILL.md + references 5종) |
+| `docs/analyst_bot_demo_runbook.md` | 짧은 실행·시연·문제 확인 절차 |
 | `docs/analysis_workflow_review.md` | 외부 워크플로우 적용 판정 근거 |
 | `docs/analysis_testset.md` | 채점 문제집 8개 + 실측 기준선 |
 | `docs/analyst_bot_testcases.md` | 봇 러너 TC — Slack·세션·권한·비용·출력 계약 |
@@ -129,7 +145,7 @@ Slack 멘션 → 스레드 키 (channel, thread_ts)
 | `docs/analyst_bq_readonly.md` | BigQuery 권한 런북 |
 | `scripts/verify_bq_readonly.py` | read-only 검증 (쓰기가 실패해야 PASS) |
 | `config/slack_analyst_app_manifest.yaml` | Slack 앱 매니페스트 (스코프 일괄 적용용) |
-| `docker/analyst-bot/`, `docs/analyst_bot_docker.md` | **현재 미사용.** 격리 필요해질 때 |
+| `docker/analyst-bot/`, `docs/analyst_bot_docker.md` | Docker/headless 운영 경로. OAuth 로그인, dry-run, self-test, `up -d`, Socket Mode 연결, Slack end-to-end canary 1회까지 확인됐다. 첫 canary에서 톤이 기술적으로 읽혀 최종 답변 용어/말투를 보강했고 재-canary가 다음 단계 |
 | `reports/20260726_*.md` | 이번에 수행한 분석 2건 |
 | `dbt/gharchive_metrics/analyses/non_push_drop_*.sql` | 실전 턴이 남긴 재현용 SQL 2건 (raw 일별 시계열 · raw↔mart 대조) |
 
@@ -137,14 +153,18 @@ Slack 멘션 → 스레드 키 (channel, thread_ts)
 
 번호는 이번에 새로 드러난 1·2·6번이 끼어들면서 밀렸다. 다른 문서의 옛 번호와 대조하지 말 것.
 
+2026-08-01 업데이트: 1·2·4·7·9번은 코드 레벨 완화책을 넣었다
+(답변 후처리/2,500자 guardrail, `--max-workers`, 스레드 FIFO, 큐 cleanup).
+다만 실제 Slack canary 전까지 운영 검증 완료로 보지는 않는다.
+
 ### 높음
 
-**1. 답변에 메타 서문이 유출된다.** 최종 텍스트 앞에 "아래가 Slack에 게시될 답변입니다"와 `---`가
-붙은 채로 그대로 게시됐다. 또 서문에 `**분석 완료.**`처럼 **Slack mrkdwn이 아닌 마크다운**을 썼다.
-게시 직전 단계에서 서문·구분선을 잘라내거나, 스킬이 최종 블록만 내놓도록 형식을 못박아야 한다.
+**1. 답변에 메타 서문이 유출된다 — 코드 레벨 완화됨, canary 필요.**
+게시 직전 후처리로 "아래가 Slack에 게시될 답변입니다", `---`, GitHub Markdown heading/bold를 정리한다.
+실제 Slack에서 같은 패턴이 다시 보이면 후처리 패턴을 추가한다.
 
-**2. 답변이 너무 길다.** 인풋 9종과 건강성 10항목을 전부 펼쳐 스레드가 벽이 된다.
-절차를 지켰다는 증거는 남기되 스레드에는 요약만 올리고 상세는 접거나 리포트로 넘기는 형태가 필요하다.
+**2. 답변이 너무 길다 — 코드 레벨 완화됨, canary 필요.**
+최종 Slack 답변은 2,500자 guardrail로 줄인다. 상세 근거는 재현 SQL과 로컬 audit/trace로 넘긴다.
 
 **3. Read가 레포 밖을 읽을 수 있다.** 운영자 결정으로 Read/Grep/Glob을 복구했고, 그 대가다.
 실측: `Read(/etc/**)`, `Read(//etc/**)`, `Read(**/hosts)`, `Read(/etc/*)` **네 형태 모두 차단 실패**.
@@ -154,11 +174,12 @@ Slack 멘션 → 스레드 키 (channel, thread_ts)
 프롬프트로도 막고 있지만 그건 소프트 방어다(`/etc/hosts` 프로브에서 `denials=0`, 모델이 스스로 거절).
 **진짜로 닫으려면 컨테이너 실행이 필요하다** — `docker/analyst-bot/`이 빌드까지 끝나 있다.
 
-**4. 동시 세션 상한이 없다.** 이벤트마다 스레드를 띄우므로 질문 N개 = 사용량 N배
-(달러가 아니라 5시간 창 사용량이다 — 2절 비용 구조). `ThreadPoolExecutor(max_workers=3)` 정도로 묶어야 한다.
+**4. 동시 세션 상한 — 코드 레벨 완화됨, canary 필요.**
+`--max-workers` 기본 1로 전역 동시 실행 수를 제한한다. BigQuery 사용량 푸터가 다른 thread와 섞이지 않게 하기 위한 데모 기본값이다.
 
-**5. 재시작하면 진행 중 스레드 소유권을 잃는다.** 소유권이 메모리 dict(`_locks`)에만 있다.
-transcript 파일 존재 여부로 판정하도록 바꿔야 한다. 현재는 멘션이 필수라 체감 영향은 작다.
+**5. 재시작하면 진행 중 스레드 소유권을 잃는다.** 실행 중인 turn 상태는 메모리에만 있다.
+프로세스가 죽으면 진행 메시지를 복구하거나 기존 작업을 취소 완료로 접지 못한다.
+transcript 파일 존재 여부로 재개 여부는 판정하지만, 진행 중이던 요청의 Slack 표면 복구는 아직 없다.
 
 **6. 스캔 상한이 하드 상한이 아니다 — 프로젝트 수준 할당량이 미설정이다.**
 `.bigqueryrc`는 **기본값**을 정할 뿐 상한이 아니다. 세션이 명령줄에 `--maximum_bytes_billed`를
@@ -170,32 +191,37 @@ transcript 파일 존재 여부로 판정하도록 바꿔야 한다. 현재는 �
 
 ### 중간
 
-**7. 같은 스레드 연속 질문의 응답 순서가 뒤집힐 수 있다.** `threading.Lock`은 FIFO가 아니다.
-스레드별 큐 + 전용 소비자 스레드로 교체 필요.
+**7. 같은 스레드 연속 질문의 응답 순서 — 코드 레벨 완화됨, canary 필요.**
+스레드별 FIFO queue로 교체했다. 실제 Slack에서 같은 thread에 빠르게 두 질문을 보내 순서를 확인한다.
 
-**8. `--headless`가 로그를 다 끈다.** 루트 레벨을 `WARNING`으로 낮추고 턴별 트레이스도 막는다.
-헤드리스로 갈 때 `--log-level`을 먼저 추가해야 한다. 지금은 attached 모드로 쓸 것.
+**8. headless 로그 — 코드 레벨 해결됨.** `--headless`와 로그 레벨을 분리했다.
+Docker/headless에서도 기본 `--log-level INFO`로 기동·턴 trace가 `docker compose logs`에 남는다.
 
-**9. `_locks` 무한 증가.** 스레드 키마다 락이 쌓이고 제거되지 않는다. 5번을 먼저 고쳐야 한다.
+**9. 스레드 lock/queue 누적 — 코드 레벨 완화됨.**
+대기·실행 중인 turn이 없는 queue는 제거한다.
 
 **10. `bq query`의 DDL/DML은 도구 권한으로 못 막는다.** IAM으로 해결했지만,
 `Bash(uv run ... dbt:*)`가 `compile`과 `build`를 구분 못 하는 구조 자체는 남아 있다.
 같은 한계가 6번(명령 중간 플래그)에서 다시 나타난다 — **접두 매칭은 인자를 못 본다.**
 
+**11. Metabase MCP 실제 카드 생성 canary가 남았다.** 코드/CLI/Docker wiring과 API key 비노출 회귀는 통과했다.
+다만 현재 로컬 환경에는 `METABASE_URL`/`METABASE_API_KEY`가 없어 실제 `create_card` 호출은 확인하지 못했다.
+시연 전에 `ANALYST_ENABLE_METABASE_MCP=1`로 켠 뒤 추이/Top-N 질문에서 카드 URL과 Slack 버튼까지 확인한다.
+
 ### 데이터 쪽 후속 과제
 
-**11. `dim_push_automation_actor`가 자동화를 거의 못 잡는다.**
+**12. `dim_push_automation_actor`가 자동화를 거의 못 잡는다.**
 등재 20,992명 중 `explicit_bot`(로그인이 `[bot]`으로 끝남)이 20,706명(98.6%),
 `machine_rate_suspect`는 **305명(1.5%)**. 분당 100건 문턱이 너무 높아 거의 발화하지 않는다.
 사실상 "자기 이름에 `[bot]`을 붙인 계정 목록"이다.
 → **일당 기준 velocity로 재설계 필요.** 이것 때문에 리포트 결론 하나를 철회했다(12번).
 
-**12. 요일별 역전의 원인은 미규명.** `reports/20260726_weekday_push_divergence.md`.
+**13. 요일별 역전의 원인은 미규명.** `reports/20260726_weekday_push_divergence.md`.
 주말에 actor는 26% 줄고 event는 8.7% 늘며 1인당 event가 47% 오른다(raw 대조로 확인된 사실).
 최초에 "자동화 봇 가설 반증"이라 결론했으나 11번 때문에 **철회**했다.
 검정 도구가 무효였으므로 원인은 여전히 열려 있다.
 
-**13. non-Push 이벤트 급감 — 시작일은 07-06이 아니라 07-09.**
+**14. non-Push 이벤트 급감 — 시작일은 07-06이 아니라 07-09.**
 `reports/20260726_actor_decline_diagnosis.md`(리포트는 히스토리라 07-06 서술이 남아 있다).
 실전 턴에서 41일 전수 대조로 **시작일을 07-09로 정정**했고, 06-18~06-24 구간의
 저빈도 6개 type 결손을 추가로 찾았다.
@@ -266,14 +292,18 @@ transcript 파일 존재 여부로 판정하도록 바꿔야 한다. 현재는 �
 ## 7. 다음에 할 일
 
 첫 실전 턴, 스캔 상한(`.bigqueryrc`), 사용량/실지출 분리 푸터, 진행 추적 한 줄 요약까지는 끝났다(2절).
-아래는 그 다음이다.
+2026-08-01에 답변 후처리, 스레드 FIFO, 전역 동시성 제한, 취소 버튼, 로컬 audit/feedback 로그를 추가했다.
+아래는 남은 항목이다.
 
 1. **프로젝트 수준 일일 쿼리 사용량 할당량을 건다(5절 6번).** 지금 스캔 상한은 rc 기본값이라
    세션이 플래그로 덮을 수 있다. 클라우드 콘솔에서 설정해야 하고, **이것만이 하드 상한이다.**
-2. **답변 형식을 고친다(5절 1·2번).** 메타 서문·`---` 유출과 마크다운 혼용을 잘라내고, 스레드 길이를 줄인다.
-   실전 턴에서 사용자에게 그대로 보인 문제다.
+2. **실 Slack canary를 돌린다.** `docs/analyst_bot_testcases.md`의 BOT-P0-01~03, BOT-I-04~05로
+   답변 형식, 진행 메시지 정리, FIFO/전역 동시성 제한, 취소 버튼을 실제 채널에서 확인한다.
 3. 테스트셋 8문제를 순서대로 통과시킨다(`docs/analysis_testset.md`). 채점 기준이 함정 회피다.
-4. 미해결 4·5번(동시 세션 상한, 스레드 소유권)을 고친다. 사람이 여럿 쓰기 시작하면 바로 문제가 된다.
+4. **Docker Slack canary를 한 번 더 돌린다.** `analyst-bot` compose 서비스는 실제 OAuth credential로
+   `dry-run`, `--self-test`, `up -d`, Socket Mode 연결, Slack end-to-end canary 1회까지 확인됐다.
+   첫 canary는 기능적으로 성공했지만 답변이 너무 기술적이었다. 이제 캐주얼 용어 치환과
+   `간단히` 답변 규칙이 적용된 상태에서 짧은 mart 질문을 다시 던져 PO-facing 톤을 확인한다.
 5. 11번(자동화 판별 재설계)을 처리한다. 이게 12번의 선행 조건이다.
 6. 13번 후속 — 급감 시작일이 07-09로 정정됐으므로 상류(GH Archive 수집) 쪽 확인은 그 날짜 기준으로 다시 잡는다.
 7. 토큰 회전.

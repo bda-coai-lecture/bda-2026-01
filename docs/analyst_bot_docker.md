@@ -1,12 +1,10 @@
 # Slack 분석 봇 컨테이너 운영 런북
 
-> **현재 사용하지 않음 (2026-07-26 결정).** 이번 회차는 호스트에서 직접 실행한다.
-> 이 문서와 `docker/analyst-bot/`은 나중에 격리가 필요해질 때 쓰기 위해 보존한다.
-> 호스트 실행이 안전한 근거: `SESSION_TOOLS`가 Read/Grep/Glob을 제거해 파일 접근이
-> cwd에 갇힌 Bash로만 가능하고, BigQuery는 전용 read-only 서비스 계정으로 제한된다.
-> `docker-compose.yml`에는 `analyst-bot` 서비스가 등록되어 있지 않다.
+> 2026-08-01 기준 `docker-compose.yml`에 `analyst-bot` 서비스가 등록되어 있다.
+> 호스트 실행은 빠른 시연용이고, Docker 실행은 Read/Grep/Glob의 레포 밖 읽기 위험을
+> 좁은 마운트로 줄이는 운영 경로다. BigQuery는 전용 read-only 서비스 계정으로 제한한다.
 
-최종 수정: 2026-07-26
+최종 수정: 2026-08-02
 
 대상: `scripts/slack_analyst_bot.py` (Slack 스레드 1개 = Claude Code 세션 1개)
 관련 파일: `docker/analyst-bot/Dockerfile`, `docker/analyst-bot/entrypoint.sh`,
@@ -53,15 +51,26 @@ chmod 644 secrets/analyst-bq-key.json   # 컨테이너는 uid 10001로 :ro 마�
 그것들은 이 서비스에 들어가면 안 되므로, `docker-compose.yml`에서 변수를 하나씩 열거한다.
 
 ```bash
-SLACK_ANALYST_BOT_TOKEN=xoxb-...     # 분석 봇 전용 앱 (Airflow Alerts 앱 아님)
+SLACK_ANALYST_BOT_TOKEN=xoxb-...     # 분석 봇용 Bot User OAuth Token
 SLACK_ANALYST_APP_TOKEN=xapp-...     # connections:write, Socket Mode
-ANTHROPIC_API_KEY=sk-ant-...         # 아래 "Anthropic 인증" 절 필독
+# Claude 인증은 아래 "Anthropic 인증" 절 중 하나를 선택한다.
+# 권장: 컨테이너 안에서 `claude auth login` 1회 실행.
+# 대안: CLAUDE_CODE_OAUTH_TOKEN=... 또는 ANTHROPIC_API_KEY=...
 # 선택
 ANALYST_CHANNEL_ALLOWLIST=C0123ABCD,C0456EFGH
 ANALYST_MAX_BUDGET_USD=5
-ANALYST_MAX_SCAN_GIB=200
+ANALYST_MAX_SCAN_GIB=10
 ANALYST_TURN_TIMEOUT_S=900
-ANALYST_HEADLESS=0
+ANALYST_MAX_WORKERS=1
+ANALYST_HEADLESS=1
+ANALYST_LOG_LEVEL=INFO
+
+# 선택: Metabase 카드/대시보드 자동 생성
+ANALYST_ENABLE_METABASE_MCP=1
+ANALYST_METABASE_INTERNAL_URL=http://metabase:3000  # MCP 접속용 컨테이너 내부 URL
+ANALYST_METABASE_PUBLIC_URL=http://localhost:3001   # Slack 링크용 브라우저 URL
+METABASE_API_KEY=mb_...
+ANALYST_METABASE_COLLECTION_NAME=BDA 데이터 플랫폼
 ```
 
 Slack 앱 자체를 아직 안 만들었다면 전체 절차는 봇이 직접 출력한다:
@@ -70,6 +79,13 @@ Slack 앱 자체를 아직 안 만들었다면 전체 절차는 봇이 직접 �
 docker compose run --rm analyst-bot --dry-run
 ```
 
+Metabase MCP는 기본 꺼짐이다. 켜려면 `METABASE_API_KEY`가 필요하다.
+봇은 `@easecloudio/mcp-metabase-server`를 `npx`로 실행하고, Claude 세션에는
+필요할 때 카드/대시보드를 만들 수 있는 Metabase 도구만 추가한다. 최종 Slack 답변에는
+카드/대시보드 URL과 버튼만 보이고, MCP/tool/collection id/API key 같은 세부값은 숨긴다.
+API key는 CLI 인자로 넘기지 않고 runtime MCP config에만 기록한다. config 파일명은
+`metabase-credentials-mcp.json`이고, 파일 권한은 0600이며, 세션 Read 차단 목록에도 들어간다.
+
 ## Anthropic 인증 — 반드시 읽을 것
 
 **컨테이너 안의 CLI는 운영자의 호스트 로그인을 쓸 수 없다.**
@@ -77,16 +93,24 @@ Claude 구독(Pro/Max) OAuth 로그인은 macOS Keychain과 `~/.claude.json`에 
 그 둘은 의도적으로 마운트하지 않는다(마운트하면 이 문서의 존재 이유가 사라진다).
 즉 **구독 로그인은 컨테이너로 이전되지 않는다.**
 
-- 구현된 경로: **`ANTHROPIC_API_KEY`** (Console API 키). 사용량은 구독이 아니라 API 크레딧에서 빠진다.
+권장 경로는 컨테이너 안에서 OAuth 로그인을 한 번 수행하는 것이다.
+
+```bash
+docker compose run --rm -it --entrypoint claude analyst-bot auth login
+```
+
+로그인 결과는 `analyst-claude` named volume의 `/home/analyst/.claude/.credentials.json`에
+저장되고, 이후 `docker compose up -d analyst-bot`에서 재사용된다.
+
+대안:
+
+- `CLAUDE_CODE_OAUTH_TOKEN=...`: 호스트에서 `claude setup-token`으로 만든 장기 토큰을 `.env`에 둔다.
+- `ANTHROPIC_API_KEY=...`: Anthropic Console API 키. 사용량은 구독이 아니라 API 크레딧에서 빠진다.
 - 게이트웨이/프록시를 쓴다면 `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL`도 전달된다.
-- 자격증명이 하나도 없으면 entrypoint가 즉시 실패하며 위 내용을 출력한다.
-- **대안(미구현):** 호스트에서 `claude setup-token`으로 만든 자격증명 파일을
-  `~/.claude/.credentials.json`에 넣어 컨테이너의
-  `/home/analyst/.claude/.credentials.json`으로 `:ro` 마운트하는 방법이 있다.
-  entrypoint는 이 파일이 있으면 인증이 있다고 인정한다. 다만 (a) 토큰 만료 시
-  갱신을 컨테이너가 파일에 쓸 수 없어 조용히 죽고, (b) 호스트 `~/.claude` 트리를
-  건드리는 마운트를 하나 더 만드는 것이므로 채택하지 않았다. 쓰려면
-  `~/.claude` **디렉터리 전체가 아니라 그 파일 하나만** 마운트해야 한다.
+
+자격증명이 하나도 없으면 entrypoint가 즉시 실패하며 위 선택지를 출력한다.
+호스트 `~/.claude` 디렉터리 전체를 마운트하지 않는다. 꼭 파일 기반으로 넘겨야 한다면
+`~/.claude` 전체가 아니라 필요한 credential 파일 하나만 별도로 검토한다.
 
 ## 빌드와 실행
 
@@ -99,6 +123,8 @@ docker compose stop analyst-bot
 ```
 
 `restart: unless-stopped` — 레포의 다른 장기 실행 서비스와 같은 정책이다.
+`SIGTERM`/`SIGINT`가 오면 봇은 실행 중인 turn의 cancel event를 세팅하고 child process group을 정리할 기회를 준다.
+Compose에는 `init: true`, `stop_grace_period: 30s`를 둔다.
 
 이미지 재현성을 위해 `CLAUDE_CODE_VERSION`은 첫 빌드 로그의 `claude --version`을 보고 고정한다:
 
@@ -125,14 +151,16 @@ docker compose build --build-arg CLAUDE_CODE_VERSION=<빌드된 버전> analyst-
 
 | 마운트 | 모드 | 이유 |
 |---|---|---|
-| `./:/app` | **ro** | dbt 모델·docs·`.claude/skills/**`·`AGENTS.md` 읽기용. 쓰기 필요 경로만 아래에서 뚫는다 |
+| 선택 마운트 → `/app` | **ro** | 전체 레포를 마운트하지 않는다. `.claude`, `dbt`, `docs`, `scripts`, `reports`, `config`, `dags`, `AGENTS.md` 등 필요한 경로만 읽기 전용으로 연다. `/app/secrets`가 생기지 않게 하는 것이 핵심이다 |
 | `./dbt/gharchive_metrics/analyses` | rw | 분석가가 임시 SQL을 남기는 **유일한** 호스트 노출 쓰기 지점 (봇 allowlist의 `Write/Edit`도 이 경로만 허용) |
 | `analyst-dbt-target` (named) | rw | `dbt compile`이 `target/`에 쓰고, 스킬은 `target/compiled/...`를 dry-run한다. 정본 경로에 있어야 하지만 호스트 레포를 더럽힐 필요는 없다 |
-| `./secrets/analyst-bq-key.json` | **ro** | 좁은 권한 BQ 키 1개 |
+| `./secrets/analyst-bq-key.json` → `/secrets/analyst-bq-key.json` | **ro** | 좁은 권한 BQ 키 1개. `/app` 아래에는 노출하지 않는다 |
 | `analyst-claude` → `/home/analyst/.claude` | rw | Claude 세션 transcript 영속화 |
+| `analyst-gcloud` → `/home/analyst/.config/gcloud` | rw | `gcloud auth activate-service-account`와 `.bigqueryrc` 저장. 봇의 `ANALYST_GCLOUD_CONFIG_DIR`와 같은 경로 |
+| `analyst-state` → `/home/analyst/state` | rw | audit/trace/feedback JSONL 저장. 봇은 `--state-dir /home/analyst/state`로 뜬다 |
 | `analyst-uv-cache` → `/home/analyst/.cache/uv` | rw | uv 캐시 (`uv run --with dbt-bigquery` 재다운로드 방지) |
 
-**레포 전체 rw 대신 "ro + 쓰기 경로 carve-out"을 택했다.** 유일한 위험은 dbt였는데
+**필요 경로 ro + 쓰기 경로 carve-out을 택했다.** 유일한 위험은 dbt였는데
 쓰기 지점이 셋뿐이고 전부 처리했다:
 
 1. `target/` → named volume (위).
@@ -185,27 +213,20 @@ transcript 경로는 `~/.claude/projects/<인코딩된 cwd>/<session_id>.jsonl`�
 docker compose exec analyst-bot ls /home/analyst/.claude/projects/-app | head
 ```
 
-## 로깅 — `--headless`를 기본으로 두지 않았다
+## 로깅 — headless와 log level을 분리했다
 
-컨테이너에 대화형 터미널이 없으므로 `--headless`가 자연스러워 보이지만,
-봇의 현재 구현에서 `--headless`는
-
-- 루트 로그 레벨을 `WARNING`으로 내리고 (`main()`의 `logging.basicConfig`),
-- 턴별 trace 라인(`on_trace`의 `LOG.info`)을 아예 건너뛴다.
-
-즉 `docker compose logs -f analyst-bot`에 기동 이후 사실상 아무것도 안 남는다.
-로그 레벨을 되살리는 환경변수나 플래그는 봇에 없고, 이 작업에서 봇 코드는 고치지 않았다.
-
-봇의 non-headless("attached") 모드는 **TTY를 요구하지 않는다** — 로깅 레벨만 다르다.
-그래서 기본값을 `ANALYST_HEADLESS=0`(= `--headless` 미전달)로 두어 INFO 로그와
-턴 trace가 `docker compose logs`에 보이게 했다. `PYTHONUNBUFFERED=1`로 버퍼링도 껐다.
-
-정말 조용히 돌리려면 `.env`에 `ANALYST_HEADLESS=1`을 넣는다(로그는 거의 사라진다).
-근본 해결은 봇에 `--log-level` 옵션을 추가하는 것이고, 그건 이 작업 범위 밖이다.
+Docker 기본값은 `ANALYST_HEADLESS=1`, `ANALYST_LOG_LEVEL=INFO`다.
+`--headless`는 이제 실행 모드 표시만 하고, 로그 억제는 `--log-level`이 담당한다.
+따라서 detached/headless로 떠도 `docker compose logs -f analyst-bot`에 기동 로그와 턴 trace가 남는다.
+정말 조용히 돌리려면 `.env`에 `ANALYST_LOG_LEVEL=WARNING`을 넣는다.
 
 ## 플래그 전달
 
-`command:`가 기본 플래그를 들고 있고, entrypoint가 `--repo-dir /app` 뒤에 이어 붙인다.
+entrypoint가 `ANALYST_*` 환경변수를 CLI flag로 변환한다.
+기본으로 `--repo-dir /app`, `--state-dir /home/analyst/state`,
+`--max-scan-gib 10`, `--max-workers 1`, `--log-level INFO`가 전달된다.
+`ANALYST_ENABLE_METABASE_MCP=1`이면 `--enable-metabase-mcp`, MCP 접속 URL, Slack 링크용 public URL,
+컬렉션 이름도 전달된다.
 argparse는 뒤에 온 값이 이기므로 임시 실행은 이렇게 한다:
 
 ```bash
@@ -225,8 +246,10 @@ docker compose run --rm --entrypoint bash analyst-bot          # 셸로 들어�
 3. BQ 키가 **파일**이고 읽을 수 있고 `"type": "service_account"`인지
    (호스트 경로가 없으면 docker가 **디렉터리**를 만들어버리므로 그 경우를 따로 안내한다)
 4. `SLACK_ANALYST_BOT_TOKEN` / `SLACK_ANALYST_APP_TOKEN` 존재
-5. Anthropic 자격증명 존재 (없으면 위 "Anthropic 인증" 안내와 함께 실패)
-6. `analyses/`, `target/` 쓰기 가능 여부 → 경고
+5. `ANALYST_ENABLE_METABASE_MCP=1`이면 `npx`, `METABASE_URL`, `METABASE_API_KEY` 존재
+6. Anthropic 자격증명 존재 (없으면 위 "Anthropic 인증" 안내와 함께 실패)
+7. `analyses/`, `target/` 쓰기 가능 여부 → 경고
+8. `/home/analyst/state`, `/home/analyst/.config/gcloud` 쓰기 가능 여부 → 실패 시 기동 차단
 
 그다음 `gcloud auth activate-service-account --key-file=$GCP_KEY_PATH`를 실행한다.
 **`bq`는 `GOOGLE_APPLICATION_CREDENTIALS`를 읽지 않고** gcloud 자격증명 저장소를 쓰기 때문에,
@@ -236,27 +259,12 @@ docker compose run --rm --entrypoint bash analyst-bot          # 셸로 들어�
 또한 `SLACK_BOT_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, `SLACK_ALERT_*`를 방어적으로 `unset`한다.
 누군가 나중에 `env_file: .env`를 다시 붙여도 알림 앱 토큰과 GitHub 토큰이 세션에 새지 않는다.
 
-## 컨테이너에서는 `Read`/`Grep`/`Glob`을 되살릴 수 있다
+## Read/Grep/Glob과 secrets 경계
 
-봇은 호스트 안전 때문에 세션 도구 집합에서 이 셋을 빼고 있다:
-
-```python
-# scripts/slack_analyst_bot.py
-SESSION_TOOLS = "Bash,Write,Edit,Skill,TodoWrite"
-```
-
-이유는 하나뿐이다 — 호스트에서 `Read`가 레포 밖 절대경로를 읽을 수 있고 막을 수 없다.
-**컨테이너에서는 그 전제가 사라진다.** 마운트가 프로젝트와 BQ 키뿐이므로 무제한 `Read`가
-도달할 수 있는 민감 파일이 없다. 따라서 컨테이너 전용 배포에서는
-
-```python
-SESSION_TOOLS = "Read,Grep,Glob,Bash,Write,Edit,Skill,TodoWrite"
-```
-
-로 되돌리는 것이 합리적이다. 얻는 것: 파일 읽기/검색이 `cat`/`rg` Bash 우회 없이
-정상 도구로 돌아가고, `APPEND_SYSTEM_PROMPT`의 0번 항목(도구 없음 안내)도 필요 없어진다.
-
-**이번 작업에서는 봇 파이썬 코드를 고치지 않았다.** 같은 스크립트가 호스트에서도
+현재 봇의 `SESSION_TOOLS`에는 `Read,Grep,Glob`이 포함된다. 그래서 Docker 서비스는
+전체 레포를 `/app`에 마운트하지 않는다. 특히 `secrets/`는 `/app` 아래에 두지 않고,
+BigQuery 키만 `/secrets/analyst-bq-key.json`으로 별도 read-only 마운트한다.
+코드에도 `analyst-bq-key.json`과 `/secrets` file-reading 명령 deny, 최종 Slack 답변 redaction을 추가했다.
 실행되기 때문에 되살리려면 컨테이너 여부로 분기해야 하고(예: 환경변수 게이트),
 그건 코드 변경 승인이 필요한 별도 결정이다. 되살릴 때도 `DISALLOWED_TOOLS`의
 `Read(**/gcp-key.json)`류 규칙은 그대로 두는 것이 좋다 — 마운트된 BQ 키 자체를
@@ -272,42 +280,46 @@ SESSION_TOOLS = "Read,Grep,Glob,Bash,Write,Edit,Skill,TodoWrite"
 | `bq` auth 오류 | entrypoint의 `activate-service-account`가 건너뛰어졌거나 키 권한 부족(`jobUser` 확인) |
 | dbt가 `Env var required but not provided: 'GCP_KEY_PATH'` | `GCP_KEY_PATH`가 세션에 없다. compose environment 확인 |
 | `dbt compile` permission denied | `analyst-dbt-target` 볼륨이 uid 10001 소유가 아님. `docker compose down && docker volume rm bda-2_analyst-dbt-target` 후 재기동 |
-| 로그가 조용하다 | `ANALYST_HEADLESS=1`이 켜져 있다. 위 로깅 절 참고 |
+| 로그가 조용하다 | `ANALYST_LOG_LEVEL`이 `WARNING` 이상인지 확인. Docker 기본은 headless + INFO 로그 |
 | Slack에 답이 안 온다 | 채널에 봇 초대(`/invite`), `ANALYST_CHANNEL_ALLOWLIST` 확인, Socket Mode/이벤트 구독 확인 |
+| Metabase 카드가 안 만들어진다 | `ANALYST_ENABLE_METABASE_MCP=1`, `METABASE_API_KEY`, `ANALYST_METABASE_INTERNAL_URL` 확인. compose 내부 URL은 보통 `http://metabase:3000` |
+| Slack의 Metabase 버튼이 안 열린다 | `ANALYST_METABASE_PUBLIC_URL` 확인. Docker 내부 URL(`http://metabase:3000`)이 Slack에 노출되면 브라우저에서 열리지 않는다 |
 
-## 검증 상태 (2026-07-26)
+## 검증 상태 (2026-08-02)
 
 확인한 것:
 
-- `docker compose config` 통과. `analyst-bot`이 의도한 마운트/환경변수로 렌더되고,
-  렌더 결과에 `SLACK_BOT_TOKEN`/`GITHUB_TOKEN`/`GH_TOKEN`이 **없다**(airflow 서비스에는 보인다).
-  컨테이너 안 `env`에도 그 셋이 없음을 실제로 확인했다.
-- 기존 서비스 / `x-airflow-common` 앵커 / 기존 볼륨은 수정하지 않았다(추가만).
-- **이미지 빌드 성공.** arm64, 82초, 1.44 GB.
-  Python 3.13.11 / Node v22.11.0 / Claude Code **2.1.220** / bq 2.1.35 / Google Cloud SDK 577.0.0.
-- entrypoint 사전 점검: 자격증명이 전혀 없을 때 5개 문제를 한 번에 출력하고 exit 1.
-  잘못된 키로는 `gcloud auth activate-service-account` 실패를 잡아내고 기동을 막는다.
-- 컨테이너 안에서 봇 `--dry-run`이 정상 동작. `project_transcript_dir`이
-  `/home/analyst/.claude/projects/-app`으로, `alerting_app_token_present = False`로 나온다.
-- 마운트 실측: `/app/README.md` 쓰기 → `Read-only file system`(의도),
-  `analyses/` 쓰기 OK, `target/` 볼륨 쓰기 OK, `~/.claude`·uv 캐시 쓰기 OK,
-  `git status`/`git log`가 read-only 워크트리에서 동작(safe.directory 적용됨).
-- `uv run --no-project --with dbt-bigquery dbt parse --project-dir ... --profiles-dir ...`
-  이 컨테이너 안에서 **성공**했다(dbt 1.12.0, bigquery adapter 등록, `target/perf_info.json` 기록,
-  로그는 `/home/analyst/dbt-logs/dbt.log`). 읽기 전용 레포 + 쓰기 경로 carve-out 설계가
-  dbt를 깨뜨리지 않는다는 근거다.
-- 빌드 중 발견해 고친 실제 버그: `analyst-dbt-target` 볼륨이 root 소유로 생성되어
-  uid 10001이 쓸 수 없었다(`dbt compile`이 EACCES로 죽는다). Dockerfile에서
-  `/app/dbt/gharchive_metrics/target`을 미리 만들고 `analyst` 소유로 바꿔,
-  docker가 새 볼륨을 초기화할 때 소유권을 물려받게 했다. **기존에 만들어진 볼륨이 있으면
-  `docker volume rm bda-2_analyst-dbt-target` 후 재기동해야 이 수정이 적용된다.**
+- `uv run python -m py_compile scripts/slack_analyst_bot.py tests/test_slack_analyst_bot.py` 통과.
+- `uv run pytest tests/test_slack_analyst_bot.py` → 29 passed.
+- `bash -n docker/analyst-bot/entrypoint.sh` 통과.
+- `docker compose config --services` 통과, 서비스 목록에 `analyst-bot` 포함.
+- Metabase MCP on/off 명령 구성, `--strict-mcp-config`, `--mcp-config` 생성, API key argv 비노출, internal/public URL 분리 단위 테스트 통과.
+- `docker compose config` 렌더 기준으로 `analyst-bot`은 전체 레포가 아니라 필요한 경로만 `/app`에 마운트하고,
+  BQ 키는 `/secrets/analyst-bq-key.json`으로 별도 마운트한다.
+- `docker compose build analyst-bot` 통과. 봇 프로세스 이미지에 `google-cloud-bigquery` 포함.
+- 컨테이너 격리 점검 통과: `/app/secrets`와 `/app/gcp-key.json` 없음, `/app` root는 쓰기 불가,
+  `/home/analyst/state`, `/home/analyst/.config/gcloud`, `analyses/`, `target/`만 쓰기 가능.
+- 컨테이너 안 Claude OAuth 로그인 통과. `/home/analyst/.claude/.credentials.json`이
+  `analyst-claude` named volume에 저장됨을 확인했다.
+- 실제 OAuth credential로 `docker compose run --rm analyst-bot --dry-run` 통과.
+  Docker 경로에서 `repo_dir=/app`, `state_dir=/home/analyst/state`,
+  `gcloud_config=/home/analyst/.config/gcloud`, `bq_identity=bda-analyst-ro@...`,
+  `bq_scan_ceiling=10 GiB via .bigqueryrc`를 확인했다.
+- 실제 OAuth credential로 `docker compose run --rm analyst-bot --self-test` 통과.
+  session id가 두 턴에서 동일했고 `--resume`이 동작했다.
+- `docker compose up -d analyst-bot` 통과. 로그에서 headless Socket Mode 연결과
+  `Bolt app is running!`을 확인했다.
+- Slack end-to-end canary 1회 통과. 실제 멘션을 받아 BigQuery 조회 후 답변을 게시했다.
+  이 canary에서 답변 톤이 기술적으로 읽히는 문제가 드러나, 이후 최종 답변 프롬프트와
+  캐주얼 용어 치환을 보강했다.
+- 컨테이너 안에서 `bq query --project_id=bda-coai --use_legacy_sql=false "select session_user()"` 실행 시
+  `bda-analyst-ro@...`로 실행되는 것을 확인했다.
+- 컨테이너 안에서 `uv run --no-project --with dbt-bigquery dbt compile ... --select metrics_daily` 통과.
+- compile된 `metrics_daily.sql`을 `bq --dry_run`으로 검증해 bq CLI 경로가 동작하는 것을 확인했다
+  (예상 스캔이 10 GiB를 넘는 쿼리는 실행하지 않는다).
 
 확인하지 못한 것:
 
-- **Slack end-to-end 턴을 돌리지 않았다.** 분석 전용 Slack 앱 토큰과 읽기 전용 BQ 키가
-  아직 없어서, 검증은 형식이 맞는 더미 키/토큰으로 했다(`--dry-run`까지).
-  실제 자격증명이 준비되면 `docker compose run --rm analyst-bot --self-test`로
-  세션 생성 → `--resume` 재개까지 먼저 확인하는 것을 권한다.
-- `bq query` 실제 실행(권한·스캔 상한 동작)도 실제 키가 필요하다.
-- `docker build --check`는 사용할 수 없었다(호스트 buildx v0.8.2, 해당 기능은 더 최신 필요).
-  대신 실제 빌드가 성공했으므로 그보다 강한 검증이다.
+- 톤/용어 보강 후 Slack end-to-end 턴 재확인은 아직 남아 있다.
+- Metabase MCP 실제 카드 생성은 `METABASE_API_KEY` 미설정 상태라 아직 미검증이다.
+- `docker build --check`는 호스트 buildx 버전에 따라 사용 불가할 수 있다.

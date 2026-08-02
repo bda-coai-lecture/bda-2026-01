@@ -24,7 +24,7 @@
 #   Create New App → From an app manifest → 워크스페이스 선택 → 붙여넣기.
 #   기존 앱을 건드리지 않으므로 위 두 경고가 모두 사라진다. (권장이었으나 미채택)
 #
-# 매니페스트가 처리하는 것: 봇 스코프, 이벤트 구독, Socket Mode 활성화.
+# 매니페스트가 처리하는 것: 봇 스코프, 이벤트 구독, Socket Mode, 버튼 interactivity 활성화.
 # 매니페스트로 처리할 수 없는 것(수동 필요):
 #   - App-Level Token(xapp-) 발급 — API가 없고 UI에서만 가능
 #   - Install/Reinstall to Workspace — xoxb- 토큰 획득
@@ -69,10 +69,9 @@ oauth_config:
       - groups:read
       # 질문자 표시명 해석. "누가 물었는지"를 리포트에 남긴다.
       - users:read
-      # 접수 즉시 👀 리액션으로 확인 표시. 턴이 수 분 걸리므로 체감이 크다.
+      # 선택/미구현: 접수 즉시 👀 리액션으로 확인 표시할 때 필요하다.
       - reactions:write
-      # 긴 답변을 스니펫 파일로 업로드. 메시지 40,000자 / 블록 3,000자 제한을
-      # 청킹으로 우회하는 대신 한 파일로 올릴 수 있다.
+      # 선택/미구현: 긴 답변을 스니펫 파일로 업로드할 때 필요하다.
       - files:write
       # 슬래시 커맨드(/analyst)를 나중에 붙일 여지. 지금은 등록하지 않아도 무해하다.
       - commands
@@ -98,8 +97,9 @@ settings:
       - message.im
       - message.mpim
   interactivity:
-    # 버튼/모달을 쓰지 않는다. 답변은 평문 메시지로만 게시한다.
-    is_enabled: false
+    # 진행 메시지의 "중단하기"와 최종 답변 피드백 버튼을 받으려면 켜져 있어야 한다.
+    # Socket Mode에서는 별도 Request URL 없이 action event가 xapp 연결로 들어온다.
+    is_enabled: true
   # Socket Mode. 이 값이 true여야 xapp- 토큰으로 연결할 수 있다.
   socket_mode_enabled: true
   org_deploy_enabled: false

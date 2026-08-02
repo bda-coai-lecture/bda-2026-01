@@ -152,13 +152,9 @@ raw payload는 STRING이므로 `json_value(payload, '$.size')`로 뽑는다. pay
 
 ## 7. 자주 쓰는 명령
 
-**먼저 환경변수를 export한다.** dbt profile이 `GCP_KEY_PATH`를 요구하고, 없으면
-`Env var required but not provided: 'GCP_KEY_PATH'`로 파싱 단계에서 죽는다.
-
-```bash
-export GCP_KEY_PATH=/Users/kakao/bda-2/gcp-key.json
-export GOOGLE_APPLICATION_CREDENTIALS=/Users/kakao/bda-2/gcp-key.json
-```
+**자격 증명은 봇/실행 환경이 이미 주입한다. 직접 export 하지 않는다.**
+dbt profile은 `GCP_KEY_PATH`를 요구하지만, 값이 비어 있으면 환경 설정 문제로 보고하고 멈춘다.
+특히 `gcp-key.json`은 운영자 키일 수 있으므로 그 경로로 덮어쓰지 않는다.
 
 ```bash
 # lineage 검색

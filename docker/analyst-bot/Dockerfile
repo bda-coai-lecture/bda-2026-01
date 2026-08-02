@@ -90,7 +90,8 @@ RUN npm install -g --no-fund --no-audit "@anthropic-ai/claude-code@${CLAUDE_CODE
 # reachable through that allowlist.
 RUN uv pip install --system --no-cache \
     "slack-bolt>=1.21,<2" \
-    "slack-sdk>=3.33,<4"
+    "slack-sdk>=3.33,<4" \
+    "google-cloud-bigquery>=3.25,<4"
 
 # --- Unprivileged user ------------------------------------------------------
 # Owns exactly the writable paths it needs: its home (uv cache, gcloud config,
@@ -102,7 +103,8 @@ RUN set -eux; \
     mkdir -p /home/analyst/.claude/projects \
              /home/analyst/.cache/uv \
              /home/analyst/.config/gcloud \
-             /home/analyst/dbt-logs; \
+             /home/analyst/dbt-logs \
+             /home/analyst/state; \
     chown -R analyst:analyst /home/analyst; \
     chmod 0700 /home/analyst; \
     mkdir -p /app /secrets; \

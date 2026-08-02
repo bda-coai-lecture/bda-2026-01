@@ -148,15 +148,25 @@
             <div class="k">4 · 분석</div>
             <div class="box data">
               <b>analysis 스킬</b>
-              <span>모드 분류 → 인풋 9종 → 가장 싼 소스 선택 → 1일/7일 건강성 검증 → dry run → 본 분석.</span>
+              <span>모드 분류 → 인풋 9종 → 가장 싼 소스 선택 → 1일/7일 건강성 검증 → dry run → 본 분석.
+              dry run과 쿼리 세부값은 로그에만 남긴다.</span>
             </div>
           </div>
           <div class="row">
             <div class="k">5 · 응답</div>
             <div class="box slack">
-              <b>진행 추적 + 최종 답변</b>
+              <b>PO용 최종 답변</b>
               <span>placeholder 메시지를 <code>chat.update</code>로 갱신(1.5초 스로틀)하고,
-              최종 답변은 별도 게시. 2,800자 단위로 줄 경계에서 분할.</span>
+              성공 시 같은 메시지를 결론 중심 답변으로 교체한다. Claude 턴 수, BigQuery GiB,
+              도구명은 Slack이 아니라 audit/trace에 남긴다.</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="k">6 · 시각화</div>
+            <div class="box data">
+              <b>선택: Metabase MCP</b>
+              <span>추이·Top-N처럼 화면으로 보는 편이 나은 경우에만 카드/대시보드를 만들고,
+              Slack에는 링크와 버튼만 노출한다.</span>
             </div>
           </div>
         </div>
@@ -275,27 +285,27 @@
                 <td><code>Read(/etc/**)</code>, <code>Read(//etc/**)</code>, <code>Read(**/hosts)</code>, <code>Read(/etc/*)</code> <b>네 형태 모두 실패</b>. 읽기 전용 도구는 기본 허용이라 allowlist로도 좁혀지지 않는다.</td>
               </tr>
               <tr>
-                <td><code>--tools</code>로 Read/Grep/Glob 제거 후 <code>cat /etc/hosts</code></td>
-                <td><span class="tag ok">차단됨</span></td>
-                <td>Bash는 cwd 밖 읽기를 기본 거부한다. 파일 접근을 Bash로 내리면 통제권에 들어온다.</td>
+                <td>Docker 좁은 마운트 + filename deny + outbound redaction</td>
+                <td><span class="tag ok">완화됨</span></td>
+                <td>Read/Grep/Glob은 UX 때문에 포함한다. 대신 컨테이너에서는 전체 레포를 마운트하지 않고, <code>secrets/</code>를 <code>/app</code> 밖에 둔다.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <div class="callout ok">
-          <b>컨테이너로 옮기면 3번 항목이 무의미해진다</b>
-          호스트 홈이 없으므로 <code>Read</code>가 절대경로를 읽어도 볼 것이 없다.
-          컨테이너 실행 시에는 Read/Grep/Glob을 되돌려도 안전하다
-          (<code>SESSION_TOOLS</code> 상수 한 줄).
+          <b>컨테이너 경계는 마운트 목록이 만든다</b>
+          호스트 홈과 <code>secrets/</code>를 <code>/app</code>에 마운트하지 않는 것이 핵심이다.
+          Read/Grep/Glob 자체가 안전한 것이 아니라, 볼 수 있는 파일 집합을 좁히는 방식이다.
         </div>
 
         <h3>여전히 못 막는 것</h3>
         <ul>
           <li><b><code>bq query</code>의 DDL/DML.</b> 명령 문자열로 SQL을 통제할 수 없다. IAM으로만 해결된다.</li>
           <li><b>스캔 비용.</b> <code>--max-budget-usd</code>는 Claude 지출만 막는다.
-          BigQuery는 <code>BIGQUERY_MAXIMUM_BYTES_BILLED</code>(쿼리당 기본 200 GiB)로 별도 상한을 건다.
-          스킬의 "raw를 함부로 스캔하지 않는다"는 규칙은 산문이지 강제가 아니다.</li>
+          BigQuery는 <code>bq</code> 경로는 <code>.bigqueryrc</code> 기본값, dbt/Python 경로는
+          <code>BIGQUERY_MAXIMUM_BYTES_BILLED</code>로 상한을 건다. 기본은 10 GiB다.
+          단, 명시적 <code>bq</code> flag는 rc 기본값을 덮을 수 있으므로 프로젝트 quota가 유일한 하드캡이다.</li>
           <li><b>프롬프트 인젝션.</b> Slack 원문이 프롬프트에 들어간다. 위 3층이 피해 범위를 제한하는 방식으로 대응한다.</li>
         </ul>
       </section>
@@ -423,22 +433,22 @@
               <tr><td>실행 형태</td><td>compose 서비스 <code>analyst-bot</code></td><td><code>restart: unless-stopped</code>, 비root</td></tr>
               <tr><td>마운트</td><td>프로젝트 + read-only BQ 키</td><td>호스트 홈·docker 소켓 미마운트</td></tr>
               <tr><td>세션 영속</td><td><code>~/.claude</code> named volume</td><td>재시작 후 스레드 재개용</td></tr>
-              <tr><td>Slack 자격증명</td><td><code>SLACK_ANALYST_BOT_TOKEN</code> / <code>SLACK_ANALYST_APP_TOKEN</code></td><td>알림 앱과 <b>별개 앱</b></td></tr>
+              <tr><td>Slack 자격증명</td><td><code>SLACK_ANALYST_BOT_TOKEN</code> / <code>SLACK_ANALYST_APP_TOKEN</code></td><td>이벤트 수신용 토큰과 Socket Mode 토큰을 명시적으로 분리</td></tr>
               <tr><td>BigQuery 자격증명</td><td><code>secrets/analyst-bq-key.json</code></td><td>전용 read-only 서비스 계정</td></tr>
               <tr><td>Claude 자격증명</td><td><code>ANTHROPIC_API_KEY</code></td><td>구독 로그인은 컨테이너로 넘어가지 않음</td></tr>
+              <tr><td>Metabase MCP</td><td><code>ANALYST_ENABLE_METABASE_MCP</code> + <code>METABASE_API_KEY</code></td><td>선택 기능. API key는 Slack/argv/config 파일에 노출하지 않음</td></tr>
               <tr><td>턴당 Claude 상한</td><td><code>--max-budget-usd 5</code></td><td>하드 캡</td></tr>
-              <tr><td>쿼리당 스캔 상한</td><td><code>--max-scan-gib 200</code></td><td><code>BIGQUERY_MAXIMUM_BYTES_BILLED</code>로 강제</td></tr>
+              <tr><td>쿼리당 스캔 상한</td><td><code>--max-scan-gib 10</code></td><td><code>.bigqueryrc</code>와 Python client 상한으로 적용</td></tr>
               <tr><td>턴 타임아웃</td><td>900초</td><td>프로세스 그룹 단위 kill</td></tr>
             </tbody>
           </table>
         </div>
 
         <div class="callout">
-          <b>Slack 앱을 새로 만드는 이유</b>
-          기존 "Airflow Alerts" 앱은 <code>chat:write</code>만 가지고 있어 이벤트를 받을 수 없다.
-          스코프를 추가하려면 재설치가 필요하고, 그 과정에서 <code>xoxb</code> 토큰이 회전하면
-          <b>Airflow 알림이 조용히 멎는다</b> — <code>slack_alert._post()</code>가 실패를 삼키기 때문에
-          티도 안 난다. 그래서 봇 전용 앱을 따로 만든다.
+          <b>Slack 앱 설정에서 주의할 점</b>
+          이 봇은 메시지 수신 이벤트, Socket Mode, 버튼 interactivity가 모두 필요하다.
+          기존 알림 앱에 스코프를 추가해 재사용할 수도 있지만, 재설치 과정에서 <code>xoxb</code> 토큰이
+          회전할 수 있다. 토큰이 바뀌면 <code>.env</code>와 알림 쪽 설정을 함께 확인한다.
         </div>
 
         <p>Socket Mode에는 <code>xapp-</code> 앱 레벨 토큰이 필요하다.
@@ -450,10 +460,10 @@
         <h2>Open items</h2>
         <div class="sub">알고 남긴 것</div>
         <ul>
-          <li><b>응답 순서</b> — 같은 스레드 연속 질문이 뒤집힐 수 있다. 스레드별 큐로 교체 필요.</li>
-          <li><b>동시 세션 상한</b> — 없다. 질문 N개 = 지출 N배. 워커 풀 도입 필요.</li>
-          <li><b>재시작 후 스레드 소유권</b> — 메모리에만 있어 멘션 없는 후속 질문이 무시된다. transcript 존재 여부로 판정하도록 변경 필요.</li>
-          <li><b>실연결 미검증</b> — Bolt 핸들러, <code>chat.update</code> 스로틀, 청킹은 문서 스펙대로 작성했으나 실제 워크스페이스에서 돌린 적이 없다.</li>
+          <li><b>응답 순서</b> — 스레드별 FIFO queue로 완화했다. 실제 Slack canary에서 빠른 연속 질문 순서를 확인한다.</li>
+          <li><b>동시 세션 상한</b> — <code>--max-workers</code>로 제한한다. 데모 기본값은 1이다.</li>
+          <li><b>재시작 후 진행 중 요청 복구</b> — 실행 중 turn 상태는 메모리에 있어 프로세스가 죽으면 진행 메시지 복구는 아직 없다.</li>
+          <li><b>실연결 미검증</b> — Slack canary와 Metabase 실제 카드 생성 canary는 별도 실행이 필요하다.</li>
           <li><b>actor 급감</b> — 최근 2주 actor·repo가 급감하는데 event는 평평하다(event/actor 6.27 → 12.16). 드리프트 알림이 이걸 정확히 가리키고 있다. 별도 진단 진행 중.</li>
         </ul>
       </section>

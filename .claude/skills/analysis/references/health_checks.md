@@ -156,10 +156,10 @@ order by cohort_month
 ### dry run
 
 ```bash
-export GOOGLE_APPLICATION_CREDENTIALS=gcp-key.json
 bq query --project_id=bda-coai --use_legacy_sql=false --dry_run < 쿼리.sql
 ```
 
+자격 증명은 봇/실행 환경이 이미 주입한다. 값이 비어 있으면 직접 덮어쓰지 말고 환경 설정 문제로 보고한다.
 출력의 bytes를 GB로 환산해 보고한다. 온디맨드 단가는 약 $6.25/TiB
 (`scripts/check_bigquery_cost_guard.py` 기본값 기준).
 

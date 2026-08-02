@@ -21,9 +21,11 @@ import sys
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Iterator
 
 # This is a long-running daemon (Socket Mode connection stays open for days), so we
 # use `logging` instead of bare print(): timestamps, levels and thread names matter
@@ -32,6 +34,7 @@ LOG = logging.getLogger("slack_analyst_bot")
 
 DEFAULT_REPO_DIR = "/Users/kakao/bda-2"
 SKILL_RELPATH = ".claude/skills/analysis/SKILL.md"
+DEFAULT_STATE_DIR = "logs/analyst-bot"
 # The analyst's own read-only key. NOT `gcp-key.json`, which carries roles/owner --
 # that one belongs to the operator and Airflow and must never reach the session.
 DEFAULT_GCP_KEY = "secrets/analyst-bq-key.json"
@@ -41,6 +44,7 @@ DEFAULT_GCP_KEY = "secrets/analyst-bq-key.json"
 #   CLOUDSDK_CONFIG=secrets/gcloud-analyst gcloud auth activate-service-account \
 #     --key-file=secrets/analyst-bq-key.json
 ANALYST_GCLOUD_CONFIG = "secrets/gcloud-analyst"
+ANALYST_GCLOUD_CONFIG_ENV = "ANALYST_GCLOUD_CONFIG_DIR"
 # Operator key. Used ONLY by the bot process for privileged accounting
 # (INFORMATION_SCHEMA.JOBS), never injected into the session. See bq_usage_since.
 DEFAULT_OPERATOR_KEY = "gcp-key.json"
@@ -48,19 +52,18 @@ BQ_PROJECT = "bda-coai"
 ANALYST_SA_PREFIX = "bda-analyst-ro@"
 
 # --- Slack credentials ------------------------------------------------------
-# The analyst bot uses its OWN Slack app, deliberately separate from the existing
-# "Airflow Alerts" app that dags/utils/slack_alert.py posts through.
+# Slack credentials are intentionally read from analyst-specific environment
+# variable names even when the workspace reuses the same underlying Slack app as
+# Airflow alerts. Keeping variable names separate makes the bot's required event
+# scopes, app-level token, and reinstall risk explicit.
 #
-# Why separate: the alerting app only needs `chat:write` (outbound). This bot must
-# RECEIVE events, which needs extra bot scopes plus an app-level token, and adding
-# those to the alerting app requires a reinstall that can rotate its xoxb token --
-# silently breaking Airflow alerts, since slack_alert._post() swallows failures.
-#
-# We intentionally do NOT fall back to SLACK_BOT_TOKEN. Doing so would connect with
-# the alerting app's identity, which lacks app_mentions:read/channels:history, and
-# fail in a confusing way at event-delivery time instead of at startup.
+# Do not fall back to SLACK_BOT_TOKEN. That variable is reserved for Airflow alerting
+# in this repo, and using it here makes a missing analyst token look like an event
+# delivery bug instead of a startup configuration error.
 BOT_TOKEN_ENV = "SLACK_ANALYST_BOT_TOKEN"
 APP_TOKEN_ENV = "SLACK_ANALYST_APP_TOKEN"
+METABASE_OPEN_ACTION_ID = "open_metabase_result"
+METABASE_RUNTIME_CONFIG_FILENAME = "metabase-credentials-mcp.json"
 
 
 def bot_token() -> str | None:
@@ -92,10 +95,10 @@ def app_token() -> str | None:
 #      and an ALLOW rule `Read(<repo>/**)` confines nothing, because read-only tools
 #      are permitted by default even under `manual`.
 #
-#      Fix: drop Read/Grep/Glob from the tool set entirely via `--tools` (see
-#      SESSION_TOOLS). All file access then goes through Bash, which IS confined to
-#      the cwd by default -- verified: `cat /etc/hosts` is denied while
-#      `cat dbt/gharchive_metrics/dbt_project.yml` succeeds.
+#      Earlier mitigation was to drop Read/Grep/Glob entirely and route file access
+#      through Bash. For the lecture/demo build they are back for ergonomics, so the
+#      real boundary is a container with narrow mounts plus filename-based deny rules
+#      and outbound redaction.
 #
 # Verified as NOT bypasses (no need to defend again): shell chaining (`;`, `&&`, `|`)
 # and command substitution are decomposed and refused by the matcher.
@@ -118,15 +121,34 @@ def app_token() -> str | None:
 #     below is written filename-first on purpose.
 #   * Residual exposure: any file whose NAME does not match a deny entry is
 #     readable, and the answer is posted to Slack. Containerising (see
-#     docs/analyst_bot_docker.md, currently unused) is what actually closes this.
+#     docs/analyst_bot_docker.md) is what actually closes this.
 SESSION_TOOLS = "Bash,Read,Grep,Glob,Write,Edit,Skill,TodoWrite"
 
-ALLOWED_TOOLS = [
+METABASE_MCP_TOOLS = [
+    # Same surface as the long-running Hamji bot. These are added only when the
+    # operator explicitly enables Metabase MCP and provides METABASE_URL/API_KEY.
+    "mcp__metabase",
+    "mcp__metabase__search_content",
+    "mcp__metabase__list_dashboards",
+    "mcp__metabase__list_collections",
+    "mcp__metabase__get_collection",
+    "mcp__metabase__get_collection_items",
+    "mcp__metabase__get_dashboard",
+    "mcp__metabase__get_dashboard_cards",
+    "mcp__metabase__create_dashboard",
+    "mcp__metabase__create_card",
+    "mcp__metabase__add_card_to_dashboard",
+    "mcp__metabase__get_card",
+    "mcp__metabase__execute_card",
+]
+
+BASE_ALLOWED_TOOLS = [
     # BigQuery. NOTE: `bq query` is NOT a read-only surface -- it executes DDL/DML
     # (CREATE OR REPLACE, DROP, DELETE, MERGE) and command-string matching cannot
     # constrain SQL. Read-only MUST be enforced at IAM: the service account should
     # hold roles/bigquery.dataViewer + jobUser and NOT dataEditor. Scan cost is
-    # likewise bounded by BIGQUERY_MAXIMUM_BYTES_BILLED (see child_env), not here.
+    # likewise bounded by BIGQUERYRC defaults for `bq` and BIGQUERY_MAXIMUM_BYTES_BILLED
+    # for dbt/Python clients (see child_env), not by the tool allowlist.
     #
     # IAM only binds if `bq` actually runs AS that service account, which requires
     # CLOUDSDK_CONFIG (see child_env) -- exporting GOOGLE_APPLICATION_CREDENTIALS is
@@ -245,11 +267,25 @@ DISALLOWED_TOOLS = [
     "Read(**/*.kdbx)",
     "Read(**/*token*.json)",
     "Read(**/service-account*.json)",
+    "Read(**/analyst-bq-key.json)",
     "Read(**/*.zsh_history)",
     "Read(**/*.bash_history)",
+    "Read(**/metabase-credentials-mcp.json)",
     # Same names via the Bash file-reading commands. Bash is cwd-confined already,
     # but these hold for anything reachable inside the repo.
     "Bash(cat /Users/kakao/Documents:*)",
+    "Bash(cat /secrets:*)",
+    "Bash(head /secrets:*)",
+    "Bash(tail /secrets:*)",
+    "Bash(grep /secrets:*)",
+    "Bash(rg /secrets:*)",
+    "Bash(find /secrets:*)",
+    "Bash(cat *credential*:*)",
+    "Bash(head *credential*:*)",
+    "Bash(tail *credential*:*)",
+    "Bash(grep *credential*:*)",
+    "Bash(rg *credential*:*)",
+    "Bash(sed *credential*:*)",
     "Bash(cat /etc:*)",
     "Bash(cat /var:*)",
     "Bash(rg /Users/kakao/Documents:*)",
@@ -263,35 +299,83 @@ You are answering a question that arrived in a Slack thread. Follow this contrac
 0. Stay inside this repository. Never read files outside it, and never quote the
    contents of any credential, key, token, or history file into your answer.
 1. Invoke the repo's `analysis` skill (Skill tool, name: analysis) before doing any work,
-   and follow its report format.
-2. State the mode classification and fill in all 9 required inputs from that skill. If an
-   input is missing from the user's message, state the assumption you made instead of
-   silently guessing.
-3. Always include the health-check table before interpreting any number.
+   and follow its analysis procedure.
+2. Internally classify the mode and fill in all 9 required inputs from that skill before
+   querying. In the FINAL Slack answer, do NOT expose internal checklist labels such as
+   "모드", "분석 모드", "인풋", "관측 grain", "세그먼트", "제외 조건", or "성공 지표".
+   If an assumption materially changes interpretation, mention it in plain prose.
+3. Run the required health checks before interpreting any number. In the FINAL Slack answer,
+   do not include a validation checklist, health-check table, or "검증:" line unless the
+   user explicitly asks for those details. Keep the detailed validation evidence in logs
+   and saved SQL only.
 4. NEVER run an unbounded scan over `githubarchive.day.20*` (or any wildcard that expands
    to the full history). Always pin an explicit date range / _TABLE_SUFFIX bound, and
-   dry-run before a real query.
+   dry-run before a real query. Dry-run output, scan bytes, job ids, CLI commands, and
+   health-check tables are operational evidence: keep them in logs / SQL files, not in
+   the FINAL Slack answer.
 5. Do not make causal claims ("X caused Y", "because of X") without a control group or an
    explicit counterfactual. Otherwise say "correlated with" and name the confounders.
 6. Your FINAL message is posted verbatim into Slack. There is no human reading it
    first and no wrapper around it, so it must BE the answer, not an introduction to
-   the answer. It must:
+   the answer. Assume a product owner will read it. It must:
+   - sound like a helpful teammate in Slack, not like a technical audit note. Be warm,
+     direct, and plain-spoken without being cute. Prefer Korean product language over
+     database language: say "활동 계정" before "active actor"; move `actor.id`, distinct
+     count, UTC, partition, and table names to the caveat unless the user asked for them.
+     Use this final-answer glossary unless the user explicitly asks for schema terms:
+     "active actor" -> "활동 계정", "actor" -> "계정", "actor.id" -> "계정 ID",
+     "event" -> "활동 기록", "event type" -> "활동 종류", "UTC" -> "데이터 기준",
+     "mart/raw/shard/partition/grain" -> avoid or explain in plain Korean.
+   - if the user asks for a quick/simple answer ("간단히", "짧게", "quickly", "tl;dr"),
+     answer in 2-4 short sentences plus one caveat line. Do not add trend tables,
+     bot-rate breakdowns, or follow-up investigations unless they materially change
+     the conclusion.
    - start with the conclusion itself. Do NOT open with a status line, a summary of
      what you did, or a hand-off sentence ("Analysis complete.", "Here is the answer
      that will be posted to Slack", "I left two SQL files"). Such a line is written
      to yourself and reads as leaked scaffolding to the person who asked.
    - contain no horizontal rules (`---`) and no preamble above the conclusion,
-   - stay under ~2,500 characters. If the inputs and health checks do not fit,
-     compress them to one line each rather than dropping the conclusion's support,
+   - stay under ~2,500 characters. Keep conclusion, core numbers, date/filter basis,
+     and caveat. Do not include process labels just because the
+     analysis checklist used them internally,
    - use Slack mrkdwn (*bold*, `code`, • bullets) - never HTML or ###-headings,
-   - reference SQL by file path (e.g. `dbt/gharchive_metrics/analyses/foo.sql`) instead of
-     pasting full query text,
+   - do not include reproduction SQL paths or a "재현:" line. Saved SQL paths belong in
+     logs/audit unless the user explicitly asks for reproducibility details,
+   - never mention dry-run bytes, `bq`/`dbt` command lines, Claude turn counts, BigQuery
+     GiB/cost accounting, MCP/tool names, or permission internals,
    - end with a one-line caveat about what the number does NOT show.
 """
 
+METABASE_APPEND_PROMPT_TEMPLATE = """\
+
+7. Metabase is available through MCP for visual follow-up. Use it only when a chart/card
+   materially improves the answer (time series, breakdown, top-N, cohort/retention table)
+   or when the user explicitly asks to show it in Metabase.
+   - Prefer an existing relevant card/dashboard if it already answers the question.
+   - If creating a new asset, first call list_collections and use a writable collection
+     named "{collection_name}" when available. Do not modify unrelated existing
+     dashboards unless the user explicitly asks for that dashboard.
+   - Create a compact native SQL card, add it to a focused dashboard only when a single
+     card is not enough, and name generated assets with a short Slack/demo prefix.
+   - Do not tell the user to copy SQL into Metabase. Create the card directly. If the
+     actual Metabase call fails, mention the failure in one short sentence and still
+     answer from the validated numbers.
+   - In the FINAL Slack answer, say only "Metabase 카드" or "Metabase 대시보드" with a
+     clickable URL. Do not mention MCP, tool names, collection ids, or API details.
+   - Link format: card {metabase_url}/question/{{id}}, dashboard {metabase_url}/dashboard/{{id}}.
+"""
+
 MAX_SLACK_CHUNK = 2800
+MAX_FINAL_ANSWER_CHARS = 2500
 TRACE_MAX_LINES = 40
 UPDATE_INTERVAL_S = 1.5
+CANCEL_ACTION_ID = "cancel_analyst_turn"
+FEEDBACK_ACTION_PREFIX = "analyst_feedback_"
+FEEDBACK_LABELS = {
+    "helpful": "도움됨",
+    "inaccurate": "부정확함",
+    "needs_more_investigation": "추가 조사 필요",
+}
 
 
 # --- Small helpers ----------------------------------------------------------
@@ -326,6 +410,385 @@ def chunk_text(text: str, limit: int = MAX_SLACK_CHUNK) -> list[str]:
     return [c for c in chunks if c.strip()]
 
 
+LEAKED_PREAMBLE_PATTERNS = [
+    re.compile(r"^\s*(?:아래|다음)(?:가|은|는)?\s*(?:Slack(?:에)?\s*)?(?:게시될\s*)?답변(?:입니다|이에요)?\.?\s*$", re.I),
+    re.compile(r"^\s*(?:분석\s*)?(?:완료|완료했습니다|완료했어요)\.?\s*$", re.I),
+    re.compile(r"^\s*here(?:'s| is)\s+(?:the\s+)?(?:slack\s+)?answer\.?\s*$", re.I),
+    re.compile(r"^\s*analysis\s+complete\.?\s*$", re.I),
+]
+
+INTERNAL_METADATA_LINE_PATTERNS = [
+    re.compile(r"^\s*(?:[-*]\s*)?(?:[*_`]+)?(?:분석\s*)?모드(?:[*_`]+)?\s*[:：]\s*.+$", re.I),
+    re.compile(r"^\s*(?:[-*]\s*)?(?:[*_`]+)?분석\s*유형(?:[*_`]+)?\s*[:：]\s*.+$", re.I),
+    re.compile(r"^\s*(?:[-*]\s*)?(?:[*_`]+)?(?:인풋|입력값?|요청\s*명세|분석\s*입력)(?:[*_`]+)?\s*[:：]?\s*$", re.I),
+    re.compile(r"^\s*(?:[-*]\s*)?(?:[*_`]+)?(?:분석\s*대상|관측\s*grain|기준\s*시간|기준\s*시각|기간|세그먼트|제외\s*조건|성공\s*지표)(?:[*_`]+)?\s*[:：]\s*.+$", re.I),
+    re.compile(r"^\s*(?:[-*]\s*)?(?:[*_`]+)?(?:mode|analysis mode|input checklist|observation grain|segments?|exclusions?|success metric)(?:[*_`]+)?\s*[:：]\s*.+$", re.I),
+]
+
+OPERATIONAL_DETAIL_LINE_PATTERNS = [
+    re.compile(r"^\s*(?:[-*•]\s*)?.*(?:dry[-_ ]?run|드라이\s*런|bq\s+query|dbt\s+compile|maximum_bytes_billed).*$", re.I),
+    re.compile(r"^\s*(?:[-*•]\s*)?.*(?:Query successfully validated|will process|bytes\s+(?:processed|billed)|bytesBilledLimitExceeded).*$", re.I),
+    re.compile(r"^\s*(?:[-*•]\s*)?.*(?:예상\s*스캔|스캔량|과금|BigQuery\s+[0-9.,]+\s*GiB|Claude\s+\d+\s*턴).*$", re.I),
+    re.compile(r"^\s*(?:[-*•]\s*)?.*(?:MCP|mcp__|tool_use|permission_denials|malformed_lines).*$", re.I),
+    re.compile(r"^\s*(?:[-*•]\s*)?(?:검증|검증\s*요약|validation|health\s*checks?)\s*[:：].*$", re.I),
+    re.compile(r"^\s*(?:[-*•]\s*)?(?:재현|재현\s*SQL|repro(?:duction)?|reproduce|sql\s*files?)\s*[:：].*$", re.I),
+    re.compile(r"^\s*(?:[-*•]\s*)?.*dbt/gharchive_metrics/analyses/[^ \n`]+\.sql.*$", re.I),
+]
+
+METABASE_FAILURE_LINE_PATTERN = re.compile(
+    r".*(?:metabase|메타베이스).*(?:mcp|도구|tool|api).*(?:실패|오류|권한|거부|failed|error|401|403|permission|denied).*",
+    re.I,
+)
+
+METABASE_URL_PATTERN = re.compile(
+    r"https?://[^\s>|)]+/(?:question|dashboard)/\d+(?:[^\s>|)]*)?",
+    re.I,
+)
+
+
+def _korean_particle(base: str, particle: str | None) -> str:
+    if particle in {"은", "는"}:
+        return base + "은"
+    if particle in {"이", "가"}:
+        return base + "이"
+    if particle in {"을", "를"}:
+        return base + "을"
+    if particle == "의":
+        return base + "의"
+    return base
+
+
+def casualize_slack_terms(text: str) -> str:
+    """Translate schema-ish metric terms into Slack-friendly product language."""
+    lines: list[str] = []
+    in_fence = False
+    for raw_line in (text or "").split("\n"):
+        line = raw_line
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            lines.append(line)
+            continue
+        if in_fence or METABASE_URL_PATTERN.search(line):
+            lines.append(line)
+            continue
+
+        line = re.sub(
+            r"\bactive\s+actors?\s*(은|는|이|가|을|를|의)?",
+            lambda m: _korean_particle("활동 계정", m.group(1)),
+            line,
+            flags=re.I,
+        )
+        line = re.sub(r"`?actor\.id`?", "계정 ID", line, flags=re.I)
+        line = re.sub(r"\bactor당\s*(?:events?|이벤트)", "계정당 활동 기록", line, flags=re.I)
+        line = re.sub(
+            r"\bactor\s*(은|는|이|가|을|를|의)?",
+            lambda m: _korean_particle("계정", m.group(1)),
+            line,
+            flags=re.I,
+        )
+        line = re.sub(r"\bevent\s*types?(?=별|[^\w]|$)", "활동 종류", line, flags=re.I)
+        line = re.sub(
+            r"\bevents?\s*(은|는|이|가|을|를|의)?",
+            lambda m: _korean_particle("활동 기록", m.group(1)),
+            line,
+            flags=re.I,
+        )
+        line = re.sub(
+            r"이벤트\s*(은|는|이|가|을|를|의)?",
+            lambda m: _korean_particle("활동 기록", m.group(1)),
+            line,
+        )
+        line = re.sub(r"\bdistinct\s+count(?=[가-힣]|[^\w]|$)", "고유 수", line, flags=re.I)
+        line = re.sub(r"\bUTC\b", "데이터 기준", line)
+        line = re.sub(r"\bmart\b", "집계 데이터", line, flags=re.I)
+        line = re.sub(r"\braw\b", "원천 데이터", line, flags=re.I)
+        line = re.sub(r"\bshards?\b", "날짜별 데이터", line, flags=re.I)
+        line = re.sub(r"\bpartitions?\b", "날짜 구간", line, flags=re.I)
+        line = re.sub(r"\bgrain(?=[가-힣]|[^\w]|$)", "집계 단위", line, flags=re.I)
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def strip_leaked_preamble(text: str) -> str:
+    """Remove assistant-facing scaffolding that should not reach Slack."""
+    lines = (text or "").replace("\r\n", "\n").split("\n")
+    start = 0
+    while start < len(lines):
+        line = lines[start].strip()
+        normalized = line.strip("*_` ")
+        if not normalized:
+            start += 1
+            continue
+        if re.fullmatch(r"-{3,}|_{3,}|\*{3,}", normalized):
+            start += 1
+            continue
+        if any(pattern.match(normalized) for pattern in LEAKED_PREAMBLE_PATTERNS):
+            start += 1
+            continue
+        break
+    body_lines = [
+        line
+        for line in lines[start:]
+        if not re.fullmatch(r"\s*(?:-{3,}|_{3,}|\*{3,})\s*", line)
+    ]
+    return "\n".join(body_lines).strip()
+
+
+def strip_internal_metadata_lines(text: str) -> str:
+    """Remove checklist labels that are useful internally but noisy in Slack."""
+    kept: list[str] = []
+    previous_blank = False
+    for line in (text or "").split("\n"):
+        normalized = line.strip().strip("*_` ")
+        if any(pattern.match(normalized) for pattern in INTERNAL_METADATA_LINE_PATTERNS):
+            continue
+        blank = not line.strip()
+        if blank and previous_blank:
+            continue
+        kept.append(line)
+        previous_blank = blank
+    return "\n".join(kept).strip()
+
+
+def strip_operational_detail_lines(text: str) -> str:
+    """Remove CLI/audit details that belong in logs, not in the Slack answer."""
+    kept: list[str] = []
+    previous_blank = False
+    for line in (text or "").split("\n"):
+        normalized = line.strip().strip("*_` ")
+        cleaned_line = line.replace("Metabase MCP", "Metabase").replace("메타베이스 MCP", "메타베이스")
+        if METABASE_URL_PATTERN.search(cleaned_line):
+            kept.append(cleaned_line)
+            previous_blank = False
+            continue
+        if METABASE_FAILURE_LINE_PATTERN.match(normalized):
+            replacement = "Metabase 카드는 생성하지 못했습니다. 분석 결과는 검증된 숫자 기준으로 답했습니다."
+            if not kept or kept[-1] != replacement:
+                kept.append(replacement)
+            previous_blank = False
+            continue
+        if any(pattern.match(normalized) for pattern in OPERATIONAL_DETAIL_LINE_PATTERNS):
+            continue
+        blank = not line.strip()
+        if blank and previous_blank:
+            continue
+        kept.append(cleaned_line)
+        previous_blank = blank
+    return "\n".join(kept).strip()
+
+
+def markdown_to_slack_mrkdwn(text: str) -> str:
+    """Convert common GitHub Markdown emitted by Claude into Slack mrkdwn."""
+    lines: list[str] = []
+    in_fence = False
+    for raw_line in (text or "").split("\n"):
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            lines.append(line)
+            continue
+        if in_fence:
+            lines.append(line)
+            continue
+
+        heading = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", line)
+        if heading:
+            lines.append(f"*{heading.group(1).strip()}*")
+            continue
+
+        line = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r"<\2|\1>", line)
+        line = re.sub(r"\*\*([^*\n]+)\*\*", r"*\1*", line)
+        line = re.sub(r"__([^_\n]+)__", r"*\1*", line)
+        line = re.sub(r"^\s*[-*]\s+", "• ", line)
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def split_paragraphs(text: str) -> list[str]:
+    return [p.strip() for p in re.split(r"\n{2,}", text or "") if p.strip()]
+
+
+def fit_text(text: str, limit: int, marker: str = " …") -> str:
+    if len(text) <= limit:
+        return text
+    if limit <= len(marker):
+        return text[:limit]
+    return text[: limit - len(marker)].rstrip() + marker
+
+
+def format_elapsed_ms(elapsed_ms: int) -> str:
+    seconds = max(1, elapsed_ms // 1000)
+    minutes, remainder = divmod(seconds, 60)
+    if minutes == 0:
+        return f"{remainder}초"
+    if remainder == 0:
+        return f"{minutes}분"
+    return f"{minutes}분 {remainder}초"
+
+
+def progress_elapsed_context(elapsed_ms: int, max_duration_ms: int | None = None) -> str:
+    elapsed = f"{format_elapsed_ms(elapsed_ms)} 경과"
+    if max_duration_ms and max_duration_ms > 0:
+        return f"{elapsed} / 최대 {format_elapsed_ms(max_duration_ms)} · 같은 thread에서 이어서 질문하면 맥락을 이어갑니다."
+    return f"{elapsed} · 같은 thread에서 이어서 질문하면 맥락을 이어갑니다."
+
+
+def compact_slack_answer(text: str, limit: int = MAX_FINAL_ANSWER_CHARS) -> str:
+    """Keep the answer Slack-sized while preserving the conclusion and caveat.
+
+    The analysis skill still asks Claude to produce a compact final answer. This is a
+    last-mile guardrail for the known failure mode where the final Slack post becomes
+    a wall of intake and health-check tables.
+    """
+    normalized = text.strip()
+    if len(normalized) <= limit:
+        return normalized
+
+    paragraphs = split_paragraphs(normalized)
+    if not paragraphs:
+        return fit_text(normalized, limit)
+
+    caveat = ""
+    for paragraph in reversed(paragraphs):
+        if re.search(r"(한계|caveat|주의|인과|계측|결측|편향|지연)", paragraph, re.I):
+            caveat = paragraph
+            break
+
+    selected: list[str] = []
+    used = 0
+    reserve = len(caveat) + 80 if caveat else 80
+    for paragraph in paragraphs:
+        if paragraph == caveat:
+            continue
+        candidate = fit_text(paragraph, 900 if not selected else 650)
+        addition = len(candidate) + (2 if selected else 0)
+        if used + addition + reserve > limit:
+            continue
+        selected.append(candidate)
+        used += addition
+        if len(selected) >= 4:
+            break
+
+    if caveat:
+        selected.append(fit_text(caveat, 500))
+
+    suffix = "상세 실행 내역은 로그에서 확인하세요."
+    candidate = "\n\n".join(selected + [suffix]).strip()
+    if len(candidate) <= limit:
+        return candidate
+    return fit_text(candidate, limit)
+
+
+def format_final_answer_for_slack(text: str, limit: int = MAX_FINAL_ANSWER_CHARS) -> str:
+    cleaned = strip_leaked_preamble(redact_sensitive_text(text))
+    cleaned = strip_internal_metadata_lines(cleaned)
+    cleaned = strip_operational_detail_lines(cleaned)
+    mrkdwn = markdown_to_slack_mrkdwn(cleaned)
+    mrkdwn = casualize_slack_terms(mrkdwn)
+    return redact_sensitive_text(compact_slack_answer(mrkdwn, limit))
+
+
+def extract_metabase_url(text: str) -> str | None:
+    match = METABASE_URL_PATTERN.search(text or "")
+    if not match:
+        return None
+    return match.group(0).rstrip(".,")
+
+
+SECRET_REDACTIONS = [
+    re.compile(r"xox[baprs]-[A-Za-z0-9-]+"),
+    re.compile(r"xapp-[A-Za-z0-9-]+"),
+    re.compile(r"\bsk-ant-[A-Za-z0-9_-]{10,}"),
+    re.compile(r"\bmb_[A-Za-z0-9_-]{8,}"),
+    re.compile(
+        r"\b(?:METABASE_API_KEY|ANTHROPIC_API_KEY|ANTHROPIC_AUTH_TOKEN|CLAUDE_CODE_OAUTH_TOKEN)\s*[:=]\s*['\"]?[^\s'\"`]+",
+        re.I,
+    ),
+    re.compile(r"(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----"),
+    re.compile(r"AIza[0-9A-Za-z_-]{20,}"),
+]
+
+
+def redact_sensitive_text(text: str) -> str:
+    redacted = text or ""
+    for pattern in SECRET_REDACTIONS:
+        redacted = pattern.sub("[REDACTED]", redacted)
+    return redacted
+
+
+def redact_sensitive_value(value):
+    if isinstance(value, str):
+        return redact_sensitive_text(value)
+    if isinstance(value, list):
+        return [redact_sensitive_value(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_sensitive_value(item) for item in value)
+    if isinstance(value, dict):
+        return {key: redact_sensitive_value(item) for key, item in value.items()}
+    return value
+
+
+def slack_progress_line(raw_line: str) -> str | None:
+    """Map raw Claude stream traces to user-facing Slack progress text.
+
+    Raw traces are still kept in local logs/audit. Slack should show product-level
+    state, not implementation details like JSON event names, tool IDs, or truncated
+    command strings.
+    """
+    line = raw_line.strip()
+    if not line:
+        return None
+    if line.startswith("init "):
+        return "분석 환경을 준비했습니다."
+    if line.startswith("rate-limit "):
+        if "allowed_warning" in line:
+            return None
+        return "실행 가능 상태를 확인하고 있습니다."
+    if line.startswith("thinking"):
+        return "질문을 해석하고 분석 계획을 세우고 있습니다."
+    if line.startswith("text "):
+        # Assistant text often contains internal narration ("I'll start with...").
+        # The final answer is posted separately after sanitation.
+        return None
+    if line.startswith("done "):
+        return None
+
+    if line.startswith("tool "):
+        detail = line[5:]
+        if detail.startswith("Skill"):
+            return "분석 절차와 안전 규칙을 확인하고 있습니다."
+        if detail.startswith("mcp__metabase"):
+            return "Metabase에서 볼 수 있는 카드/대시보드를 준비하고 있습니다."
+        if detail.startswith(("Read", "Grep", "Glob")):
+            return "사용할 데이터 모델과 분석 문서를 확인하고 있습니다."
+        if detail.startswith(("Write", "Edit")):
+            return "계산 근거를 정리하고 있습니다."
+        if detail.startswith("Bash"):
+            lowered = detail.lower()
+            if "bq query" in lowered and "--dry_run" in lowered:
+                return "쿼리 실행 전 안전 조건을 확인하고 있습니다."
+            if "bq query" in lowered:
+                return "BigQuery에서 필요한 데이터를 조회하고 있습니다."
+            if "dbt compile" in lowered:
+                return "dbt 분석 SQL을 컴파일하고 있습니다."
+            if "dbt ls" in lowered:
+                return "dbt lineage를 확인하고 있습니다."
+            if "git status" in lowered:
+                return "저장소 상태를 확인하고 있습니다."
+            if any(token in lowered for token in ("cat ", "sed ", "rg ", "grep ", "ls ")):
+                return "분석에 필요한 파일과 정의를 확인하고 있습니다."
+        return "필요한 근거를 수집하고 있습니다."
+
+    if line.startswith("result[error]"):
+        return "차단된 도구 호출을 안전한 방식으로 바꿔 재시도하고 있습니다."
+    if line.startswith("result[ok]"):
+        return "도구 결과를 확인하고 다음 단계로 진행 중입니다."
+
+    return None
+
+
 def encode_project_dir(repo_dir: str) -> str:
     """Claude Code encodes a project cwd by replacing BOTH '/' and '.' with '-'."""
     absolute = str(Path(repo_dir).resolve())
@@ -353,8 +816,15 @@ def gcp_key_path(repo_dir: str) -> Path:
     return Path(repo_dir) / DEFAULT_GCP_KEY
 
 
+def analyst_gcloud_config_path(repo_dir: str) -> Path:
+    env = os.environ.get(ANALYST_GCLOUD_CONFIG_ENV)
+    if env:
+        return Path(env).expanduser()
+    return Path(repo_dir) / ANALYST_GCLOUD_CONFIG
+
+
 def bigqueryrc_path(repo_dir: str) -> Path:
-    return Path(repo_dir) / ANALYST_GCLOUD_CONFIG / ".bigqueryrc"
+    return analyst_gcloud_config_path(repo_dir) / ".bigqueryrc"
 
 
 def ensure_bigqueryrc(cfg: "Config") -> Path:
@@ -402,10 +872,11 @@ def child_env(cfg: "Config") -> dict[str, str]:
     # active in the gcloud credential store. Measured 2026-07-26: with the read-only
     # key exported, `select session_user()` still returned the operator's personal
     # account, i.e. the read-only boundary did not exist on the `bq` path at all.
+    gcloud_cfg = analyst_gcloud_config_path(cfg.repo_dir)
     # Pointing CLOUDSDK_CONFIG at a dedicated config dir where only the analyst
     # service account is activated is what actually enforces it. Forced, not
     # setdefault: this is the security boundary, so the parent env must not win.
-    env["CLOUDSDK_CONFIG"] = str(Path(cfg.repo_dir) / ANALYST_GCLOUD_CONFIG)
+    env["CLOUDSDK_CONFIG"] = str(gcloud_cfg)
     # Scan ceiling, part 2. BIGQUERY_MAXIMUM_BYTES_BILLED above is read by the Python
     # client (so it binds dbt) but `bq` IGNORES it -- measured 2026-07-26: an 18.4 GB
     # raw sweep ran to completion under a 10 GiB env ceiling. `bq` honours the flag
@@ -413,15 +884,19 @@ def child_env(cfg: "Config") -> dict[str, str]:
     # without the session having to pass it. Not airtight: an explicit flag on the
     # command line still overrides the rc default. See ensure_bigqueryrc.
     env["BIGQUERYRC"] = str(bigqueryrc_path(cfg.repo_dir))
-    # Hard scan ceiling. `--max-budget-usd` caps Claude API spend only; nothing in the
-    # tool allowlist can constrain a SQL scan, so BigQuery cost is bounded here. `bq`
-    # reads this and fails the job outright when the estimate exceeds it, which is a
-    # real guardrail rather than the prose rule in the skill.
-    env.setdefault("BIGQUERY_MAXIMUM_BYTES_BILLED", str(cfg.max_scan_bytes))
+    # Python/dbt client scan ceiling. `bq` ignores this env var, so the bq CLI path is
+    # covered separately by BIGQUERYRC above. Force this value as well: a wider parent
+    # shell env must not silently weaken the dbt/Python-client ceiling.
+    env["BIGQUERY_MAXIMUM_BYTES_BILLED"] = str(cfg.max_scan_bytes)
     # Never leak the alerting app's Slack token into the analysis session.
     env.pop("SLACK_BOT_TOKEN", None)
     env.pop(BOT_TOKEN_ENV, None)
     env.pop(APP_TOKEN_ENV, None)
+    # Metabase credentials are passed to the MCP server through its dedicated MCP
+    # config, not as generic Claude child env. If MCP is disabled, strip a parent
+    # shell key so a non-Metabase turn cannot leak it via stderr/final text.
+    if not metabase_mcp_ready(cfg):
+        env.pop("METABASE_API_KEY", None)
     return env
 
 
@@ -429,19 +904,24 @@ def child_env(cfg: "Config") -> dict[str, str]:
 @dataclass
 class Config:
     repo_dir: str = DEFAULT_REPO_DIR
+    state_dir: str = DEFAULT_STATE_DIR
     headless: bool = False
     channel_allowlist: list[str] = field(default_factory=list)
     max_budget_usd: float = 5.0
-    # BigQuery on-demand is ~$6.25/TiB, so 200 GiB is roughly $1.25 per query worst case.
-    # 10 GiB. BigQuery enforces this per job via BIGQUERY_MAXIMUM_BYTES_BILLED, so a
-    # query over the line fails outright rather than being talked past. Sized from
-    # measurement: a 41-day raw shard sweep billed 4.39 GiB, so ordinary mart work and
-    # bounded raw checks fit, while a broad raw sweep does not. Raising it is an
-    # operator decision -- restart with `--max-scan-gib N`. Was 200 GiB, which let a
-    # full raw sweep through on 2% of budget and was not a defence line in any sense.
+    # 10 GiB. Applied as a bq CLI default via .bigqueryrc and as a Python/dbt client
+    # ceiling via BIGQUERY_MAXIMUM_BYTES_BILLED. Not an airtight cloud quota: an
+    # explicit bq flag can override the rc default. Raising it is an operator decision
+    # -- restart with `--max-scan-gib N`.
     max_scan_bytes: int = 10 * 1024**3
     timeout: int = 900
+    max_workers: int = 1
     model: str | None = None
+    log_level: str = "INFO"
+    enable_metabase_mcp: bool = False
+    metabase_url: str = ""
+    metabase_public_url: str = ""
+    metabase_api_key: str = ""
+    metabase_collection_name: str = "BDA 데이터 플랫폼"
     # Overridable only so --self-test can exercise the spawn/stream path without
     # dragging the whole analysis skill into a trivial prompt.
     append_system_prompt: str = APPEND_SYSTEM_PROMPT
@@ -453,6 +933,7 @@ class TurnResult:
     session_id: str | None = None
     final_text: str = ""
     error: str | None = None
+    cancelled: bool = False
     num_turns: int | None = None
     duration_ms: int | None = None
     total_cost_usd: float | None = None
@@ -462,7 +943,76 @@ class TurnResult:
     already_in_use: bool = False
 
 
+def metabase_mcp_ready(cfg: Config) -> bool:
+    return bool(cfg.enable_metabase_mcp and cfg.metabase_url and cfg.metabase_api_key)
+
+
+def normalized_metabase_url(url: str) -> str:
+    return (url or "").rstrip("/")
+
+
+def metabase_slack_url_base(cfg: Config) -> str:
+    return normalized_metabase_url(cfg.metabase_public_url or cfg.metabase_url)
+
+
+def metabase_mcp_config_path(cfg: Config) -> Path:
+    return Path(cfg.state_dir).expanduser() / "runtime" / METABASE_RUNTIME_CONFIG_FILENAME
+
+
+def ensure_metabase_mcp_config(cfg: Config) -> Path | None:
+    """Write a per-bot runtime MCP config without exposing the API key in argv/logs."""
+    if not metabase_mcp_ready(cfg):
+        return None
+    path = metabase_mcp_config_path(cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "mcpServers": {
+            "metabase": {
+                "type": "stdio",
+                "command": "npx",
+                "args": ["-y", "@easecloudio/mcp-metabase-server"],
+                "env": {
+                    "METABASE_URL": normalized_metabase_url(cfg.metabase_url),
+                    "METABASE_API_KEY": cfg.metabase_api_key,
+                },
+            }
+        }
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    path.chmod(0o600)
+    return path
+
+
+def allowed_tools(cfg: Config) -> list[str]:
+    if not metabase_mcp_ready(cfg):
+        return list(BASE_ALLOWED_TOOLS)
+    return [*BASE_ALLOWED_TOOLS, *METABASE_MCP_TOOLS]
+
+
+def effective_append_system_prompt(cfg: Config) -> str:
+    if not metabase_mcp_ready(cfg):
+        return cfg.append_system_prompt
+    metabase_url = normalized_metabase_url(cfg.metabase_url)
+    slack_url = metabase_slack_url_base(cfg)
+    return (
+        cfg.append_system_prompt
+        + METABASE_APPEND_PROMPT_TEMPLATE.format(
+            collection_name=cfg.metabase_collection_name,
+            metabase_url=slack_url or metabase_url,
+        )
+    )
+
+
+def rewrite_metabase_links_for_slack(text: str, cfg: Config) -> str:
+    internal_url = normalized_metabase_url(cfg.metabase_url)
+    public_url = metabase_slack_url_base(cfg)
+    if not internal_url or not public_url or internal_url == public_url:
+        return text
+    return (text or "").replace(internal_url, public_url)
+
+
 def build_command(cfg: Config, session_id: str, resume: bool) -> list[str]:
+    mcp_config = ensure_metabase_mcp_config(cfg)
     cmd = [
         "claude",
         "-p",
@@ -473,19 +1023,22 @@ def build_command(cfg: Config, session_id: str, resume: bool) -> list[str]:
         "manual",
         "--max-budget-usd",
         str(cfg.max_budget_usd),
-        # Removes Read/Grep/Glob from the session. Required: the Read tool cannot be
-        # confined to the repo by any permission rule (see hole 2 above).
+        # Tool surface exposed to the analysis session. Read/Grep/Glob are included
+        # for Slack UX ergonomics; Docker narrow mounts and outbound redaction are the
+        # defence line for secrets.
         "--tools",
         SESSION_TOOLS,
         "--append-system-prompt",
-        cfg.append_system_prompt,
+        effective_append_system_prompt(cfg),
     ]
+    if mcp_config is not None:
+        cmd += ["--strict-mcp-config", "--mcp-config", str(mcp_config)]
     if cfg.model:
         cmd += ["--model", cfg.model]
     cmd += ["--resume" if resume else "--session-id", session_id]
     # These flags are variadic and would swallow a positional prompt, which is
     # exactly why the prompt goes in over stdin instead. Keep them LAST.
-    cmd += ["--allowedTools", *ALLOWED_TOOLS]
+    cmd += ["--allowedTools", *allowed_tools(cfg)]
     cmd += ["--disallowedTools", *DISALLOWED_TOOLS]
     return cmd
 
@@ -515,6 +1068,7 @@ def run_turn(
     prompt: str,
     *,
     resume: bool,
+    cancel_event: threading.Event | None = None,
     on_trace=None,
     on_text=None,
 ) -> TurnResult:
@@ -525,7 +1079,11 @@ def run_turn(
     wrapped so a Slack outage cannot kill the turn.
     """
     result = TurnResult(session_id=session_id)
-    cmd = build_command(cfg, session_id, resume)
+    try:
+        cmd = build_command(cfg, session_id, resume)
+    except OSError as exc:
+        result.error = f"Metabase MCP 설정 파일 생성 실패: {exc}"
+        return result
 
     def emit(line: str) -> None:
         result.trace.append(line)
@@ -578,17 +1136,36 @@ def run_turn(
     stderr_thread.start()
 
     timer_fired = threading.Event()
+    cancel_fired = threading.Event()
 
-    def on_timeout() -> None:
-        timer_fired.set()
+    def kill_process_group() -> None:
         try:
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
             pass
 
+    def on_timeout() -> None:
+        timer_fired.set()
+        kill_process_group()
+
     timer = threading.Timer(cfg.timeout, on_timeout)
     timer.daemon = True
     timer.start()
+
+    cancel_thread: threading.Thread | None = None
+    cancel_watcher_stop = threading.Event()
+    if cancel_event is not None:
+        def watch_cancel() -> None:
+            while not cancel_watcher_stop.is_set():
+                if not cancel_event.wait(timeout=0.2):
+                    continue
+                if proc.poll() is None:
+                    cancel_fired.set()
+                    kill_process_group()
+                return
+
+        cancel_thread = threading.Thread(target=watch_cancel, daemon=True)
+        cancel_thread.start()
 
     try:
         if proc.stdin is not None:
@@ -619,10 +1196,13 @@ def run_turn(
         proc.wait()
     finally:
         timer.cancel()
+        cancel_watcher_stop.set()
+        if cancel_thread is not None:
+            cancel_thread.join(timeout=1)
         stderr_thread.join(timeout=2)
         try:
             if proc.poll() is None:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                kill_process_group()
         except (ProcessLookupError, PermissionError):
             pass
 
@@ -633,6 +1213,12 @@ def run_turn(
     if timer_fired.is_set():
         result.ok = False
         result.error = f"타임아웃({cfg.timeout}s) 초과로 세션 프로세스를 종료했습니다."
+        return result
+
+    if cancel_fired.is_set():
+        result.ok = False
+        result.cancelled = True
+        result.error = "사용자 요청으로 세션 프로세스를 종료했습니다."
         return result
 
     if proc.returncode != 0 and not result.ok:
@@ -737,10 +1323,18 @@ def bq_usage_since(cfg: "Config", since: datetime) -> ScanUsage:
     Never raises -- a turn must still report its answer if billing lookup fails.
     """
     try:
+        key = Path(cfg.repo_dir) / DEFAULT_OPERATOR_KEY
+        if not key.is_file():
+            return ScanUsage(
+                error=(
+                    "BigQuery usage lookup disabled: operator key is not mounted "
+                    f"at {key}"
+                )
+            )
+
         from google.cloud import bigquery
         from google.oauth2 import service_account
 
-        key = Path(cfg.repo_dir) / DEFAULT_OPERATOR_KEY
         creds = service_account.Credentials.from_service_account_file(
             str(key), scopes=["https://www.googleapis.com/auth/cloud-platform"]
         )
@@ -778,25 +1372,72 @@ def bq_usage_since(cfg: "Config", since: datetime) -> ScanUsage:
         return ScanUsage(error=str(exc))
 
 
-class SessionRegistry:
-    """Per-(channel, thread_ts) locks. Two concurrent `--resume` on one session id
-    do NOT error - they silently branch the transcript and lose a turn - so
-    serialization per thread is mandatory."""
+@dataclass
+class _ThreadQueueState:
+    condition: threading.Condition
+    next_ticket: int = 0
+    serving_ticket: int = 0
+    waiters: int = 0
+    active: bool = False
+    last_used: float = field(default_factory=time.monotonic)
 
-    def __init__(self) -> None:
+
+class SessionRegistry:
+    """Duplicate suppression, per-thread FIFO, and global turn concurrency.
+
+    Two concurrent `--resume` calls for one Claude session can silently branch the
+    transcript. A plain `threading.Lock` prevents overlap but does not guarantee FIFO
+    order, and one Slack storm can still start an unbounded number of Claude workers.
+    This registry makes both constraints explicit.
+    """
+
+    def __init__(self, max_concurrent_turns: int = 3) -> None:
+        if max_concurrent_turns < 1:
+            raise ValueError("max_concurrent_turns must be >= 1")
         self._registry_lock = threading.Lock()
-        self._locks: dict[tuple[str, str], threading.Lock] = {}
+        self._queues: dict[tuple[str, str], _ThreadQueueState] = {}
         self._seen_events: set[str] = set()
         self._seen_order: list[str] = []
+        self._global_slots = threading.BoundedSemaphore(max_concurrent_turns)
 
-    def lock_for(self, channel: str, thread_ts: str) -> threading.Lock:
+    @contextmanager
+    def claim(self, channel: str, thread_ts: str) -> Iterator[None]:
         key = (channel, thread_ts)
         with self._registry_lock:
-            lock = self._locks.get(key)
-            if lock is None:
-                lock = threading.Lock()
-                self._locks[key] = lock
-            return lock
+            state = self._queues.get(key)
+            if state is None:
+                state = _ThreadQueueState(condition=threading.Condition(self._registry_lock))
+                self._queues[key] = state
+            ticket = state.next_ticket
+            state.next_ticket += 1
+            state.waiters += 1
+            while ticket != state.serving_ticket:
+                state.condition.wait()
+            state.waiters -= 1
+            state.active = True
+            state.last_used = time.monotonic()
+
+        acquired = False
+        try:
+            self._global_slots.acquire()
+            acquired = True
+            yield
+        finally:
+            if acquired:
+                self._global_slots.release()
+            with self._registry_lock:
+                current = self._queues.get(key)
+                if current is state:
+                    state.active = False
+                    state.serving_ticket += 1
+                    state.last_used = time.monotonic()
+                    state.condition.notify_all()
+                    if (
+                        state.waiters == 0
+                        and not state.active
+                        and state.serving_ticket == state.next_ticket
+                    ):
+                        self._queues.pop(key, None)
 
     def is_duplicate(self, event_key: str | None) -> bool:
         if not event_key:
@@ -814,55 +1455,334 @@ class SessionRegistry:
 
     def known_thread(self, channel: str, thread_ts: str) -> bool:
         with self._registry_lock:
-            return (channel, thread_ts) in self._locks
+            return (channel, thread_ts) in self._queues
+
+
+@dataclass
+class ActiveTurn:
+    cancel_event: threading.Event
+    channel: str
+    thread_ts: str
+    pending_ts: str | None
+    requester: str
+    started_at: datetime
+    slack_trace: object | None = None
+    cancel_requested_by: str | None = None
+    cancel_requested_at: str | None = None
+
+
+class ActiveTurnRegistry:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._turns: dict[str, ActiveTurn] = {}
+
+    def register(self, run_id: str, turn: ActiveTurn) -> None:
+        with self._lock:
+            self._turns[run_id] = turn
+
+    def finish(self, run_id: str) -> None:
+        with self._lock:
+            self._turns.pop(run_id, None)
+
+    def request_cancel(self, run_id: str, user: str) -> ActiveTurn | None:
+        with self._lock:
+            turn = self._turns.get(run_id)
+            if turn is None:
+                return None
+            turn.cancel_requested_by = user
+            turn.cancel_requested_at = datetime.now(timezone.utc).isoformat()
+            turn.cancel_event.set()
+            return turn
+
+    def request_cancel_all(self, user: str) -> list[ActiveTurn]:
+        with self._lock:
+            turns = list(self._turns.values())
+            now = datetime.now(timezone.utc).isoformat()
+            for turn in turns:
+                if not turn.cancel_requested_by:
+                    turn.cancel_requested_by = user
+                    turn.cancel_requested_at = now
+                turn.cancel_event.set()
+            return turns
+
+
+def safe_state_key(*parts: str) -> str:
+    return "_".join(parts).replace("/", "_").replace(":", "_").replace(".", "_")
+
+
+class BotAuditLogger:
+    """Append-only local audit and feedback logs.
+
+    This intentionally lives under `logs/` by default, which is already gitignored.
+    Records are operational evidence, not source artifacts.
+    """
+
+    def __init__(self, state_dir: str) -> None:
+        self.state_dir = Path(state_dir).expanduser()
+
+    def _date_key(self, dt: datetime) -> str:
+        kst = dt.astimezone(timezone(timedelta(hours=9)))
+        return kst.date().isoformat()
+
+    def _append_jsonl(self, relpath: str, record: dict) -> None:
+        path = self.state_dir / relpath
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
+
+    def record_turn(self, **record) -> None:
+        completed_at = record.get("completed_at")
+        if isinstance(completed_at, datetime):
+            dt = completed_at
+        elif isinstance(completed_at, str):
+            try:
+                dt = datetime.fromisoformat(completed_at)
+            except ValueError:
+                dt = datetime.now(timezone.utc)
+        else:
+            dt = datetime.now(timezone.utc)
+        payload = redact_sensitive_value(dict(record))
+        self._append_jsonl(f"audit/{self._date_key(dt)}.jsonl", payload)
+
+    def record_trace(self, channel: str, thread_ts: str, trace: list[str], summary: dict) -> None:
+        key = safe_state_key(channel, thread_ts)
+        for line in trace:
+            self._append_jsonl(
+                f"traces/{key}.jsonl",
+                {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "type": "trace",
+                    "line": redact_sensitive_text(line),
+                },
+            )
+        self._append_jsonl(
+            f"traces/{key}.jsonl",
+            redact_sensitive_value({
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "type": "summary",
+                **summary,
+            }),
+        )
+
+    def record_feedback(
+        self,
+        *,
+        audit_id: str,
+        feedback_type: str,
+        user: str,
+        channel: str,
+        thread_ts: str,
+    ) -> None:
+        self._append_jsonl(
+            f"feedback/{self._date_key(datetime.now(timezone.utc))}.jsonl",
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "audit_id": audit_id,
+                "feedback_type": feedback_type,
+                "user": user,
+                "channel": channel,
+                "thread_ts": thread_ts,
+            },
+        )
+
+
+def section_block(text: str) -> dict:
+    return {
+        "type": "section",
+        # Slack may otherwise collapse longer bot-authored sections behind "Show more".
+        # `expand` is supported by section blocks and is specifically useful for AI-style
+        # answers where the whole response should be visible without an extra click.
+        "expand": True,
+        "text": {"type": "mrkdwn", "text": text[:MAX_SLACK_CHUNK]},
+    }
+
+
+def context_block(text: str) -> dict:
+    return {
+        "type": "context",
+        "elements": [{"type": "mrkdwn", "text": text[:MAX_SLACK_CHUNK]}],
+    }
+
+
+def cancellation_requested_payload(elapsed_ms: int, requested_by: str | None) -> tuple[str, list[dict]]:
+    actor = f"<@{requested_by}> 요청으로 " if requested_by else ""
+    elapsed = format_elapsed_ms(elapsed_ms)
+    text = f":octagonal_sign: *분석 중단 요청됨*\n{actor}현재 실행 중인 작업을 중단하고 있습니다."
+    blocks = [
+        section_block(text),
+        context_block(f"{elapsed} 경과 · 실행 중인 분석 작업에 종료 신호를 보냈습니다."),
+    ]
+    return text, blocks
+
+
+def cancelled_payload(
+    elapsed_ms: int,
+    requested_by: str | None,
+    scan: ScanUsage | None = None,
+) -> tuple[str, list[dict]]:
+    actor = f"<@{requested_by}> 요청으로 " if requested_by else ""
+    elapsed = format_elapsed_ms(elapsed_ms)
+    text = f":white_check_mark: *분석 중단됨*\n{actor}분석을 멈췄습니다. 부분 결과는 게시하지 않았습니다."
+    details = f"{elapsed} 경과"
+    blocks = [
+        section_block(text),
+        context_block(f"{details} · 이미 시작된 작업의 세부 내역은 실행 로그에 남깁니다."),
+    ]
+    return text, blocks
+
+
+def user_facing_error(error: str | None, permission_denials: list[dict] | None = None) -> str:
+    text = error or ""
+    lowered = text.lower()
+    if "타임아웃" in text or "timed out" in lowered or "timeout" in lowered:
+        return "분석 시간이 제한을 넘어 작업을 중단했습니다. 범위를 더 좁혀 다시 요청하세요."
+    if "bytesbilledlimitexceeded" in lowered or "maximum_bytes_billed" in lowered:
+        return "요청 범위가 실행 상한을 넘어 중단했습니다. 기간이나 범위를 줄여 다시 요청하세요."
+    if "permission" in lowered or "denied" in lowered or permission_denials:
+        return "권한 제한에 걸려 이 요청을 완료하지 못했습니다. 원시 오류는 로컬 audit 로그에 남겼습니다."
+    if "claude" in lowered and ("401" in lowered or "oauth" in lowered or "auth" in lowered):
+        return "Claude 인증 상태를 확인해야 합니다. 터미널에서 로그인 상태를 점검하세요."
+    if "already in use" in lowered:
+        return "같은 thread의 이전 작업이 아직 정리되지 않았습니다. 잠시 뒤 다시 요청하세요."
+    return "분석 중 오류가 발생했습니다. 원시 오류는 로컬 audit 로그에 남겼습니다."
+
+
+def error_payload(message: str) -> tuple[str, list[dict]]:
+    text = f":rotating_light: *분석 실패*\n{message}"
+    blocks = [
+        section_block(text),
+        context_block("필요하면 질문 범위와 기간을 좁혀 같은 thread에서 다시 요청하세요."),
+    ]
+    return text, blocks
 
 
 # --- Slack plumbing ---------------------------------------------------------
 class SlackTrace:
     """Placeholder message + throttled `chat.update` live progress trace."""
 
-    def __init__(self, client, channel: str, thread_ts: str, header: str) -> None:
+    def __init__(
+        self,
+        client,
+        channel: str,
+        thread_ts: str,
+        header: str,
+        *,
+        cancel_action_value: str | None = None,
+        max_duration_ms: int | None = None,
+    ) -> None:
         self._client = client
         self._channel = channel
         self._thread_ts = thread_ts
         self._header = header
+        self._cancel_action_value = cancel_action_value
+        self._max_duration_ms = max_duration_ms
+        self._started_at_monotonic = time.monotonic()
         self._lines: list[str] = []
         self._ts: str | None = None
         self._last_update = 0.0
+        self._last_activity = time.monotonic()
+        self._closed = False
+        self._heartbeat_stop = threading.Event()
+        self._override_blocks: list[dict] | None = None
+        self._last_error: str | None = None
         self._lock = threading.Lock()
         self._start()
+        self._heartbeat = threading.Thread(target=self._heartbeat_loop, daemon=True)
+        self._heartbeat.start()
+
+    @property
+    def ts(self) -> str | None:
+        return self._ts
+
+    @property
+    def last_error(self) -> str | None:
+        return self._last_error
 
     def _start(self) -> None:
         try:
+            text = f"{self._header}\n질문을 접수했습니다."
             resp = self._client.chat_postMessage(
                 channel=self._channel,
                 thread_ts=self._thread_ts,
-                text=f"{self._header}\n_분석을 시작합니다…_",
+                text=self._message_text(text),
+                blocks=self._blocks(text),
             )
             self._ts = resp.get("ts")
+            self._last_error = None
         except Exception:  # noqa: BLE001 - Slack must never kill a turn
+            self._last_error = "failed to post placeholder message"
             LOG.exception("failed to post placeholder message")
 
     def _render(self) -> str:
-        lines = self._lines[-TRACE_MAX_LINES:]
-        if not lines:
-            # After finish() the header IS the message; before the first tool call
-            # there is nothing to show yet.
+        if self._closed:
             return self._header[:MAX_SLACK_CHUNK]
-        body = "\n".join(f"• {line}" for line in lines)
-        text = f"{self._header}\n{body}"
+        lines = self._lines[-4:]
+        if not lines:
+            return f"{self._header}\n질문을 정리하고 분석 범위를 잡고 있습니다."[:MAX_SLACK_CHUNK]
+        current = lines[-1]
+        previous = lines[:-1]
+        text = f"{self._header}\n{current}"
+        if previous:
+            body = "\n".join(f"• {line}" for line in previous)
+            text += f"\n\n*진행상황*\n{body}"
         return text[:MAX_SLACK_CHUNK]
 
+    def _elapsed_ms(self) -> int:
+        return int((time.monotonic() - self._started_at_monotonic) * 1000)
+
+    def _progress_context(self) -> str:
+        return progress_elapsed_context(self._elapsed_ms(), self._max_duration_ms)
+
+    def _message_text(self, text: str) -> str:
+        if self._closed or self._override_blocks is not None:
+            return text[:MAX_SLACK_CHUNK]
+        return f"{text}\n{self._progress_context()}"[:MAX_SLACK_CHUNK]
+
+    def _blocks(self, text: str) -> list[dict] | None:
+        if self._override_blocks is not None:
+            return self._override_blocks
+        section = section_block(text)
+        if self._closed:
+            return [section]
+        blocks = [
+            section,
+            context_block(self._progress_context()),
+        ]
+        if self._cancel_action_value:
+            blocks.append(
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "중단하기", "emoji": True},
+                            "style": "danger",
+                            "action_id": CANCEL_ACTION_ID,
+                            "value": self._cancel_action_value,
+                        }
+                    ],
+                },
+            )
+        return blocks
+
     def add(self, line: str) -> None:
+        friendly = slack_progress_line(line)
+        if friendly is None:
+            return
         with self._lock:
-            self._lines.append(line)
+            if self._closed:
+                return
+            self._last_activity = time.monotonic()
+            self._lines = [existing for existing in self._lines if existing != friendly]
+            self._lines.append(friendly)
+            self._lines = self._lines[-4:]
             now = time.monotonic()
             if now - self._last_update < UPDATE_INTERVAL_S:
                 return  # coalesce: the next update carries everything anyway
             self._last_update = now
             self._flush_locked()
 
-    def finish(self, footer: str) -> None:
+    def finish(self, footer: str, *, blocks: list[dict] | None = None) -> bool:
         """Collapse the live trace into a single summary line.
 
         The per-tool trace earns its keep while the turn is running -- a turn takes
@@ -871,35 +1791,184 @@ class SlackTrace:
         rather than appended to.
         """
         with self._lock:
+            self._closed = True
+            self._heartbeat_stop.set()
             self._lines = []
             self._header = footer
-            self._flush_locked()
+            self._cancel_action_value = None
+            self._override_blocks = blocks
+            delivered = self._flush_locked()
+        self._heartbeat.join(timeout=1)
+        return delivered
 
-    def _flush_locked(self) -> None:
+    def replace_and_stop_progress(self, text: str, *, blocks: list[dict] | None = None) -> bool:
+        """Replace the live progress message and stop progress/heartbeat rewrites.
+
+        Used immediately after a cancel button click so the visible "중단 요청됨"
+        state is not overwritten by a late tool trace or heartbeat before the child
+        process exits and the final cancelled state is rendered.
+        """
+        with self._lock:
+            self._closed = True
+            self._heartbeat_stop.set()
+            self._lines = []
+            self._header = text
+            self._cancel_action_value = None
+            self._override_blocks = blocks
+            delivered = self._flush_locked()
+        self._heartbeat.join(timeout=1)
+        return delivered
+
+    def _heartbeat_loop(self) -> None:
+        while not self._heartbeat_stop.wait(timeout=10):
+            with self._lock:
+                if self._closed:
+                    return
+                if time.monotonic() - self._last_activity >= 30:
+                    line = "데이터 조회가 길어져 기다리는 중입니다."
+                    if not self._lines or self._lines[-1] != line:
+                        self._lines.append(line)
+                self._last_update = 0
+                self._flush_locked()
+
+    def _flush_locked(self) -> bool:
         if not self._ts:
-            return
+            self._last_error = "Slack progress message ts is missing"
+            return False
+        text = self._render()
         try:
             self._client.chat_update(
-                channel=self._channel, ts=self._ts, text=self._render()
+                channel=self._channel,
+                ts=self._ts,
+                text=self._message_text(text),
+                blocks=self._blocks(text),
             )
+            self._last_error = None
+            return True
         except Exception:  # noqa: BLE001
+            self._last_error = "chat_update failed"
             LOG.exception("chat_update failed")
+            return False
 
 
-def post_chunks(client, channel: str, thread_ts: str, text: str) -> None:
-    for chunk in chunk_text(text):
+def feedback_blocks(
+    text: str,
+    audit_id: str,
+    footer: str | None = None,
+    *,
+    metabase_url: str | None = None,
+) -> list[dict]:
+    blocks = [
+        section_block(text),
+    ]
+    if footer:
+        blocks.append(context_block(footer))
+    if metabase_url:
+        blocks.append(
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "Metabase 열기", "emoji": True},
+                        "action_id": METABASE_OPEN_ACTION_ID,
+                        "url": metabase_url,
+                    }
+                ],
+            }
+        )
+    blocks.append(
+        {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": FEEDBACK_LABELS["helpful"], "emoji": True},
+                    "style": "primary",
+                    "action_id": f"{FEEDBACK_ACTION_PREFIX}helpful",
+                    "value": audit_id,
+                },
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": FEEDBACK_LABELS["inaccurate"], "emoji": True},
+                    "style": "danger",
+                    "action_id": f"{FEEDBACK_ACTION_PREFIX}inaccurate",
+                    "value": audit_id,
+                },
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": FEEDBACK_LABELS["needs_more_investigation"],
+                        "emoji": True,
+                    },
+                    "action_id": f"{FEEDBACK_ACTION_PREFIX}needs_more_investigation",
+                    "value": audit_id,
+                },
+            ],
+        },
+    )
+    return blocks
+
+
+def feedback_recorded_blocks(blocks: list[dict], feedback_type: str, user: str | None) -> list[dict]:
+    """Return answer blocks with feedback buttons replaced by a visible status."""
+    label = FEEDBACK_LABELS.get(feedback_type, feedback_type)
+    actor = f" · <@{user}>" if user else ""
+    kept: list[dict] = []
+    for block in blocks:
+        if block.get("type") == "actions":
+            elements = block.get("elements") or []
+            if any(str(element.get("action_id", "")).startswith(FEEDBACK_ACTION_PREFIX) for element in elements):
+                continue
+        if block.get("type") == "context":
+            rendered = str(block.get("elements", ""))
+            if "피드백 기록됨:" in rendered:
+                continue
+        kept.append(block)
+    kept.append(context_block(f"피드백 기록됨: {label}{actor}"))
+    return kept
+
+
+def post_chunks(
+    client,
+    channel: str,
+    thread_ts: str,
+    text: str,
+    *,
+    final_blocks: list[dict] | None = None,
+) -> list[str]:
+    posted_ts: list[str] = []
+    chunks = chunk_text(text)
+    for index, chunk in enumerate(chunks):
+        kwargs = {}
+        if final_blocks is not None and index == len(chunks) - 1:
+            kwargs["blocks"] = final_blocks
         try:
-            client.chat_postMessage(channel=channel, thread_ts=thread_ts, text=chunk)
+            resp = client.chat_postMessage(
+                channel=channel,
+                thread_ts=thread_ts,
+                text=chunk,
+                **kwargs,
+            )
+            if resp and resp.get("ts"):
+                posted_ts.append(resp["ts"])
         except Exception:  # noqa: BLE001
             LOG.exception("chat_postMessage failed")
         time.sleep(1.05)  # Slack allows roughly 1 msg/sec per channel
+    return posted_ts
 
 
 MENTION_RE = re.compile(r"<@[UW][A-Z0-9]+>")
 
 
-def clean_text(text: str) -> str:
-    return MENTION_RE.sub("", text or "").strip()
+def clean_text(text: str, bot_user_id: str | None = None) -> str:
+    raw = text or ""
+    if bot_user_id:
+        raw = raw.replace(f"<@{bot_user_id}>", "")
+    else:
+        raw = MENTION_RE.sub("", raw)
+    return raw.strip()
 
 
 def build_prompt(user: str, channel: str, thread_ts: str, question: str) -> str:
@@ -918,6 +1987,8 @@ def build_prompt(user: str, channel: str, thread_ts: str, question: str) -> str:
 def handle_turn(
     cfg: Config,
     registry: SessionRegistry,
+    active_turns: ActiveTurnRegistry,
+    audit_logger: BotAuditLogger,
     client,
     *,
     team: str,
@@ -926,82 +1997,221 @@ def handle_turn(
     user: str,
     question: str,
 ) -> None:
-    lock = registry.lock_for(channel, thread_ts)
     tag = f"[{channel}/{thread_ts}]"
-    with lock:
+    with registry.claim(channel, thread_ts):
+        audit_id = str(uuid.uuid4())
+        run_id = str(uuid.uuid4())
+        cancel_event = threading.Event()
         turn_started_at = datetime.now(timezone.utc)
         session_id = session_id_for(team, channel, thread_ts)
         exists = transcript_path(cfg.repo_dir, session_id).exists()
-        header = f":bar_chart: *분석 진행 중* — `{session_id[:8]}`"
+        header = ":bar_chart: *분석 중*"
 
-        slack_trace = SlackTrace(client, channel, thread_ts, header)
+        slack_trace = SlackTrace(
+            client,
+            channel,
+            thread_ts,
+            header,
+            cancel_action_value=run_id,
+            max_duration_ms=cfg.timeout * 1000,
+        )
+        active_turn = ActiveTurn(
+            cancel_event=cancel_event,
+            channel=channel,
+            thread_ts=thread_ts,
+            pending_ts=slack_trace.ts,
+            requester=user,
+            started_at=turn_started_at,
+            slack_trace=slack_trace,
+        )
+        active_turns.register(
+            run_id,
+            active_turn,
+        )
         chunks_of_text: list[str] = []
 
         def on_trace(line: str) -> None:
-            if not cfg.headless:
-                LOG.info("%s %s", tag, line)
+            LOG.info("%s %s", tag, line)
             slack_trace.add(line)
 
         def on_text(text: str) -> None:
             chunks_of_text.append(text)
 
         prompt = build_prompt(user, channel, thread_ts, question)
-        result = run_turn(
-            cfg,
-            session_id,
-            prompt,
-            resume=exists,
-            on_trace=on_trace,
-            on_text=on_text,
-        )
+        result = TurnResult(session_id=session_id)
+        try:
+            try:
+                result = run_turn(
+                    cfg,
+                    session_id,
+                    prompt,
+                    resume=exists,
+                    cancel_event=cancel_event,
+                    on_trace=on_trace,
+                    on_text=on_text,
+                )
+            except Exception as exc:  # noqa: BLE001
+                LOG.exception("%s claude turn crashed", tag)
+                result.ok = False
+                result.error = f"claude turn crashed: {exc}"
 
-        if not exists and result.already_in_use:
-            LOG.warning("%s session already in use; falling back to --resume", tag)
-            slack_trace.add("세션이 이미 존재하여 --resume 으로 재시도합니다")
-            result = run_turn(
-                cfg,
-                session_id,
-                prompt,
-                resume=True,
-                on_trace=on_trace,
-                on_text=on_text,
-            )
+            if not exists and result.already_in_use:
+                LOG.warning("%s session already in use; falling back to --resume", tag)
+                slack_trace.add("세션이 이미 존재하여 --resume 으로 재시도합니다")
+                try:
+                    result = run_turn(
+                        cfg,
+                        session_id,
+                        prompt,
+                        resume=True,
+                        cancel_event=cancel_event,
+                        on_trace=on_trace,
+                        on_text=on_text,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    LOG.exception("%s claude resume turn crashed", tag)
+                    result.ok = False
+                    result.error = f"claude resume turn crashed: {exc}"
+        finally:
+            active_turns.finish(run_id)
 
         # Two different kinds of "cost" that must not be added together: Claude runs
         # on the operator's subscription (the CLI reports an API-equivalent estimate
         # and consumes a rolling rate-limit window -- no invoice), while BigQuery
         # bytes are actually billed. Summing them would overstate real spend ~30x.
         scan = bq_usage_since(cfg, turn_started_at)
-        footer = (
+        bq_footer = (
+            f"BigQuery {scan.gib:.2f} GiB · ${scan.usd:.2f} · {scan.jobs}건"
+            if scan.error is None
+            else f"BigQuery 집계 실패 ({truncate_line(scan.error, 90)})"
+        )
+        audit_footer = (
             f"Claude {result.num_turns or 0}턴 · "
             f"{(result.duration_ms or 0) / 1000:.0f}초 · "
             f"환산 ${(result.total_cost_usd or 0):.2f} (구독, 청구 없음)"
-            f"  |  BigQuery {scan.gib:.2f} GiB · ${scan.usd:.2f} (실지출, {scan.jobs}건)"
+            f"  |  {bq_footer}"
+        )
+        slack_footer = (
+            f"{(result.duration_ms or 0) / 1000:.0f}초 · "
+            "상세 실행 내역은 로그에 저장됨"
         )
         if result.bad_json_lines:
-            footer += f" · malformed_lines={result.bad_json_lines}"
-        slack_trace.finish(footer)
+            audit_footer += f" · malformed_lines={result.bad_json_lines}"
+
+        audit_common = {
+            "audit_id": audit_id,
+            "created_at": turn_started_at.isoformat(),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "duration_ms": int((datetime.now(timezone.utc) - turn_started_at).total_seconds() * 1000),
+            "team": team,
+            "channel": channel,
+            "thread_ts": thread_ts,
+            "requester": user,
+            "question": question,
+            "session_id": session_id,
+            "resume": exists,
+            "claude_turns": result.num_turns,
+            "claude_duration_ms": result.duration_ms,
+            "claude_cost_usd_equivalent": result.total_cost_usd,
+            "bq_gib": scan.gib,
+            "bq_usd": scan.usd,
+            "bq_jobs": scan.jobs,
+            "bq_error": scan.error,
+            "permission_denials": result.permission_denials,
+            "bad_json_lines": result.bad_json_lines,
+        }
+        try:
+            audit_logger.record_trace(
+                channel,
+                thread_ts,
+                result.trace[-TRACE_MAX_LINES:],
+                {
+                    "audit_id": audit_id,
+                    "ok": result.ok,
+                    "cancelled": result.cancelled,
+                    "footer": audit_footer,
+                },
+            )
+        except Exception:  # noqa: BLE001 - audit must not hide the answer
+            LOG.exception("failed to record trace audit")
+
+        if result.cancelled:
+            elapsed_ms = int((datetime.now(timezone.utc) - turn_started_at).total_seconds() * 1000)
+            text, blocks = cancelled_payload(
+                elapsed_ms,
+                active_turn.cancel_requested_by,
+                scan,
+            )
+            slack_trace.finish(text, blocks=blocks)
+            try:
+                audit_logger.record_turn(
+                    **audit_common,
+                    status="cancelled",
+                    error=result.error or "cancelled",
+                )
+            except Exception:  # noqa: BLE001
+                LOG.exception("failed to record cancelled turn audit")
+            return
 
         if not result.ok:
-            post_chunks(
+            message = user_facing_error(result.error, result.permission_denials)
+            text, blocks = error_payload(message)
+            slack_trace.finish(text, blocks=blocks)
+            try:
+                audit_logger.record_turn(
+                    **audit_common,
+                    status="error",
+                    error=result.error or "unknown error",
+                )
+            except Exception:  # noqa: BLE001
+                LOG.exception("failed to record failed turn audit")
+            return
+
+        raw_body = result.final_text.strip() or "\n\n".join(chunks_of_text).strip() or "_(빈 응답)_"
+        body = format_final_answer_for_slack(raw_body)
+        body = rewrite_metabase_links_for_slack(body, cfg)
+        final_blocks = feedback_blocks(
+            body,
+            audit_id,
+            slack_footer,
+            metabase_url=extract_metabase_url(body),
+        )
+        delivered = slack_trace.finish(body, blocks=final_blocks)
+        if delivered and slack_trace.ts:
+            answer_ts = [slack_trace.ts]
+        else:
+            LOG.warning(
+                "%s final answer chat.update failed; falling back to chat.postMessage (%s)",
+                tag,
+                slack_trace.last_error or "unknown error",
+            )
+            answer_ts = post_chunks(
                 client,
                 channel,
                 thread_ts,
-                f":rotating_light: *분석 실패*\n```{(result.error or '알 수 없는 오류')[:2000]}```",
+                body,
+                final_blocks=final_blocks,
             )
+        if not answer_ts:
+            try:
+                audit_logger.record_turn(
+                    **audit_common,
+                    status="delivery_error",
+                    answer=body,
+                    error=slack_trace.last_error or "final answer was not delivered to Slack",
+                )
+            except Exception:  # noqa: BLE001
+                LOG.exception("failed to record delivery error audit")
             return
-
-        body = result.final_text.strip() or "_(빈 응답)_"
-        post_chunks(client, channel, thread_ts, body)
-
-        if result.permission_denials:
-            lines = [":lock: *권한 차단된 도구 호출*"]
-            for denial in result.permission_denials[:8]:
-                detail = json.dumps(denial.get("tool_input") or {}, ensure_ascii=False)
-                lines.append(f"• `{denial.get('tool_name', '?')}` — {truncate_line(detail, 120)}")
-            post_chunks(client, channel, thread_ts, "\n".join(lines))
-
-        post_chunks(client, channel, thread_ts, f":receipt: `{footer}`")
+        try:
+            audit_logger.record_turn(
+                **audit_common,
+                status="success",
+                answer=body,
+                answer_message_ts=answer_ts[-1] if answer_ts else None,
+            )
+        except Exception:  # noqa: BLE001
+            LOG.exception("failed to record successful turn audit")
 
 
 # --- Preflight --------------------------------------------------------------
@@ -1012,6 +2222,7 @@ def preflight(cfg: Config) -> tuple[list[str], dict]:
     skill = repo / SKILL_RELPATH
     key = gcp_key_path(cfg.repo_dir)
     claude_bin = shutil.which("claude")
+    npx_bin = shutil.which("npx")
 
     if not bot_token():
         blockers.append(f"{BOT_TOKEN_ENV} 이 설정되지 않았습니다 (xoxb- 토큰).")
@@ -1020,17 +2231,44 @@ def preflight(cfg: Config) -> tuple[list[str], dict]:
     if os.environ.get("SLACK_BOT_TOKEN") and not bot_token():
         blockers.append(
             "SLACK_BOT_TOKEN 이 설정되어 있지만 이 봇은 사용하지 않습니다. "
-            "그 토큰은 Airflow 알림 전용 앱(chat:write 만 보유)이라 이벤트를 받을 수 없습니다. "
-            f"분석 봇 전용 앱을 따로 만들어 {BOT_TOKEN_ENV} 로 설정하세요."
+            f"분석 봇은 이벤트 수신용 설정을 명확히 하기 위해 {BOT_TOKEN_ENV} 와 "
+            f"{APP_TOKEN_ENV} 를 별도로 요구합니다."
         )
     if claude_bin is None:
         blockers.append("`claude` 실행 파일을 PATH에서 찾을 수 없습니다.")
+    if cfg.max_workers < 1:
+        blockers.append("--max-workers 는 1 이상이어야 합니다.")
     if not repo.is_dir():
         blockers.append(f"repo dir 이 존재하지 않습니다: {repo}")
     elif not skill.is_file():
         blockers.append(f"analysis 스킬이 없습니다: {skill}")
     if not (key.is_file() and os.access(key, os.R_OK)):
         blockers.append(f"GCP 키를 읽을 수 없습니다: {key}")
+
+    metabase_status = "disabled"
+    metabase_config_file = ""
+    if cfg.enable_metabase_mcp:
+        missing_metabase = []
+        if not cfg.metabase_url:
+            missing_metabase.append("METABASE_URL")
+        if not cfg.metabase_api_key:
+            missing_metabase.append("METABASE_API_KEY")
+        if npx_bin is None:
+            missing_metabase.append("npx")
+        if missing_metabase:
+            metabase_status = f"blocked ({', '.join(missing_metabase)} missing)"
+            blockers.append(
+                "Metabase MCP가 활성화됐지만 필요한 설정이 없습니다: "
+                + ", ".join(missing_metabase)
+            )
+        else:
+            try:
+                mcp_config = ensure_metabase_mcp_config(cfg)
+                metabase_config_file = str(mcp_config) if mcp_config else ""
+                metabase_status = "configured (smoke not run)"
+            except OSError as exc:
+                metabase_status = "blocked (config write failed)"
+                blockers.append(f"Metabase MCP 설정 파일을 쓸 수 없습니다: {exc}")
 
     # `bq` ignores GOOGLE_APPLICATION_CREDENTIALS and uses the gcloud credential
     # store, so an unbuilt or stale CLOUDSDK_CONFIG silently falls back to whatever
@@ -1043,7 +2281,7 @@ def preflight(cfg: Config) -> tuple[list[str], dict]:
         scan_ceiling = "<write failed>"
         blockers.append(f"{bigqueryrc_path(cfg.repo_dir)} 를 쓸 수 없습니다: {exc}")
 
-    gcloud_cfg = repo / ANALYST_GCLOUD_CONFIG
+    gcloud_cfg = analyst_gcloud_config_path(cfg.repo_dir)
     bq_identity = "<unchecked>"
     if not gcloud_cfg.is_dir():
         blockers.append(
@@ -1073,16 +2311,30 @@ def preflight(cfg: Config) -> tuple[list[str], dict]:
 
     summary = {
         "repo_dir": str(repo),
+        "state_dir": str(Path(cfg.state_dir).expanduser()),
         "mode": "headless" if cfg.headless else "attached",
         "channel_allowlist": cfg.channel_allowlist or ["<all>"],
         "max_budget_usd": cfg.max_budget_usd,
         "max_scan_gib": cfg.max_scan_bytes // 1024**3,
         "timeout_s": cfg.timeout,
+        "max_workers": cfg.max_workers,
+        "bq_usage_footer": (
+            "per-turn exact enough for demo (single worker)"
+            if cfg.max_workers == 1
+            else "may include concurrent analyst jobs; use --max-workers 1 for exact demo footer"
+        ),
         "model": cfg.model or "<cli default>",
         "permission_mode": "manual",
-        "allowed_tools": len(ALLOWED_TOOLS),
+        "allowed_tools": len(allowed_tools(cfg)),
         "disallowed_tools": len(DISALLOWED_TOOLS),
         "claude_bin": claude_bin or "<not found>",
+        "npx_bin": npx_bin or "<not found>",
+        "metabase_mcp": metabase_status,
+        "metabase_url": normalized_metabase_url(cfg.metabase_url) or "MISSING",
+        "metabase_public_url": metabase_slack_url_base(cfg) or "MISSING",
+        "metabase_api_key": "set" if cfg.metabase_api_key else "MISSING",
+        "metabase_collection": cfg.metabase_collection_name,
+        "metabase_mcp_config": metabase_config_file or "<not written>",
         "project_transcript_dir": str(
             Path.home() / ".claude" / "projects" / encode_project_dir(cfg.repo_dir)
         ),
@@ -1117,24 +2369,28 @@ Slack 자격증명이 설정되지 않았습니다.
     app_mention, message.channels, message.groups, message.im, message.mpim
   ※ Socket Mode 가 켜져 있으면 Request URL 은 요구되지 않습니다.
 
---- 3. Socket Mode + 앱 레벨 토큰 ------------------------------------------
+--- 3. Interactivity & Shortcuts --------------------------------------------
+  Interactivity 를 켜야 진행 메시지의 `중단하기`와 답변 피드백 버튼이 동작합니다.
+  Socket Mode 를 쓰므로 Request URL 은 요구되지 않습니다.
+
+--- 4. Socket Mode + 앱 레벨 토큰 ------------------------------------------
   Socket Mode → Enable Socket Mode 켜기
   Basic Information → App-Level Tokens → Generate Token and Scopes
   → 스코프 `connections:write` → Generate → xapp- 토큰 복사
 
---- 4. 재설치 --------------------------------------------------------------
+--- 5. 재설치 --------------------------------------------------------------
   OAuth & Permissions → Reinstall to Workspace (새 스코프 승인)
 
   주의: 재설치로 xoxb- 토큰이 회전하면 .env 의 SLACK_BOT_TOKEN 이 낡아
   Airflow 알림이 조용히 멎습니다. 재설치 직후 auth.test 로 확인하고,
   바뀌었으면 SLACK_BOT_TOKEN 과 {BOT_TOKEN_ENV} 양쪽에 반영하세요.
 
---- 5. 환경변수 ------------------------------------------------------------
+--- 6. 환경변수 ------------------------------------------------------------
   .env 에 기록하거나 export:
     {BOT_TOKEN_ENV}=xoxb-...
     {APP_TOKEN_ENV}=xapp-...
 
---- 6. 채널 초대 -----------------------------------------------------------
+--- 7. 채널 초대 -----------------------------------------------------------
   대상 채널에서  /invite @<봇 이름>
   (chat:write.public 이 있으면 공개 채널은 초대 없이도 게시 가능)
 
@@ -1236,10 +2492,23 @@ def start_listener(cfg: Config) -> None:
     bot_user_id = app.client.auth_test()["user_id"]
     LOG.info("connected as bot_user_id=%s", bot_user_id)
 
-    registry = SessionRegistry()
+    registry = SessionRegistry(cfg.max_workers)
+    active_turns = ActiveTurnRegistry()
+    audit_logger = BotAuditLogger(cfg.state_dir)
+    previous_signal_handlers: dict[int, object] = {}
+
+    def request_shutdown(signum, _frame) -> None:  # noqa: ANN001
+        signame = signal.Signals(signum).name
+        turns = active_turns.request_cancel_all("system")
+        LOG.warning("received %s; requested cancellation for %d active turn(s)", signame, len(turns))
+        raise KeyboardInterrupt
+
+    for signum in (signal.SIGTERM, signal.SIGINT):
+        previous_signal_handlers[signum] = signal.getsignal(signum)
+        signal.signal(signum, request_shutdown)
 
     def allowed_channel(channel: str) -> bool:
-        return not cfg.channel_allowlist or channel in cfg.channel_allowlist
+        return channel.startswith("D") or not cfg.channel_allowlist or channel in cfg.channel_allowlist
 
     def dispatch(event: dict, client) -> None:
         channel = event.get("channel")
@@ -1257,19 +2526,122 @@ def start_listener(cfg: Config) -> None:
 
         thread_ts = event.get("thread_ts") or event.get("ts")
         team = event.get("team") or "unknown"
-        question = clean_text(event.get("text", ""))
+        question = clean_text(event.get("text", ""), bot_user_id)
         if not question:
+            try:
+                client.chat_postMessage(
+                    channel=channel,
+                    thread_ts=thread_ts,
+                    text="질문 본문을 멘션 뒤에 함께 적어주세요. 예: `@분석봇 지난 7일 active actor 변화를 봐줘`",
+                )
+            except Exception:  # noqa: BLE001
+                LOG.exception("failed to post empty-question guide")
             return
 
         # Slack redelivers un-acked events, so the handler returns immediately and
         # the real work happens on a worker thread.
         worker = threading.Thread(
             target=_safe_handle,
-            args=(cfg, registry, client, team, channel, thread_ts, user, question),
+            args=(
+                cfg,
+                registry,
+                active_turns,
+                audit_logger,
+                client,
+                team,
+                channel,
+                thread_ts,
+                user,
+                question,
+            ),
             name=f"turn-{channel}-{thread_ts}",
-            daemon=True,
+            daemon=False,
         )
         worker.start()
+
+    @app.action(CANCEL_ACTION_ID)
+    def on_cancel(action, body, client, ack=None):  # noqa: ANN001
+        if ack is not None:
+            ack()
+        run_id = action.get("value") if isinstance(action, dict) else None
+        user = (body.get("user") or {}).get("id") if isinstance(body, dict) else None
+        channel = (body.get("channel") or {}).get("id") if isinstance(body, dict) else None
+        if not run_id or not user:
+            LOG.warning("cancel action missing run_id/user")
+            return
+        turn = active_turns.request_cancel(run_id, user)
+        if turn is None:
+            if channel:
+                try:
+                    client.chat_postEphemeral(
+                        channel=channel,
+                        user=user,
+                        text="이미 완료됐거나 중단된 작업입니다.",
+                    )
+                except Exception:  # noqa: BLE001
+                    LOG.exception("failed to post stale cancel notice")
+            return
+        if turn.pending_ts:
+            try:
+                elapsed_ms = int((datetime.now(timezone.utc) - turn.started_at).total_seconds() * 1000)
+                text, blocks = cancellation_requested_payload(elapsed_ms, user)
+                if hasattr(turn.slack_trace, "replace_and_stop_progress"):
+                    turn.slack_trace.replace_and_stop_progress(text, blocks=blocks)
+                else:
+                    client.chat_update(
+                        channel=turn.channel,
+                        ts=turn.pending_ts,
+                        text=text,
+                        blocks=blocks,
+                    )
+            except Exception:  # noqa: BLE001
+                LOG.exception("failed to update cancellation request message")
+
+    @app.action(re.compile(f"^{FEEDBACK_ACTION_PREFIX}"))
+    def on_feedback(action, body, client, ack=None):  # noqa: ANN001
+        if ack is not None:
+            ack()
+        if not isinstance(action, dict) or not isinstance(body, dict):
+            return
+        action_id = action.get("action_id") or ""
+        audit_id = action.get("value") or ""
+        feedback_type = action_id.removeprefix(FEEDBACK_ACTION_PREFIX)
+        user = (body.get("user") or {}).get("id")
+        channel = (body.get("channel") or {}).get("id")
+        message = body.get("message") or {}
+        thread_ts = message.get("thread_ts") or message.get("ts")
+        message_ts = message.get("ts")
+        if not audit_id or not feedback_type or not user or not channel or not thread_ts:
+            LOG.warning("feedback action missing required fields")
+            return
+        try:
+            audit_logger.record_feedback(
+                audit_id=audit_id,
+                feedback_type=feedback_type,
+                user=user,
+                channel=channel,
+                thread_ts=thread_ts,
+            )
+            if message_ts:
+                client.chat_update(
+                    channel=channel,
+                    ts=message_ts,
+                    text=message.get("text") or "피드백을 기록했습니다.",
+                    blocks=feedback_recorded_blocks(message.get("blocks") or [], feedback_type, user),
+                )
+            else:
+                client.chat_postEphemeral(
+                    channel=channel,
+                    user=user,
+                    text="피드백을 기록했습니다.",
+                )
+        except Exception:  # noqa: BLE001
+            LOG.exception("failed to record feedback")
+
+    @app.action(METABASE_OPEN_ACTION_ID)
+    def on_open_metabase(ack=None):  # noqa: ANN001
+        if ack is not None:
+            ack()
 
     @app.event("app_mention")
     def on_mention(event, client, ack=None):  # noqa: ANN001
@@ -1280,12 +2652,13 @@ def start_listener(cfg: Config) -> None:
         # Registration is required or Bolt logs "Unhandled request" for every message
         # in every subscribed channel.
         #
-        # Deliberately a no-op for turn dispatch: a follow-up must @-mention the bot,
-        # which arrives as an `app_mention` event and is handled above. Without that
-        # rule, once a thread was owned EVERY human message in it -- including two
-        # people talking to each other -- would spawn a paid Claude turn. Multi-turn
-        # still works: `app_mention` fires for mentions inside threads too, and the
-        # session id is derived from thread_ts, so context carries across turns.
+        # Public/private channel replies still require an @-mention; otherwise once a
+        # thread was owned EVERY human message in it would spawn a paid Claude turn.
+        # Direct messages are different: the user intentionally talks to the bot, so
+        # plain DM text is accepted for the 1-person lecture/demo workflow.
+        if event.get("channel_type") == "im":
+            dispatch(event, client)
+            return
         if LOG.isEnabledFor(logging.DEBUG):
             thread_ts = event.get("thread_ts")
             if thread_ts and registry.known_thread(event.get("channel", ""), thread_ts):
@@ -1295,18 +2668,38 @@ def start_listener(cfg: Config) -> None:
                     thread_ts,
                 )
 
-    LOG.info(
-        "starting Socket Mode listener (%s mode)",
-        "headless" if cfg.headless else "attached",
-    )
-    SocketModeHandler(app, app_token()).start()
+    try:
+        LOG.info(
+            "starting Socket Mode listener (%s mode)",
+            "headless" if cfg.headless else "attached",
+        )
+        SocketModeHandler(app, app_token()).start()
+    except KeyboardInterrupt:
+        active_turns.request_cancel_all("system")
+        LOG.warning("Socket Mode listener stopped")
+    finally:
+        for signum, previous in previous_signal_handlers.items():
+            signal.signal(signum, previous)
 
 
-def _safe_handle(cfg, registry, client, team, channel, thread_ts, user, question) -> None:  # noqa: ANN001
+def _safe_handle(  # noqa: ANN001
+    cfg,
+    registry,
+    active_turns,
+    audit_logger,
+    client,
+    team,
+    channel,
+    thread_ts,
+    user,
+    question,
+) -> None:
     try:
         handle_turn(
             cfg,
             registry,
+            active_turns,
+            audit_logger,
             client,
             team=team,
             channel=channel,
@@ -1327,12 +2720,30 @@ def _safe_handle(cfg, registry, client, team, channel, thread_ts, user, question
 
 
 # --- CLI --------------------------------------------------------------------
+def bool_from_env(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Slack Socket Mode bot: 1 thread = 1 Claude Code analysis session.",
     )
-    parser.add_argument("--headless", action="store_true", help="터미널 실시간 출력 끄기")
+    parser.add_argument("--headless", action="store_true", help="TTY 없는 실행 모드 표시")
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="프로세스 로그 레벨. Docker/headless에서도 기본 INFO 로그를 남긴다",
+    )
     parser.add_argument("--repo-dir", default=DEFAULT_REPO_DIR, help="세션 cwd (레포 루트)")
+    parser.add_argument(
+        "--state-dir",
+        default=DEFAULT_STATE_DIR,
+        help="audit/trace/feedback JSONL 저장 경로 (기본: logs/analyst-bot)",
+    )
     parser.add_argument("--channel-allowlist", default="", help="쉼표 구분 채널 ID (빈 값이면 전체)")
     parser.add_argument("--max-budget-usd", type=float, default=5.0, help="턴당 Claude 하드 지출 상한")
     parser.add_argument(
@@ -1340,13 +2751,47 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         default=10,
         help=(
-            "BigQuery 쿼리당 스캔 상한(GiB). BIGQUERY_MAXIMUM_BYTES_BILLED 로 강제. "
-            "기본 10. 세션은 스스로 못 올리므로, 초과가 정당한 분석이면 "
-            "운영자가 이 값을 올려 재기동하는 것이 승인 절차다"
+            "BigQuery 쿼리당 스캔 상한(GiB). bq는 .bigqueryrc 기본값, dbt/Python은 "
+            "BIGQUERY_MAXIMUM_BYTES_BILLED로 적용. 기본 10. 명시적 bq flag나 프로젝트 quota와 "
+            "다르므로, 초과가 정당한 분석이면 운영자가 이 값을 올려 재기동하는 것이 승인 절차다"
         ),
     )
     parser.add_argument("--timeout", type=int, default=900, help="턴당 타임아웃(초)")
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=1,
+        help="동시에 실행할 Slack 분석 턴 수. 기본 1은 BigQuery 사용량 푸터가 섞이지 않게 하기 위한 데모 권장값",
+    )
     parser.add_argument("--model", default=None, help="claude --model 패스스루")
+    parser.add_argument(
+        "--enable-metabase-mcp",
+        dest="enable_metabase_mcp",
+        action="store_true",
+        default=None,
+        help="METABASE_URL/METABASE_API_KEY로 Metabase MCP를 Claude 세션에 주입",
+    )
+    parser.add_argument(
+        "--disable-metabase-mcp",
+        dest="enable_metabase_mcp",
+        action="store_false",
+        help="환경변수 ANALYST_ENABLE_METABASE_MCP=1 이 있어도 Metabase MCP를 끔",
+    )
+    parser.add_argument(
+        "--metabase-url",
+        default=None,
+        help="Metabase MCP 접속용 base URL. 미지정 시 METABASE_URL 환경변수 사용",
+    )
+    parser.add_argument(
+        "--metabase-public-url",
+        default=None,
+        help="Slack 링크용 Metabase base URL. 미지정 시 METABASE_PUBLIC_URL/ANALYST_METABASE_PUBLIC_URL 또는 --metabase-url 사용",
+    )
+    parser.add_argument(
+        "--metabase-collection-name",
+        default=None,
+        help="봇이 생성 카드/대시보드를 우선 저장할 Metabase 컬렉션 이름",
+    )
     parser.add_argument("--dry-run", action="store_true", help="사전 점검 후 설정만 출력하고 종료")
     parser.add_argument("--self-test", action="store_true", help="Slack 없이 세션 생성/재개 검증")
     return parser.parse_args(argv)
@@ -1355,18 +2800,37 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     logging.basicConfig(
-        level=logging.WARNING if args.headless else logging.INFO,
+        level=getattr(logging, args.log_level),
         format="%(asctime)s %(levelname)-7s %(threadName)s %(message)s",
     )
 
     cfg = Config(
         repo_dir=str(Path(args.repo_dir).expanduser()),
+        state_dir=str(Path(args.state_dir).expanduser()),
         headless=args.headless,
         channel_allowlist=[c.strip() for c in args.channel_allowlist.split(",") if c.strip()],
         max_budget_usd=args.max_budget_usd,
         max_scan_bytes=args.max_scan_gib * 1024**3,
         timeout=args.timeout,
+        max_workers=args.max_workers,
         model=args.model,
+        log_level=args.log_level,
+        enable_metabase_mcp=(
+            args.enable_metabase_mcp
+            if args.enable_metabase_mcp is not None
+            else bool_from_env("ANALYST_ENABLE_METABASE_MCP", False)
+        ),
+        metabase_url=args.metabase_url or os.environ.get("METABASE_URL", ""),
+        metabase_public_url=(
+            args.metabase_public_url
+            or os.environ.get("METABASE_PUBLIC_URL", "")
+            or os.environ.get("ANALYST_METABASE_PUBLIC_URL", "")
+        ),
+        metabase_api_key=os.environ.get("METABASE_API_KEY", ""),
+        metabase_collection_name=(
+            args.metabase_collection_name
+            or os.environ.get("ANALYST_METABASE_COLLECTION_NAME", "BDA 데이터 플랫폼")
+        ),
     )
 
     if args.dry_run:
@@ -1378,9 +2842,12 @@ def main() -> None:
         if "Read" in SESSION_TOOLS.split(","):
             print("  주의: Read 포함. 세션이 레포 밖 절대경로를 읽을 수 있습니다.")
             print("        디렉터리 단위 deny 는 Read 에 적용되지 않으며, 파일명 글롭만 유효합니다.")
-            print("        완전 차단은 컨테이너 실행이 필요합니다 (docs/analyst_bot_docker.md).")
+            if str(Path(cfg.repo_dir)) == "/app" or os.environ.get(ANALYST_GCLOUD_CONFIG_ENV):
+                print("        Docker 실행에서는 좁은 마운트 목록이 실제 파일 격리 경계입니다.")
+            else:
+                print("        호스트 실행의 완전 차단은 어렵고 Docker 좁은 마운트가 필요합니다.")
         print("\n=== allowed tools (enforced because permission-mode=manual) ===")
-        for tool in ALLOWED_TOOLS:
+        for tool in allowed_tools(cfg):
             print(f"  + {tool}")
         print("\n=== disallowed tools (hard deny in every mode) ===")
         for tool in DISALLOWED_TOOLS:

@@ -17,6 +17,9 @@ SKILL_FILE="${REPO_DIR}/.claude/skills/analysis/SKILL.md"
 KEY_PATH="${GCP_KEY_PATH:-/secrets/analyst-bq-key.json}"
 ANALYSES_DIR="${REPO_DIR}/dbt/gharchive_metrics/analyses"
 TARGET_DIR="${REPO_DIR}/dbt/gharchive_metrics/target"
+STATE_DIR="${ANALYST_STATE_DIR:-/home/analyst/state}"
+export ANALYST_GCLOUD_CONFIG_DIR="${ANALYST_GCLOUD_CONFIG_DIR:-${CLOUDSDK_CONFIG:-/home/analyst/.config/gcloud}}"
+export CLOUDSDK_CONFIG="${ANALYST_GCLOUD_CONFIG_DIR}"
 
 # Defensive: this service must never carry the Airflow alerting app's token or
 # the operator's GitHub tokens. docker-compose.yml enumerates variables instead
@@ -83,6 +86,14 @@ if [[ -d "${TARGET_DIR}" && ! -w "${TARGET_DIR}" ]]; then
     warn "${TARGET_DIR} is not writable by uid $(id -u). \`dbt compile\` will
        fail, which breaks the skill's dry-run step. It should be a named volume."
 fi
+if ! mkdir -p "${STATE_DIR}" >/dev/null 2>&1 || [[ ! -w "${STATE_DIR}" ]]; then
+    err "State directory ${STATE_DIR} is not writable by uid $(id -u).
+       Mount a persistent writable volume there; audit/trace/feedback logs use it."
+fi
+if ! mkdir -p "${ANALYST_GCLOUD_CONFIG_DIR}" >/dev/null 2>&1 || [[ ! -w "${ANALYST_GCLOUD_CONFIG_DIR}" ]]; then
+    err "Gcloud config directory ${ANALYST_GCLOUD_CONFIG_DIR} is not writable by uid $(id -u).
+       The bot writes .bigqueryrc there and gcloud stores the bq service-account auth there."
+fi
 
 # --- 3. BigQuery service-account key ----------------------------------------
 if [[ -d "${KEY_PATH}" ]]; then
@@ -121,7 +132,29 @@ if [[ -z "${SLACK_ANALYST_APP_TOKEN:-}" ]]; then
        connections:write; required for Socket Mode)."
 fi
 
-# --- 5. Anthropic credentials ----------------------------------------------
+# --- 5. Optional Metabase MCP -----------------------------------------------
+if [[ "${ANALYST_ENABLE_METABASE_MCP:-0}" == "1" ]]; then
+    if ! command -v npx >/dev/null 2>&1; then
+        err "\`npx\` is not on PATH. Metabase MCP runs via
+           npx -y @easecloudio/mcp-metabase-server -- rebuild the image."
+    fi
+    if [[ -z "${METABASE_URL:-}" ]]; then
+        err "ANALYST_ENABLE_METABASE_MCP=1 but METABASE_URL is not set.
+           In docker compose this should usually be http://metabase:3000."
+    fi
+    if [[ -z "${METABASE_API_KEY:-}" ]]; then
+        err "ANALYST_ENABLE_METABASE_MCP=1 but METABASE_API_KEY is not set.
+           Create a Metabase API key and pass it through .env. Do not use
+           METABASE_EMAIL/PASSWORD for the MCP server."
+    fi
+    if [[ -z "${ANALYST_METABASE_PUBLIC_URL:-}" ]]; then
+        warn "ANALYST_ENABLE_METABASE_MCP=1 but ANALYST_METABASE_PUBLIC_URL is not set.
+       Slack links will fall back to METABASE_URL, which may be a Docker-internal
+       URL such as http://metabase:3000."
+    fi
+fi
+
+# --- 6. Anthropic credentials ----------------------------------------------
 # The operator's HOST login does not transfer on its own: subscription OAuth
 # lands in the macOS Keychain and ~/.claude.json, neither of which is (or should
 # be) mounted here. But the container can hold its own credential -- ~/.claude is
@@ -148,7 +181,7 @@ if [[ -z "${ANTHROPIC_API_KEY:-}" \
        See docs/analyst_bot_docker.md."
 fi
 
-# --- 6. Report and bail -----------------------------------------------------
+# --- 7. Report and bail -----------------------------------------------------
 if ((${#WARNINGS[@]})); then
     printf '\n'
     for w in "${WARNINGS[@]}"; do printf '[entrypoint] WARNING: %s\n' "${w}"; done
@@ -159,7 +192,7 @@ if ((${#ERRORS[@]})); then
     exit 1
 fi
 
-# --- 7. Activate the service account for the bq CLI ------------------------
+# --- 8. Activate the service account for the bq CLI ------------------------
 # bq does NOT read GOOGLE_APPLICATION_CREDENTIALS; it uses the gcloud credential
 # store (CLOUDSDK_CONFIG). Without this every `bq query` in a session fails with
 # "There was a problem refreshing your current auth tokens".
@@ -176,20 +209,39 @@ if [[ "${ANALYST_SKIP_GCLOUD_AUTH:-0}" != "1" ]]; then
     fi
 fi
 
-# --- 8. Build the bot command ----------------------------------------------
+# --- 9. Build the bot command ----------------------------------------------
 # --repo-dir must be the canonical container path: `claude --resume` is scoped to
 # the project dir derived from cwd, and the bot maps a session's transcript to
 # ~/.claude/projects/<cwd with / and . replaced by ->. For /app that is
 # ~/.claude/projects/-app, which is why ~/.claude is a named volume.
-ARGS=(--repo-dir "${REPO_DIR}")
-
-# ANALYST_HEADLESS is 0 by default ON PURPOSE. `--headless` sets the root log
-# level to WARNING *and* suppresses the per-turn LOG.info trace lines, so
-# `docker compose logs -f analyst-bot` would show essentially nothing after
-# startup. The bot's non-headless ("attached") mode does not need a TTY -- it
-# only changes logging -- so it is the correct mode for a container.
+# Docker can run in headless mode and still keep INFO logs; `--log-level` controls
+# logging separately from `--headless`.
+ARGS=(
+    --repo-dir "${REPO_DIR}"
+    --state-dir "${STATE_DIR}"
+    --log-level "${ANALYST_LOG_LEVEL:-INFO}"
+    --max-budget-usd "${ANALYST_MAX_BUDGET_USD:-5}"
+    --max-scan-gib "${ANALYST_MAX_SCAN_GIB:-10}"
+    --timeout "${ANALYST_TURN_TIMEOUT_S:-900}"
+    --max-workers "${ANALYST_MAX_WORKERS:-1}"
+)
+if [[ -n "${ANALYST_CHANNEL_ALLOWLIST:-}" ]]; then
+    ARGS+=(--channel-allowlist "${ANALYST_CHANNEL_ALLOWLIST}")
+fi
 if [[ "${ANALYST_HEADLESS:-0}" == "1" ]]; then
     ARGS+=(--headless)
+fi
+if [[ "${ANALYST_ENABLE_METABASE_MCP:-0}" == "1" ]]; then
+    ARGS+=(--enable-metabase-mcp)
+fi
+if [[ -n "${METABASE_URL:-}" ]]; then
+    ARGS+=(--metabase-url "${METABASE_URL}")
+fi
+if [[ -n "${ANALYST_METABASE_PUBLIC_URL:-}" ]]; then
+    ARGS+=(--metabase-public-url "${ANALYST_METABASE_PUBLIC_URL}")
+fi
+if [[ -n "${ANALYST_METABASE_COLLECTION_NAME:-}" ]]; then
+    ARGS+=(--metabase-collection-name "${ANALYST_METABASE_COLLECTION_NAME}")
 fi
 
 # User-supplied flags come last so they win in argparse.
@@ -198,8 +250,18 @@ ARGS+=("$@")
 log "user=$(id -un)($(id -u):$(id -g))  cwd=${REPO_DIR}"
 log "claude=$(command -v claude) ($(claude --version 2>/dev/null | head -1))"
 log "bq=$(command -v bq)  python=${PY}"
-log "bq_key=${KEY_PATH}  claude_transcripts=${CLAUDE_CONFIG_DIR:-${HOME}/.claude}/projects"
+log "bq_key=${KEY_PATH}  gcloud_config=${ANALYST_GCLOUD_CONFIG_DIR}"
+log "state_dir=${STATE_DIR}  claude_transcripts=${CLAUDE_CONFIG_DIR:-${HOME}/.claude}/projects"
 log "slack_bot_token=$(mask "${SLACK_ANALYST_BOT_TOKEN:-}")  slack_app_token=$(mask "${SLACK_ANALYST_APP_TOKEN:-}")"
+if [[ "${ANALYST_ENABLE_METABASE_MCP:-0}" == "1" ]]; then
+    if [[ -n "${METABASE_API_KEY:-}" ]]; then
+        log "metabase_mcp=enabled  metabase_url=${METABASE_URL:-MISSING}  metabase_public_url=${ANALYST_METABASE_PUBLIC_URL:-MISSING}  metabase_api_key=set"
+    else
+        log "metabase_mcp=enabled  metabase_url=${METABASE_URL:-MISSING}  metabase_public_url=${ANALYST_METABASE_PUBLIC_URL:-MISSING}  metabase_api_key=MISSING"
+    fi
+else
+    log "metabase_mcp=disabled"
+fi
 if [[ -f "${CLAUDE_CREDS}" ]]; then
     log "anthropic_auth=in-container OAuth (${CLAUDE_CREDS})"
 elif [[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
