@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slack 분석 봇 변경 요약</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f6f8;
+        --paper: #ffffff;
+        --ink: #172033;
+        --muted: #64748b;
+        --line: #d7dee8;
+        --soft: #eef3f7;
+        --slack: #6d28d9;
+        --data: #0f766e;
+        --ops: #2563eb;
+        --guard: #b45309;
+        --ok: #15803d;
+        --bad: #b91c1c;
+      }
+
+      * { box-sizing: border-box; min-width: 0; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+        line-height: 1.58;
+      }
+
+      .deck {
+        width: min(1120px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 22px 0 72px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding: 12px 0 0;
+        background: linear-gradient(var(--bg) 86%, rgb(244 246 248 / 0));
+      }
+
+      .brandrow {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        background: var(--slack);
+      }
+
+      .stamp {
+        color: var(--muted);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      h1 {
+        margin: 10px 0 6px;
+        font-size: clamp(25px, 3.2vw, 34px);
+        line-height: 1.2;
+        letter-spacing: -0.4px;
+      }
+
+      .lede {
+        max-width: 78ch;
+        margin: 0 0 18px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .tablist {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 4px 0 10px;
+        scrollbar-width: none;
+      }
+
+      .tablist::-webkit-scrollbar { display: none; }
+
+      .tab {
+        appearance: none;
+        cursor: pointer;
+        white-space: nowrap;
+        background: var(--paper);
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 15px;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 720;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .tab:hover { color: var(--ink); }
+      .tab:focus-visible { outline: 2px solid var(--ops); outline-offset: 2px; }
+      .tab .idx {
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        color: #94a3b8;
+        font-weight: 780;
+      }
+      .tab[aria-selected="true"] {
+        background: var(--ops);
+        border-color: var(--ops);
+        color: #fff;
+      }
+      .tab[aria-selected="true"] .idx { color: rgb(255 255 255 / 0.72); }
+
+      .panel[hidden] { display: none; }
+
+      section {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 20px 22px;
+        margin: 0 0 18px;
+      }
+
+      section > h2 {
+        margin: 0 0 4px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 780;
+        letter-spacing: 0.10em;
+        text-transform: uppercase;
+      }
+
+      section > h2 + .sub {
+        margin: 0 0 16px;
+        font-size: 19px;
+        font-weight: 730;
+        letter-spacing: -0.2px;
+      }
+
+      h3 { margin: 22px 0 8px; font-size: 15px; }
+      h3:first-of-type { margin-top: 4px; }
+      p { margin: 0 0 12px; }
+      ul, ol { margin: 0 0 12px; padding-left: 20px; }
+      li { margin: 4px 0; }
+
+      code {
+        background: var(--soft);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 1px 5px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.88em;
+      }
+
+      pre {
+        margin: 0 0 14px;
+        padding: 13px 15px;
+        overflow-x: auto;
+        background: var(--soft);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+      }
+
+      pre code {
+        padding: 0;
+        border: 0;
+        background: none;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      a { color: var(--ops); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+      .snapshot {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin: 0 0 18px;
+      }
+
+      .metric {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 15px;
+      }
+
+      .metric .k {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 780;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .metric .v {
+        margin-top: 6px;
+        font-size: 19px;
+        font-weight: 780;
+        line-height: 1.25;
+      }
+
+      .metric .d {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+
+      .callout {
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--ops);
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin: 0 0 14px;
+        background: #f6f9fe;
+      }
+
+      .callout.slack { border-top-color: var(--slack); background: #faf7ff; }
+      .callout.ok { border-top-color: var(--ok); background: #f6fbf7; }
+      .callout.warn { border-top-color: var(--guard); background: #fdfaf5; }
+
+      .callout .label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--ops);
+        font-size: 12px;
+        font-weight: 820;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .callout.slack .label { color: var(--slack); }
+      .callout.ok .label { color: var(--ok); }
+      .callout.warn .label { color: var(--guard); }
+      .callout p:last-child { margin-bottom: 0; }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin: 0 0 14px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      th, td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      thead th {
+        background: var(--soft);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 780;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      tbody tr:last-child td { border-bottom: 0; }
+      td code { background: none; border: 0; padding: 0; }
+
+      .cards {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+        margin: 0 0 14px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 13px 15px;
+        background: var(--paper);
+      }
+
+      .card .cat {
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 820;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .card .claim {
+        margin: 5px 0 6px;
+        font-size: 14.5px;
+        font-weight: 730;
+        line-height: 1.45;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+        margin: 0 0 14px;
+      }
+
+      .step {
+        min-height: 110px;
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--ops);
+        border-radius: 10px;
+        padding: 11px 12px;
+        background: var(--paper);
+      }
+
+      .step:nth-child(1), .step:nth-child(5) { border-top-color: var(--slack); background: #faf7ff; }
+      .step:nth-child(3) { border-top-color: var(--data); background: #f4fbfa; }
+      .step .no { color: #94a3b8; font-size: 11px; font-weight: 820; font-variant-numeric: tabular-nums; }
+      .step .name { margin-top: 5px; font-size: 14px; font-weight: 760; }
+      .step p { margin: 5px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+
+      .split {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        margin: 0 0 14px;
+      }
+
+      .col {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+
+      .col h3 {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 820;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .col ul { margin-bottom: 0; }
+
+      .status {
+        display: inline-block;
+        border: 1px solid;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 780;
+        white-space: nowrap;
+      }
+
+      .s-ok { color: var(--ok); border-color: #a7d3b4; background: #eef7f1; }
+      .s-warn { color: var(--guard); border-color: #e2c48d; background: #fbf3e6; }
+      .s-new { color: var(--ops); border-color: #a9c6ef; background: #edf3fd; }
+
+      footer {
+        color: var(--muted);
+        font-size: 12px;
+        padding-top: 6px;
+      }
+
+      @media (max-width: 900px) {
+        .snapshot { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .flow { grid-template-columns: 1fr; }
+        .step { min-height: auto; }
+      }
+
+      @media (max-width: 540px) {
+        .deck { width: min(100% - 20px, 1120px); padding-bottom: 48px; }
+        section { padding: 17px 16px; }
+        .snapshot { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <div class="topbar">
+        <div class="brandrow">
+          <div class="brand"><span class="dot"></span>bda-2 · Slack 분석 봇</div>
+          <div class="stamp">2026-08-02</div>
+        </div>
+        <h1>Slack 분석 봇 변경 요약</h1>
+        <p class="lede">
+          이번 변경은 봇이 “분석을 할 수 있음”에서 “Slack에서 실제로 맡겨도 되는 동료처럼 움직임”으로 넘어가는 작업이다.
+          핵심 기준은 간단하다. <b>Slack은 의사결정 화면, 근거는 로그</b>다.
+        </p>
+        <div class="tablist" role="tablist" aria-label="변경 요약 구획">
+          <button class="tab" role="tab" id="t1" aria-controls="p1" aria-selected="true"><span class="idx">01</span>햄찌 워크플로우와 UX</button>
+          <button class="tab" role="tab" id="t2" aria-controls="p2" aria-selected="false" tabindex="-1"><span class="idx">02</span>기술 변경사항</button>
+          <button class="tab" role="tab" id="t3" aria-controls="p3" aria-selected="false" tabindex="-1"><span class="idx">03</span>Docker 컨테이너화</button>
+        </div>
+      </div>
+
+      <div class="snapshot" aria-label="현재 상태">
+        <div class="metric">
+          <div class="k">Slack 표면</div>
+          <div class="v">짧고 덜 기술적으로</div>
+          <div class="d">결론, 숫자, 기간, 한계만 전면 배치</div>
+        </div>
+        <div class="metric">
+          <div class="k">회귀 테스트</div>
+          <div class="v">29 passed</div>
+          <div class="d">답변 후처리와 MCP wiring 포함</div>
+        </div>
+        <div class="metric">
+          <div class="k">Docker</div>
+          <div class="v">headless 연결 확인</div>
+          <div class="d">Socket Mode 로그에 Bolt running 확인</div>
+        </div>
+        <div class="metric">
+          <div class="k">다음 확인</div>
+          <div class="v">톤 재-canary</div>
+          <div class="d">기능은 통과, 말투 검수만 남음</div>
+        </div>
+      </div>
+
+      <div class="panel" id="p1" role="tabpanel" aria-labelledby="t1" tabindex="0">
+        <section>
+          <h2>Workflow</h2>
+          <p class="sub">햄찌에서 가져온 건 코드보다 운영 감각이다</p>
+          <p>
+            오래 돌던 <code>hamji-portable-20260801</code>을 보면서 그대로 베끼기보다,
+            지금 봇에 꼭 필요한 습관만 골랐다. 질문을 받으면 기다리는 사람에게 진행 상황을 보여주고,
+            답변은 바로 읽히게 만들고, 자세한 근거는 나중에 확인할 수 있게 따로 남기는 방식이다.
+          </p>
+
+          <div class="flow" aria-label="Slack 분석 봇 흐름">
+            <div class="step">
+              <div class="no">01</div>
+              <div class="name">Slack 질문</div>
+              <p>멘션이나 DM으로 들어온 질문을 하나의 분석 턴으로 잡는다.</p>
+            </div>
+            <div class="step">
+              <div class="no">02</div>
+              <div class="name">진행 메시지</div>
+              <p>복잡한 로그 대신 사람이 읽는 상태와 중단 버튼을 보여준다.</p>
+            </div>
+            <div class="step">
+              <div class="no">03</div>
+              <div class="name">분석 실행</div>
+              <p>Claude, dbt, BigQuery를 쓰되 내부 경로와 비용 상세는 숨긴다.</p>
+            </div>
+            <div class="step">
+              <div class="no">04</div>
+              <div class="name">답변 정리</div>
+              <p>게시 직전에 기술 메모, 재현 경로, 토큰 패턴을 걷어낸다.</p>
+            </div>
+            <div class="step">
+              <div class="no">05</div>
+              <div class="name">Slack 최종 답변</div>
+              <p>결론, 핵심 숫자, 기준일/기간, 한계만 남긴다.</p>
+            </div>
+          </div>
+
+          <div class="callout slack">
+            <span class="label">협업 메모</span>
+            <p>
+              작업 중 계속 잡았던 기준은 “분석자용 근거는 로그, Slack은 의사결정 화면”이었다.
+              햄찌를 너무 딱딱한 감사자가 아니라, Slack에서 옆자리 동료처럼 말하는 분석 파트너로 두자는 쪽으로 톤을 맞췄다.
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2>Slack UX</h2>
+          <p class="sub">답변이 보고서가 아니라 대화처럼 읽히게 바꿨다</p>
+          <div class="split">
+            <div class="col">
+              <h3>이전 느낌</h3>
+              <ul>
+                <li><code>검증:</code>, <code>재현:</code> 같은 분석자용 라인이 보였다.</li>
+                <li><code>dry run</code>, <code>bq query</code>, <code>Claude N턴</code> 같은 운영 흔적이 섞였다.</li>
+                <li><code>active actor</code>, <code>actor.id</code>, <code>UTC</code>가 그대로 나와 답변이 기술 문서처럼 보였다.</li>
+                <li>사용자가 “간단히”라고 해도 표와 추가 비교가 붙을 수 있었다.</li>
+              </ul>
+            </div>
+            <div class="col">
+              <h3>바뀐 느낌</h3>
+              <ul>
+                <li>첫 줄은 결론으로 시작한다.</li>
+                <li>핵심 숫자와 기준일/기간을 바로 보이게 둔다.</li>
+                <li>한계는 한 줄로 분리한다.</li>
+                <li>짧게 물으면 2-4문장 안에서 끝낸다.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>기술 표현</th>
+                  <th>Slack 표현</th>
+                  <th>의도</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>active actor</code></td>
+                  <td>활동 계정</td>
+                  <td>지표는 유지하되 먼저 읽히는 말로 보여준다.</td>
+                </tr>
+                <tr>
+                  <td><code>actor.id</code></td>
+                  <td>계정 ID</td>
+                  <td>필요할 때만 원래 기준을 괄호로 보충한다.</td>
+                </tr>
+                <tr>
+                  <td><code>event</code></td>
+                  <td>활동 기록</td>
+                  <td>데이터 테이블 냄새를 줄인다.</td>
+                </tr>
+                <tr>
+                  <td><code>UTC</code></td>
+                  <td>데이터 기준</td>
+                  <td>시간대 설명은 남기되 첫 화면을 덜 딱딱하게 만든다.</td>
+                </tr>
+                <tr>
+                  <td><code>mart/raw/shard/partition/grain</code></td>
+                  <td>필요하면 풀어서 설명</td>
+                  <td>내부 구조는 답변의 주인공이 아니게 한다.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <div class="panel" id="p2" role="tabpanel" aria-labelledby="t2" tabindex="0" hidden>
+        <section>
+          <h2>Implementation</h2>
+          <p class="sub">Docker를 빼면 변경은 다섯 가지 축으로 정리된다</p>
+          <p>
+            2번 꼭지는 자칫 구현 목록처럼 보이기 쉬워서, “무슨 문제를 줄였는가” 기준으로 묶었다.
+            핵심 파일은 거의 <code>scripts/slack_analyst_bot.py</code>에 모여 있다.
+          </p>
+
+          <div class="cards">
+            <div class="card">
+              <div class="cat">Final answer</div>
+              <div class="claim">게시 직전 후처리</div>
+              <p><code>format_final_answer_for_slack()</code>에서 메타 서문, 내부 라벨, 운영 상세, secret 패턴을 정리한다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">Session</div>
+              <div class="claim">스레드별 순서 보장</div>
+              <p>Slack thread 하나를 Claude session 하나로 묶고, 같은 thread는 FIFO로만 실행한다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">Control</div>
+              <div class="claim">중단과 heartbeat</div>
+              <p>긴 작업 중 멈춘 것처럼 보이지 않게 진행 메시지를 갱신하고, 사용자가 중단할 수 있게 했다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">Audit</div>
+              <div class="claim">근거는 로그로 이동</div>
+              <p>질문, 상태, Claude turn, BigQuery 사용량, raw trace, 피드백을 <code>logs/analyst-bot/</code>에 남긴다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">Metabase</div>
+              <div class="claim">선택 기능으로 연결</div>
+              <p>API key가 있을 때만 MCP config를 주입하고, Slack에는 카드/대시보드 링크만 노출한다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">Cost guard</div>
+              <div class="claim">비용 경계 명확화</div>
+              <p><code>.bigqueryrc</code>로 기본 스캔 상한을 넣고, 하드 quota는 콘솔 설정이 필요하다고 문서화했다.</p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Contract</h2>
+          <p class="sub">Slack에 보이면 안 되는 것들을 계약으로 박았다</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Slack에 남김</th>
+                  <th>로그로 보냄</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>결론, 핵심 숫자, 기준일/기간</td>
+                  <td><code>검증:</code>, <code>재현:</code>, SQL 파일 경로</td>
+                </tr>
+                <tr>
+                  <td>판단에 필요한 한계</td>
+                  <td><code>dry run</code>, <code>bq query</code>, <code>dbt compile</code></td>
+                </tr>
+                <tr>
+                  <td>Metabase 카드/대시보드 링크</td>
+                  <td>MCP 이름, API key, collection id, permission 내부값</td>
+                </tr>
+                <tr>
+                  <td>실행이 길어질 때의 진행 상태</td>
+                  <td>Claude turn 수, BigQuery GiB, raw trace</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="callout ok">
+            <span class="label">검증</span>
+            <p>
+              <code>uv run pytest tests/test_slack_analyst_bot.py</code> 기준 <b>29 passed</b>.
+              답변 후처리, 캐주얼 용어 치환, Metabase MCP config, 중단 버튼, 피드백 버튼, Slack raw error 은닉을 회귀에 포함했다.
+            </p>
+          </div>
+        </section>
+      </div>
+
+      <div class="panel" id="p3" role="tabpanel" aria-labelledby="t3" tabindex="0" hidden>
+        <section>
+          <h2>Container</h2>
+          <p class="sub">Docker는 배포 편의보다 권한 경계 때문에 넣었다</p>
+          <p>
+            로컬 세션 도구는 레포 밖 파일을 읽을 수 있었다. 이름 기반 deny만으로는 충분하지 않아서,
+            실제 운영 경계는 Claude permission list가 아니라 컨테이너 마운트로 잡았다.
+          </p>
+
+          <div class="split">
+            <div class="col">
+              <h3>컨테이너 안에 넣는 것</h3>
+              <ul>
+                <li>필요한 레포 경로를 읽기 전용으로 mount</li>
+                <li>read-only BigQuery 서비스 계정 키</li>
+                <li>ad-hoc SQL을 쓸 <code>dbt/gharchive_metrics/analyses/</code></li>
+                <li>dbt target, Claude credential, audit state용 named volume</li>
+              </ul>
+            </div>
+            <div class="col">
+              <h3>컨테이너 밖에 두는 것</h3>
+              <ul>
+                <li>호스트 <code>~/.claude</code> 전체</li>
+                <li>운영자 GCP 키</li>
+                <li><code>/app/secrets</code>, <code>/app/gcp-key.json</code></li>
+                <li>레포 전체 쓰기 권한</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="callout warn">
+            <span class="label">로그인 방식</span>
+            <p>
+              호스트 로그인을 그대로 넘기지 않는다. 컨테이너 안에서 한 번 OAuth 로그인하고,
+              결과는 <code>analyst-claude</code> named volume에 저장한다.
+            </p>
+          </div>
+
+          <pre><code>docker compose run --rm -it --entrypoint claude analyst-bot auth login</code></pre>
+        </section>
+
+        <section>
+          <h2>Runbook</h2>
+          <p class="sub">headless 실행은 확인됐고, 다음은 톤 재-canary다</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>항목</th>
+                  <th>상태</th>
+                  <th>메모</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="status s-ok">완료</span> build</td>
+                  <td><code>docker compose build analyst-bot</code> 통과</td>
+                  <td>entrypoint, gcloud, dbt, bq 경로 확인</td>
+                </tr>
+                <tr>
+                  <td><span class="status s-ok">완료</span> dry-run</td>
+                  <td><code>docker compose run --rm analyst-bot --dry-run</code> 통과</td>
+                  <td>repo/state/gcloud 위치와 scan ceiling 확인</td>
+                </tr>
+                <tr>
+                  <td><span class="status s-ok">완료</span> self-test</td>
+                  <td><code>docker compose run --rm analyst-bot --self-test</code> 통과</td>
+                  <td>session 생성과 <code>--resume</code> 동작 확인</td>
+                </tr>
+                <tr>
+                  <td><span class="status s-ok">완료</span> headless</td>
+                  <td><code>docker compose up -d analyst-bot</code> 후 Socket Mode 연결</td>
+                  <td>로그에 <code>Bolt app is running!</code> 표시</td>
+                </tr>
+                <tr>
+                  <td><span class="status s-warn">남음</span> Slack tone canary</td>
+                  <td>첫 canary는 기능 통과, 말투가 기술적으로 읽힘</td>
+                  <td>용어와 짧은 답변 규칙 보강 후 재확인 필요</td>
+                </tr>
+                <tr>
+                  <td><span class="status s-warn">남음</span> Metabase canary</td>
+                  <td><code>METABASE_API_KEY</code> 필요</td>
+                  <td>카드 생성과 Slack 버튼 노출 확인</td>
+                </tr>
+                <tr>
+                  <td><span class="status s-warn">남음</span> BigQuery hard quota</td>
+                  <td>콘솔 설정 필요</td>
+                  <td><code>.bigqueryrc</code>는 기본값이지 완전한 하드 상한은 아님</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>기본 운영 명령</h3>
+          <pre><code>docker compose logs -f analyst-bot
+docker compose run --rm analyst-bot --dry-run
+docker compose run --rm analyst-bot --self-test
+docker compose up -d analyst-bot</code></pre>
+        </section>
+      </div>
+
+      <section>
+        <h2>References</h2>
+        <p class="sub">더 자세한 문서는 역할별로 나눠 둔다</p>
+        <ul>
+          <li>운영 인수인계: <a href="./analyst_bot_handoff.md">docs/analyst_bot_handoff.md</a></li>
+          <li>짧은 시연 절차: <a href="./analyst_bot_demo_runbook.md">docs/analyst_bot_demo_runbook.md</a></li>
+          <li>Docker 운영 경로: <a href="./analyst_bot_docker.md">docs/analyst_bot_docker.md</a></li>
+          <li>hamji 적용 상세: <a href="../reports/20260801_slack_analyst_bot_hamji_adaptation.html">reports/20260801_slack_analyst_bot_hamji_adaptation.html</a></li>
+        </ul>
+      </section>
+
+      <footer>
+        작성 기준: 2026-08-02. 기능 canary는 통과했고, Slack 말투 보강 후 재-canary가 다음 단계다.
+      </footer>
+    </main>
+
+    <script>
+      const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+      const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+
+      function selectTab(tab) {
+        tabs.forEach((item) => {
+          const selected = item === tab;
+          item.setAttribute('aria-selected', String(selected));
+          item.tabIndex = selected ? 0 : -1;
+        });
+        panels.forEach((panel) => {
+          panel.hidden = panel.id !== tab.getAttribute('aria-controls');
+        });
+      }
+
+      tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => selectTab(tab));
+        tab.addEventListener('keydown', (event) => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          let nextIndex = index;
+          if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+          if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+          if (event.key === 'Home') nextIndex = 0;
+          if (event.key === 'End') nextIndex = tabs.length - 1;
+          tabs[nextIndex].focus();
+          selectTab(tabs[nextIndex]);
+        });
+      });
+    </script>
+  </body>
+</html>

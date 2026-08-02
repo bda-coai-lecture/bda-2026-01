@@ -4,7 +4,7 @@
 업데이트: 2026-08-02 — `hamji-portable-20260801` 운영 패턴을 참고해 Slack 표면/실행 제어/audit을 정리했고,
 PO가 읽는 최종 답변에서는 dry run/Claude 턴/BigQuery GiB 같은 운영 세부값을 숨긴다. Metabase MCP 연결 옵션도 추가했다.
 변경점 요약은 `reports/20260801_slack_analyst_bot_hamji_adaptation.html`을 본다.
-공유용 3단 구성 요약은 `docs/analyst_bot_change_summary.md`를 본다.
+공유용 3단 구성 요약은 `docs/analyst_bot_change_summary.html`을 먼저 보고, 원문은 `docs/analyst_bot_change_summary.md`를 본다.
 짧게 켜고 시연하는 절차는 `docs/analyst_bot_demo_runbook.md`를 먼저 본다.
 
 Slack 스레드에서 받은 데이터 질문을 GitHub Archive/BigQuery로 분석해 답하는 봇과,
