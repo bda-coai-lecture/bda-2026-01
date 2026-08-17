@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BDA 2 — AI 데이터 분석 자동화 강의 흐름</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f6f8;
+        --paper: #ffffff;
+        --ink: #172033;
+        --muted: #64748b;
+        --line: #d7dee8;
+        --soft: #eef3f7;
+        --blue: #2563eb;
+        --green: #0f766e;
+        --amber: #b45309;
+        --red: #b91c1c;
+      }
+
+      * { box-sizing: border-box; min-width: 0; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+        line-height: 1.56;
+      }
+
+      .deck {
+        width: min(1120px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 22px 0 72px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding: 12px 0 0;
+        background: linear-gradient(var(--bg) 88%, rgb(244 246 248 / 0));
+      }
+
+      .brandrow {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        background: var(--blue);
+      }
+
+      .stamp {
+        color: var(--muted);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      h1 {
+        margin: 10px 0 6px;
+        font-size: 30px;
+        line-height: 1.24;
+        letter-spacing: 0;
+      }
+
+      .lede {
+        max-width: 82ch;
+        margin: 0 0 16px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .tablist {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 4px 0 12px;
+        scrollbar-width: none;
+      }
+
+      .tablist::-webkit-scrollbar { display: none; }
+
+      .tab {
+        appearance: none;
+        cursor: pointer;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--paper);
+        color: var(--muted);
+        padding: 7px 14px;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .tab:hover {
+        color: var(--ink);
+        border-color: #b9c5d5;
+      }
+
+      .tab[aria-selected="true"] {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #ffffff;
+      }
+
+      .tab[aria-selected="true"] .idx {
+        color: rgb(255 255 255 / 0.72);
+      }
+
+      .tab:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+
+      .idx {
+        color: #94a3b8;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .panel[hidden] { display: none; }
+
+      section {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 22px;
+        margin: 0 0 18px;
+      }
+
+      section > h2 {
+        margin: 0 0 4px;
+        color: var(--muted);
+        font-size: 13px;
+        letter-spacing: 0.10em;
+        text-transform: uppercase;
+      }
+
+      section > h2 + .sub {
+        margin: 0 0 16px;
+        font-size: 20px;
+        font-weight: 730;
+      }
+
+      h3 {
+        margin: 20px 0 8px;
+        font-size: 15px;
+      }
+
+      p {
+        margin: 0 0 12px;
+      }
+
+      ul, ol {
+        margin: 0 0 12px;
+        padding-left: 20px;
+      }
+
+      li {
+        margin: 4px 0;
+      }
+
+      b {
+        color: var(--ink);
+      }
+
+      code {
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: var(--soft);
+        padding: 1px 5px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.88em;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 10px;
+        margin: 0 0 14px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        padding: 14px 15px;
+      }
+
+      .card .cat {
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .card .claim {
+        margin: 5px 0 6px;
+        font-size: 15px;
+        font-weight: 730;
+        line-height: 1.45;
+      }
+
+      .card p:last-child {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .card ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .card li {
+        margin: 3px 0;
+      }
+
+      .question-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 14px;
+        margin: 0 0 14px;
+      }
+
+      .question-card {
+        border: 1px solid var(--line);
+        border-top: 4px solid var(--blue);
+        border-radius: 8px;
+        background: var(--paper);
+        padding: 18px 19px;
+      }
+
+      .question-card .cat {
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .question-card .claim {
+        margin: 6px 0 12px;
+        font-size: 19px;
+        font-weight: 760;
+        line-height: 1.35;
+      }
+
+      .question-card ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .question-card li {
+        margin: 6px 0;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin: 0 0 14px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      th, td {
+        padding: 9px 12px;
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid var(--line);
+      }
+
+      thead th {
+        white-space: nowrap;
+        background: var(--soft);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 750;
+        letter-spacing: 0.04em;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 12px;
+        margin: 0 0 14px;
+      }
+
+      .col {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px 16px;
+      }
+
+      .col.soft {
+        background: var(--soft);
+      }
+
+      .col h4 {
+        margin: 0 0 4px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .col .cap {
+        margin: 0 0 10px;
+        font-size: 15px;
+        font-weight: 730;
+      }
+
+      .col ul {
+        margin-bottom: 0;
+        font-size: 14px;
+      }
+
+      .note {
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--blue);
+        border-radius: 8px;
+        background: #f6f9fe;
+        padding: 14px 16px;
+        margin: 0 0 14px;
+      }
+
+      .note.warn {
+        border-top-color: var(--amber);
+        background: #fdfaf5;
+      }
+
+      .note.ok {
+        border-top-color: var(--green);
+        background: #f6fbf7;
+      }
+
+      .note .lbl {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .note.warn .lbl { color: var(--amber); }
+      .note.ok .lbl { color: var(--green); }
+      .note p:last-child { margin-bottom: 0; }
+
+      .visual-callout {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #111827;
+        margin: 0 0 14px;
+      }
+
+      .visual-callout img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        background: var(--soft);
+      }
+
+      .visual-callout::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(rgb(15 23 42 / 0.72), rgb(15 23 42 / 0.12) 42%, rgb(15 23 42 / 0.82));
+        pointer-events: none;
+      }
+
+      .visual-message {
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        top: 18px;
+        z-index: 1;
+        max-width: 760px;
+        border: 1px solid rgb(167 243 208 / 0.42);
+        border-radius: 8px;
+        background: rgb(6 78 59 / 0.78);
+        color: #ffffff;
+        padding: 14px 16px;
+      }
+
+      .visual-message .lbl {
+        display: block;
+        margin-bottom: 5px;
+        color: rgb(209 250 229 / 0.88);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .visual-message p {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 650;
+        line-height: 1.5;
+      }
+
+      .visual-message b {
+        color: #ffffff;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 10px;
+        margin: 0 0 14px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 94px minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px 14px;
+        background: var(--paper);
+      }
+
+      .step .era {
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .step .title {
+        margin: 0 0 3px;
+        font-weight: 740;
+      }
+
+      .step p:last-child {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .runbook {
+        list-style: none;
+        counter-reset: run;
+        padding: 0;
+      }
+
+      .runbook li {
+        counter-increment: run;
+        position: relative;
+        margin: 0 0 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        padding: 11px 14px 11px 46px;
+      }
+
+      .runbook li::before {
+        content: counter(run, decimal-leading-zero);
+        position: absolute;
+        left: 13px;
+        top: 12px;
+        color: var(--blue);
+        font-size: 11px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+
+      footer {
+        color: var(--muted);
+        font-size: 12px;
+        padding-top: 6px;
+      }
+
+      @media (max-width: 720px) {
+        h1 { font-size: 26px; }
+        section { padding: 18px; }
+        .step { grid-template-columns: 1fr; gap: 4px; }
+        .visual-message {
+          left: 10px;
+          right: 10px;
+          top: 10px;
+          padding: 11px 12px;
+        }
+        .visual-message p { font-size: 13px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <div class="topbar">
+        <div class="brandrow">
+          <div class="brand"><span class="dot"></span>bda-2 · 강의 방향</div>
+          <div class="stamp">2026-08-16</div>
+        </div>
+        <h1>AI를 통한 데이터 자동화 분석</h1>
+        <p class="lede">
+          이 강의의 출발점은 "AI가 분석을 대신한다"가 아니다.
+          AI가 SQL과 차트 생성을 빠르게 도와주는 환경에서,
+          사람이 <b>무엇을 정의하고, 어디까지 읽고, 어떻게 검증하고, 어떻게 운영할지</b>를 배우는 것이다.
+        </p>
+        <div class="tablist" role="tablist" aria-label="강의 목차">
+          <button class="tab" role="tab" id="t0" aria-controls="p0" aria-selected="true"><span class="idx">00</span>지난 회차와 강의 비교</button>
+          <button class="tab" role="tab" id="t1" aria-controls="p1" aria-selected="false" tabindex="-1"><span class="idx">01</span>DA 인식 계보</button>
+          <button class="tab" role="tab" id="t2" aria-controls="p2" aria-selected="false" tabindex="-1"><span class="idx">02</span>Python vs SQL</button>
+          <button class="tab" role="tab" id="t3" aria-controls="p3" aria-selected="false" tabindex="-1"><span class="idx">03</span>우리는 어떡하죠</button>
+        </div>
+      </div>
+
+      <div class="panel" id="p0" role="tabpanel" aria-labelledby="t0" tabindex="0">
+      <section>
+        <h2>00 지난 회차와 강의 비교</h2>
+        <p class="sub">BDA 1은 개념을 먼저 깔고 구현했다면, BDA 2는 결과물을 만들며 필요한 디테일을 역추적한다</p>
+        <ul>
+          <li>지난 회차는 <code>vectorize</code>, <code>dict</code>/<code>hash</code>처럼 성능을 좌우하는 기초 개념을 먼저 공부했다.</li>
+          <li>이번 회차는 그런 지식을 하나하나 미리 다 깔고 시작하기보다, 결과물을 만들면서 필요한 디테일을 파고든다.</li>
+          <li>핵심 질문은 "이 개념을 알고 구현했나"에서 <b>"이 결과가 왜 이렇게 나왔고, 어디를 의심해야 하나"</b>로 이동한다.</li>
+        </ul>
+
+        <h3>지난 회차에서 먼저 깔고 공부한 것</h3>
+        <div class="cards">
+          <div class="card">
+            <div class="cat">지난 회차</div>
+            <p class="claim"><code>vectorize</code>로 NumPy/Pandas 고속 연산을 이해했다</p>
+            <ul>
+              <li>Python 반복문과 벡터 연산의 속도 차이를 본다.</li>
+              <li>row 단위 처리보다 column/batch 연산이 빠른 이유를 이해한다.</li>
+              <li>Pandas 코드가 느려지는 지점을 직접 고쳐본다.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="cat">지난 회차</div>
+            <p class="claim"><code>dict</code>와 <code>hash</code>로 시공간 복잡도를 익혔다</p>
+            <ul>
+              <li>list scan과 dict lookup의 차이를 비교한다.</li>
+              <li>O(n), O(1) 같은 시간 복잡도를 실제 코드 속도로 확인한다.</li>
+              <li>메모리를 더 쓰고 속도를 얻는 trade-off를 배운다.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="cat">지난 회차</div>
+            <p class="claim">자료구조가 계산 비용을 바꾼다는 감각을 익혔다</p>
+            <ul>
+              <li>sparse matrix와 dense matrix의 차이를 본다.</li>
+              <li>join, groupby, indexing이 느려지는 이유를 확인한다.</li>
+              <li>모델 입력 형태가 학습 시간과 메모리에 주는 영향을 본다.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>구분</th><th>지난 회차의 중심</th><th>BDA 2의 중심</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>학습 대상</td>
+                <td>성능과 구현을 이해하기 위한 기초 개념</td>
+                <td>결과물을 만들며 드러난 문제를 파고드는 분석 운영 감각</td>
+              </tr>
+              <tr>
+                <td>학습 순서</td>
+                <td>개념 이해 → 코드 구현 → 결과 확인</td>
+                <td>결과물 생성 → 이상 지점 발견 → 필요한 개념 역추적</td>
+              </tr>
+              <tr>
+                <td>코드 디테일</td>
+                <td>미리 공부하고 나서 실습에 들어간다</td>
+                <td>먼저 만들고, 제대로 안 돌아가는 지점에서 깊게 판다</td>
+              </tr>
+              <tr>
+                <td>AI의 역할</td>
+                <td>보조 도구 또는 검색 도구</td>
+                <td>SQL, Python, 차트, 기본 최적화 초안을 빠르게 만드는 실행 파트너</td>
+              </tr>
+              <tr>
+                <td>사람의 역할</td>
+                <td>개념을 이해하고 직접 구현하는 사람</td>
+                <td>결과를 의심하고 원인을 추적하며 통제하는 설계자</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>이번 회차에서 보여줄 것</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>AI가 해주는 것</th><th>사람이 확인할 것</th><th>보여줄 산출물</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>차트 후보를 여러 개 만든다</td>
+                <td>차트가 예뻐 보여도 같은 지표 정의, grain, 기간, 분모를 쓰는지 확인한다</td>
+                <td>metric mart 기반 Metabase dashboard</td>
+              </tr>
+              <tr>
+                <td>SQL 초안을 빠르게 만든다</td>
+                <td>빨리 돌아가는 것처럼 보여도 <code>_TABLE_SUFFIX</code>, partition filter, dry run bytes를 확인한다</td>
+                <td>비용 추적, scan guard, partition 판단</td>
+              </tr>
+              <tr>
+                <td>반복 질문에 답변한다</td>
+                <td>답이 자연스러워 보여도 근거, 한계, 실패 로그, 비용 푸터가 남는지 확인한다</td>
+                <td>Slack 분석 봇, audit trail</td>
+              </tr>
+              <tr>
+                <td>코드와 최적화 방식을 제안한다</td>
+                <td>제안이 그럴듯해 보여도 결과가 이상하면 멈추고 lineage와 입력 데이터를 다시 본다</td>
+                <td>dbt test, lineage, 운영 체크리스트</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note warn">
+          <span class="lbl">결론</span>
+          <ul>
+            <li>기초 지식이 중요하지 않다는 뜻이 아니다.</li>
+            <li>다만 모든 디테일을 미리 공부한 뒤 시작하는 방식은 점점 비효율적이다.</li>
+            <li>먼저 만들고, 이상한 지점에서 멈추고, 그때 필요한 개념을 끝까지 파고드는 사람이 필요하다.</li>
+            <li>제대로 안 돌아가는 낌새가 보이면 넘기지 말고, 원인을 의심하고 통제하는 <b>집요한 설계자</b>가 되어야 한다.</li>
+          </ul>
+        </div>
+      </section>
+      </div>
+
+      <div class="panel" id="p1" role="tabpanel" aria-labelledby="t1" tabindex="0" hidden>
+        <section>
+          <h2>01 DA 인식 계보</h2>
+          <p class="sub">DA의 일은 모델과 쿼리를 직접 만드는 사람에서, 질문과 지표의 책임을 지는 사람으로 이동했다</p>
+          <p>
+            이 계보는 업계 전체를 통계적으로 대표한다기보다, 강의자가 현장에서 체감한 인식 변화에 가깝다.
+            중요한 것은 어느 연도에 정확히 무슨 일이 있었는지가 아니라,
+            <b>도구가 쉬워질수록 DA에게 남는 책임이 무엇인지</b>를 보는 것이다.
+          </p>
+
+          <div class="timeline" aria-label="DA 인식 변화 타임라인">
+            <div class="step">
+              <div class="era">2017~19</div>
+              <div>
+                <p class="title">ML/DL이 슬슬 알려지기 시작했다</p>
+                <p>
+                  "데이터 분석가가 머신러닝과 딥러닝도 해야 하는 것 아닌가?"라는 기대가 커졌다.
+                  분석가의 일이 리포트와 통계에서 모델 학습까지 넓어지는 것처럼 보였다.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="era">2020~21</div>
+              <div>
+                <p class="title">제대로 쓰려면 인프라와 개발력이 필요하다는 사실이 보였다</p>
+                <p>
+                  모델 하나를 노트북에서 돌리는 것과 서비스에 붙이는 것은 달랐다.
+                  데이터 엔지니어, ML 엔지니어, 분석가, 백엔드 개발자의 경계가 조금씩 분화됐다.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="era">2021~22</div>
+              <div>
+                <p class="title">DA는 다시 분석가 쪽으로 좁혀졌다</p>
+                <p>
+                  많은 조직에서 DA는 ML/DL 모델을 직접 만드는 사람이라기보다,
+                  SQL과 비즈니스 맥락을 바탕으로 지표를 해석하고 전략을 제안하는 역할로 인식됐다.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="era">2023~24</div>
+              <div>
+                <p class="title">GPT로 상상이 다 이루어질 것처럼 보였다</p>
+                <p>
+                  "일단 GPT로 해보라니까?"라는 분위기 속에서 빠른 프로토타입과 자동 생성 결과가 쏟아졌다.
+                  동시에 문제 정의와 검증 없이 그럴듯하기만 한 제품, 기획, 분석도 같이 늘어났다.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="era">2024~25</div>
+              <div>
+                <p class="title">단순 쿼리 작성자로서의 DA 가치는 약해졌다</p>
+                <p>
+                  AI가 SQL 초안을 빠르게 만들기 시작하면서 "쿼리 짜는 일은 대체되는 것 아닌가"라는 질문이 커졌다.
+                  하지만 실제로 중요한 것은 쿼리 문법보다 지표 정의, grain, 제외 조건, 해석, 액션 아이템이었다.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="era">2025~26</div>
+              <div>
+                <p class="title">모두가 무언가를 만드는 시대로 넘어갔다</p>
+                <p>
+                  AI 기반 도구 덕분에 앱, 대시보드, 봇, 분석 리포트의 첫 버전은 훨씬 쉽게 만들어졌다.
+                  직무 경계는 흐려졌고, "만드는 능력"보다 "만든 것이 맞는지 판단하는 능력"이 더 중요해졌다.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="era">2025~</div>
+              <div>
+                <p class="title">만드는 것은 쉬워졌고, 전문가의 필요성은 아직 남아 있다</p>
+                <p>
+                  AI는 실행 속도를 올린다. 그러나 어떤 질문이 좋은 질문인지, 어떤 숫자를 믿을지,
+                  어떤 결론을 조직의 행동으로 바꿀지는 여전히 사람이 책임져야 한다.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="cards">
+            <div class="card">
+              <div class="cat">바뀐 오해</div>
+              <p class="claim">DA는 SQL을 치는 사람이다</p>
+              <p>SQL은 중요한 도구지만 정체성은 아니다. 같은 SQL도 지표 정의가 다르면 완전히 다른 답을 낸다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">남은 책임</div>
+              <p class="claim">무엇을 세는지 정한다</p>
+              <p>분석 대상, 관측 grain, 기준 시간, 기간, 세그먼트, 제외 조건을 고정해야 AI 결과도 검증할 수 있다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">새 역할</div>
+              <p class="claim">AI 결과의 감사자가 된다</p>
+              <p>빠른 초안은 AI에게 맡기되, lineage와 비용, 반례, 한계, 액션 아이템은 사람이 끝까지 확인한다.</p>
+            </div>
+          </div>
+
+          <figure class="visual-callout">
+            <img
+              src="assets/da_zhi_lu_wei_ma_adviser.png"
+              alt="권력자 앞에서 참모가 두루마리를 들고 설명하고, 주변 관료들이 침묵하는 어두운 궁정 장면"
+              loading="lazy"
+            />
+            <figcaption class="visual-message">
+              <span class="lbl">강의 메시지</span>
+              <p>
+                BDA 2에서 보는 DA는 "코드를 못 써도 되는 사람"이 아니다.
+                <b>AI가 만든 실행 결과를 믿을 수 있는 분석 계약으로 바꾸고, 틀렸을 때 멈출 수 있는 사람</b>이다.
+              </p>
+            </figcaption>
+          </figure>
+
+          <div class="note warn">
+            <span class="lbl">비유: 지록위마형 참모</span>
+            <p>
+              진지한 비유로는 "지록위마"가 잘 맞는다. 권력자가 듣고 싶은 답이 먼저 정해져 있고,
+              똑똑한 참모가 그럴듯한 문서와 근거를 만들어준다. 주변 사람들은 이상하다는 것을 알지만 분위기 때문에 침묵한다.
+            </p>
+            <p>
+              AI 시대의 위험도 여기에 가깝다. AI가 항상 문제라기보다,
+              사람이 원하는 결론을 정해두고 AI에게 근거를 만들게 할 때 분석은 더 빠르고 자신 있게 망가진다.
+            </p>
+          </div>
+
+        </section>
+      </div>
+
+      <div class="panel" id="p2" role="tabpanel" aria-labelledby="t2" tabindex="0" hidden>
+        <section>
+          <h2>02 Python vs SQL</h2>
+          <p class="sub">예전 질문은 Python이냐 R이냐였고, 지금 질문은 무엇을 먼저 해야 하느냐다</p>
+
+          <h3>예전 논쟁: Python vs R</h3>
+          <div class="cards">
+            <div class="card">
+              <div class="cat">흐름</div>
+              <p class="claim">사실상 주류는 Python이 가져갔다</p>
+              <ul>
+                <li>분석, 자동화, 백엔드, ML, 데이터 파이프라인을 한 언어로 이어붙이기 쉽다.</li>
+                <li>라이브러리 생태계와 커뮤니티가 넓어 문제를 만났을 때 우회로가 많다.</li>
+                <li>뭐부터 공부할지 모르겠다면 Python부터 시작하는 선택이 가장 무난하다.</li>
+              </ul>
+            </div>
+            <div class="card">
+              <div class="cat">이유</div>
+              <p class="claim">접착성과 확장성이 컸다</p>
+              <ul>
+                <li>노트북, API, 배치 작업, 웹 서비스, 모델 학습을 한 흐름으로 묶을 수 있다.</li>
+                <li>데이터 분석에서 만든 코드를 서비스나 자동화로 밀어붙이기 좋다.</li>
+                <li>편의성만이 아니라 이후 확장 경로가 넓다는 점이 강했다.</li>
+              </ul>
+            </div>
+            <div class="card">
+              <div class="cat">예외</div>
+              <p class="claim">그래도 R이 사라진 것은 아니다</p>
+              <ul>
+                <li>통계 모델링, 계량, 실험 설계, 학술 분석 일부에서는 여전히 R을 쓴다.</li>
+                <li>이미 R 기반으로 돌아가는 조직과 코드베이스도 있다.</li>
+                <li>정답은 없지만, 첫 언어를 고르라면 Python이 덜 막막하다.</li>
+              </ul>
+            </div>
+          </div>
+
+          <h3>지금 질문은 달라졌다</h3>
+          <div class="note">
+            <span class="lbl">먼저 물을 것</span>
+            <ul>
+              <li>공부해야 하는가 이전에, <b>그것을 공부하는 것이 왜 필요한가</b>를 물어야 한다.</li>
+              <li>기술 이름을 고르는 문제처럼 보이지만, 실제로는 내가 어떤 문제를 열어보고 싶은지의 문제다.</li>
+              <li>AI 시대에는 도구 문법보다도, 왜 그 도구가 필요한지 설명하는 능력이 더 중요해진다.</li>
+            </ul>
+          </div>
+
+          <div class="question-grid">
+            <div class="question-card">
+              <div class="cat">쿼리</div>
+              <p class="claim">데이터 분석가는 쿼리치는 존재인가?</p>
+              <ul>
+                <li>아니다. 쿼리는 데이터를 열어보는 도구 중 가장 유용한 것일 뿐이다.</li>
+                <li>상황이 달라지면 Excel이든 Python이든 BI든 도구 자체는 바뀔 수 있다.</li>
+                <li>AI 시대에는 SQL 문법을 외우는 것보다, 무엇을 확인해야 하는지 아는 쪽이 더 중요해진다.</li>
+                <li>다만 기술적으로 보면 쿼리 문법보다 <b>DB를 이해하는 것</b>이 더 중요하다.</li>
+                <li>그래서 계속 OLAP/OLTP, warehouse, partition, scan cost를 이야기했다.</li>
+              </ul>
+            </div>
+            <div class="question-card">
+              <div class="cat">머신러닝</div>
+              <p class="claim">머신러닝을 공부해야 하나?</p>
+              <ul>
+                <li>글쎄. 먼저 내가 머신러닝을 잘 알아야 하는 사람인지 물어야 한다.</li>
+                <li>내 방향이 ML을 이용해 서비스를 만들고 개선하는 쪽인지부터 봐야 한다.</li>
+                <li>ML은 너무 넓다. 어떤 기술을 배워서 어디에 쓸지 정하지 않으면 금방 흐려진다.</li>
+                <li>연구가 목적이 아니라면, 공부할 기술보다 <b>활용처</b>를 먼저 고민하는 편이 낫다.</li>
+              </ul>
+            </div>
+            <div class="question-card">
+              <div class="cat">제품</div>
+              <p class="claim">제품을 만들어야 하나?</p>
+              <ul>
+                <li>제품을 만드는 것은 너무 좋은 경험이다.</li>
+                <li>다만 내가 창업자인지, 분석가인지, 학습자인지 먼저 구분해야 한다.</li>
+                <li>제품을 만들기 위해 필요한 시간과 지식은 생각보다 훨씬 많다.</li>
+                <li>분석 공부의 수단으로 만들 것인지, 실제로 운영할 제품을 만들 것인지 잘 생각해봐야 한다.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="panel" id="p3" role="tabpanel" aria-labelledby="t3" tabindex="0" hidden>
+        <section>
+          <h2>03 우리는 어떡하죠</h2>
+          <p class="sub">일단 도전하고, 나의 표면적을 넓히고, 그 과정에서 중심축을 찾아본다</p>
+
+          <div class="note">
+            <span class="lbl">열린 질문</span>
+            <p>
+              여기서는 정답을 닫지 않는다. 무엇을 공부해야 하는지보다,
+              <b>어떤 문제에 오래 붙어 있을 수 있는지</b>를 각자 확인하는 쪽에 가깝다.
+            </p>
+          </div>
+
+          <div class="cards">
+            <div class="card">
+              <div class="cat">시작</div>
+              <p class="claim">일단 해본다</p>
+              <p>책을 다 보고, 기술을 다 익히고, 준비가 끝난 뒤 시작하는 순서는 너무 느리다. 작게라도 먼저 만들고 부딪힌다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">탐색</div>
+              <p class="claim">나의 표면적을 넓힌다</p>
+              <p>쿼리, 자동화, 대시보드, 봇, 제품, 모델을 조금씩 만져보며 내가 반응하는 문제의 범위를 넓힌다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">조정</div>
+              <p class="claim">중심축과 취향을 본다</p>
+              <p>잘하는 것, 오래 붙잡는 것, 불편함을 느끼는 지점, 다시 고치고 싶은 부분을 보며 방향을 잡는다.</p>
+            </div>
+          </div>
+
+          <div class="note ok">
+            <span class="lbl">남겨둘 질문</span>
+            <p>
+              AI 시대의 공부는 더 많은 기술명을 모으는 일이 아니라,
+              내가 무엇을 만들고 싶어 하는지, 무엇을 검증해야 불안하지 않은지,
+              어떤 방식으로 계속 개선할 수 있는지 끊임없이 메타인지하는 과정이다.
+            </p>
+          </div>
+        </section>
+      </div>
+
+      <footer>
+        bda-2 · AI 데이터 분석 자동화 강의 흐름 · 코드 디테일보다는 원리, 검증, 실습, 운영에 무게를 둔다.
+      </footer>
+    </main>
+
+    <script>
+      (function () {
+        var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+        function select(tab) {
+          tabs.forEach(function (t) {
+            var on = t === tab;
+            t.setAttribute('aria-selected', on ? 'true' : 'false');
+            t.tabIndex = on ? 0 : -1;
+            document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+          });
+        }
+        tabs.forEach(function (tab, i) {
+          tab.addEventListener('click', function () { select(tab); });
+          tab.addEventListener('keydown', function (e) {
+            var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+            if (!d) return;
+            e.preventDefault();
+            var next = tabs[(i + d + tabs.length) % tabs.length];
+            next.focus();
+            select(next);
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

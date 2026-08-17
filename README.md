@@ -6,6 +6,7 @@ GitHub Archive(BigQuery) 데이터를 활용한 **repo 추천 시스템** 구축
 로컬 Airflow + Metabase + BigQuery metric mart 운영 노트는 [docs/data_platform_local.md](docs/data_platform_local.md)에 정리되어 있습니다.
 추천 실험 MLflow 기록/비교 방법은 [docs/mlflow_recsys_tracking.html](docs/mlflow_recsys_tracking.html)에 분리되어 있습니다.
 추천 MLOps API 구조와 로컬 user simulator 흐름은 [docs/recsys_api_architecture.html](docs/recsys_api_architecture.html)에 정리되어 있습니다.
+BigQuery + dbt 분석 시 비용·품질·재현성을 지키는 실행 규칙은 [docs/bigquery_dbt_analysis_workflow.md](docs/bigquery_dbt_analysis_workflow.md)에 정리되어 있습니다.
 
 1~6주차 강의 경계와 다음 주차 진행안은 [docs/week6_checkpoint_and_week7_plan.md](docs/week6_checkpoint_and_week7_plan.md)에 정리되어 있습니다.
 

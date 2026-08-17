@@ -13,10 +13,19 @@ wheels/
 data/
 gcp-key.json
 
+# Analyst-bot credentials (secrets/analyst-bq-key.json). The `gcp-key.json`
+# pattern above does not cover this filename, and no other rule does either.
+secrets/
+
 # Local orchestration state
 logs/
 plugins/
-config/
+.openai/site-src/
+config/*
+# Exception: the Slack app manifest is source, not local state. It holds scopes and
+# event subscriptions only -- no tokens -- and docs/analyst_bot_handoff.md points at
+# it as the procedure for splitting the analyst bot onto its own app.
+!config/slack_analyst_app_manifest.yaml
 mlruns/
 mlartifacts/
 mlflow.db

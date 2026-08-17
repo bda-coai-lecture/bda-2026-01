@@ -15,8 +15,8 @@ if not Path(PROJECT_DIR).exists():
     PROJECT_DIR = str(Path(__file__).resolve().parents[1])
 LOCAL_TZ = ZoneInfo("Asia/Seoul")
 
-# Evaluate the rolling window in KST. At 00:30 KST, `date -u ... yesterday`
-# would point two local calendar days back, leaving the newest ready shard out.
+# Run after the GitHub Archive UTC daily shard has closed. At 09:30 KST,
+# KST yesterday and the latest complete UTC date are the same calendar day.
 # Refresh only the newest partitions daily. Wider historical backfills should be
 # explicit maintenance jobs because BigQuery public table scans are billed.
 WINDOW_START = "$(TZ=Asia/Seoul date -d '3 days ago' +%F)"
@@ -131,7 +131,7 @@ with DAG(
     dag_id="gharchive_dbt_metrics",
     description="Load the rolling GitHub Archive fact table used for drill-downs and dbt demos.",
     start_date=datetime(2026, 5, 12, tzinfo=LOCAL_TZ),
-    schedule="30 0 * * *",
+    schedule="30 9 * * *",
     catchup=False,
     max_active_runs=1,
     default_args=default_args,

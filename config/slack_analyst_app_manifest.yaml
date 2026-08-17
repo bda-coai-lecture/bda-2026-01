@@ -1,0 +1,106 @@
+# Slack 분석 봇 앱 매니페스트
+#
+# ── 기존 앱("Airflow Alerts", bot_id B0B76RVQA66)에 적용하는 경우 ─────────────
+#   https://api.slack.com/apps → 해당 앱 → 좌측 App Manifest → YAML 탭에
+#   이 내용을 붙여넣고 Save Changes. 스코프·이벤트·Socket Mode가 한 번에 적용된다.
+#   그다음 Install/Reinstall to Workspace 로 새 스코프를 승인한다.
+#
+#   ⚠ 재설치 시 xoxb- 토큰이 회전할 수 있다. 회전하면 .env 의 SLACK_BOT_TOKEN 이
+#     낡아 Airflow 알림이 조용히 멎는다(dags/utils/slack_alert.py 의 _post() 가
+#     실패를 삼킨다). 재설치 직후 반드시 아래를 확인할 것:
+#
+#       curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+#         https://slack.com/api/auth.test | python3 -m json.tool
+#
+#     ok:false 가 나오면 새 Bot User OAuth Token 을 .env 의 SLACK_BOT_TOKEN 과
+#     SLACK_ANALYST_BOT_TOKEN 양쪽에 반영한다. Airflow 컨테이너도 재시작해야 한다.
+#
+#   ⚠ 같은 앱을 알림과 분석 봇이 공유하면 봇 표시 이름·아이콘도 공유된다.
+#     아래 display_information 을 그대로 적용하면 Airflow 알림의 표시 이름까지
+#     "BDA Analyst" 로 바뀐다. 이름을 유지하려면 display_information 블록을
+#     현재 앱 값으로 두고 oauth_config / settings 만 반영할 것.
+#
+# ── 별도 앱을 새로 만드는 경우 ──────────────────────────────────────────────
+#   Create New App → From an app manifest → 워크스페이스 선택 → 붙여넣기.
+#   기존 앱을 건드리지 않으므로 위 두 경고가 모두 사라진다. (권장이었으나 미채택)
+#
+# 매니페스트가 처리하는 것: 봇 스코프, 이벤트 구독, Socket Mode, 버튼 interactivity 활성화.
+# 매니페스트로 처리할 수 없는 것(수동 필요):
+#   - App-Level Token(xapp-) 발급 — API가 없고 UI에서만 가능
+#   - Install/Reinstall to Workspace — xoxb- 토큰 획득
+#   - 채널에 봇 초대 (chat:write.public 이 있으면 공개 채널은 초대 없이도 게시 가능)
+# 자세한 절차: scripts/slack_analyst_bot.py --dry-run 출력 참조
+
+display_information:
+  name: BDA Analyst
+  description: GitHub Archive 데이터 질문에 답하는 분석 봇 (스레드 1개 = 세션 1개)
+  background_color: "#2563eb"
+  long_description: |
+    Slack 스레드에서 받은 데이터 질문을 BigQuery(GitHub Archive mart)로 분석해 답한다.
+    스레드마다 독립된 Claude Code 세션이 붙어 후속 질문이 앞선 검증과 정의를 물려받는다.
+    BigQuery는 전용 read-only 서비스 계정으로만 접근하며 쓰기 권한이 없다.
+    답변에는 분석 모드, 사용한 모델과 필터, 데이터 건강성 검증, 한계가 함께 붙는다.
+
+features:
+  bot_user:
+    display_name: BDA Analyst
+    # 상시 온라인 표시. Socket Mode 연결이 끊기면 자동으로 오프라인으로 바뀐다.
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      # --- 필수: 없으면 봇이 동작하지 않는다 ---
+      # 멘션 이벤트 수신. 없으면 app_mention 이벤트가 아예 오지 않는다.
+      - app_mentions:read
+      # 스레드 답글 수신. 후속 질문을 받으려면 채널 종류별로 필요하다.
+      - channels:history
+      - groups:history
+      - im:history
+      - mpim:history
+      # 답변 게시.
+      - chat:write
+
+      # --- 운영 편의: 넉넉하게 부여 ---
+      # 초대 안 된 공개 채널에도 답변 게시. /invite 누락으로 조용히 실패하는 것을 막는다.
+      - chat:write.public
+      # 채널 이름 해석. 로그와 리포트에 ID 대신 이름을 남길 수 있다.
+      - channels:read
+      - groups:read
+      # 질문자 표시명 해석. "누가 물었는지"를 리포트에 남긴다.
+      - users:read
+      # 선택/미구현: 접수 즉시 👀 리액션으로 확인 표시할 때 필요하다.
+      - reactions:write
+      # 선택/미구현: 긴 답변을 스니펫 파일로 업로드할 때 필요하다.
+      - files:write
+      # 슬래시 커맨드(/analyst)를 나중에 붙일 여지. 지금은 등록하지 않아도 무해하다.
+      - commands
+
+      # --- 의도적으로 넣지 않은 것 ---
+      # search:read       봇이 워크스페이스 전체 메시지를 검색할 수 있게 된다.
+      # files:read        워크스페이스의 모든 파일 열람.
+      # users:read.email  이메일 수집. 분석에 불필요.
+      # admin.*           워크스페이스 관리. 분석 봇에 필요한 이유가 없다.
+      # channels:manage / channels:join  채널 생성·가입 조작.
+      #
+      # 이 토큰이 유출되면 위 스코프만큼의 피해가 가능하다. 분석 봇은 "읽고 답하는" 일만
+      # 하므로 읽기 범위를 워크스페이스 전체로 넓히는 스코프는 넣지 않는다.
+
+settings:
+  event_subscriptions:
+    # Socket Mode를 쓰므로 request_url은 필요 없다.
+    bot_events:
+      - app_mention
+      - message.channels
+      # 위 선택 스코프를 남겼다면 함께 유지
+      - message.groups
+      - message.im
+      - message.mpim
+  interactivity:
+    # 진행 메시지의 "중단하기"와 최종 답변 피드백 버튼을 받으려면 켜져 있어야 한다.
+    # Socket Mode에서는 별도 Request URL 없이 action event가 xapp 연결로 들어온다.
+    is_enabled: true
+  # Socket Mode. 이 값이 true여야 xapp- 토큰으로 연결할 수 있다.
+  socket_mode_enabled: true
+  org_deploy_enabled: false
+  token_rotation_enabled: false

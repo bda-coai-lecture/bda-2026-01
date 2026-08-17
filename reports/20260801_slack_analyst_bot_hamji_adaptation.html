@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Slack 분석 봇 hamji 운영 패턴 적용 변경점</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f7f8;
+      --fg: #1f2937;
+      --muted: #6b7280;
+      --card: #ffffff;
+      --line: #e5e7eb;
+      --accent: #2563eb;
+      --good: #047857;
+      --warn: #b45309;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 40px 24px 64px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+      letter-spacing: -0.03em;
+    }
+    h2 {
+      margin-top: 36px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      font-size: 22px;
+    }
+    .meta {
+      color: var(--muted);
+      margin-bottom: 28px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef2ff;
+      font-weight: 700;
+    }
+    tr:last-child td {
+      border-bottom: 0;
+    }
+    code {
+      background: #eef2f7;
+      border-radius: 5px;
+      padding: 2px 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 9px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .done { background: #dcfce7; color: var(--good); }
+    .left { background: #fef3c7; color: var(--warn); }
+    ul {
+      padding-left: 22px;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Slack 분석 봇 hamji 운영 패턴 적용 변경점</h1>
+  <div class="meta">작성일: 2026-08-01 · 업데이트: 2026-08-02 · 대상: <code>scripts/slack_analyst_bot.py</code></div>
+
+  <section class="card">
+    <p>
+      <code>/Users/kakao/Downloads/hamji-portable-20260801</code>의 오래 운영된 Slack/Bolt 기반 분석 봇 구현을 검토했고,
+      현재 BDA 2의 Python 단일 러너 구조에 맞는 부분만 축소 적용했다. TypeScript 구조를 그대로 이식하지 않고,
+      운영 마감 품질에 직접 영향을 주는 Slack 표면, 실행 제어, 감사 가능성을 우선 처리했다.
+    </p>
+    <p>
+      이번 변경은 BigQuery 분석 실행이 아니라 봇 러너 개선이다. 따라서 GitHub Archive raw/mart 조회는 수행하지 않았다.
+    </p>
+  </section>
+
+  <h2>hamji에서 가져온 판단</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>hamji 운영 패턴</th>
+        <th>BDA 적용 방식</th>
+        <th>이유</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Slack 메시지를 제품 UI로 보고 pending/progress/final/error를 분리</td>
+        <td>최종 답변 sanitize/Slack mrkdwn 변환/길이 제한 레이어 추가</td>
+        <td>“분석 완료”, “아래가 답변입니다”, <code>모드: 활동량</code>, <code>인풋</code>, <code>---</code> 같은 내부 scaffolding이 사용자에게 노출되는 문제를 차단</td>
+      </tr>
+      <tr>
+        <td>스레드별 keyed lock으로 같은 thread의 turn을 직렬화</td>
+        <td>기존 단순 lock을 FIFO queue로 교체하고 전역 <code>--max-workers</code> 상한 추가</td>
+        <td>빠른 연속 질문에서 답변 순서 역전과 Claude transcript 분기를 줄임</td>
+      </tr>
+      <tr>
+        <td>진행 메시지에 heartbeat와 취소 action 제공</td>
+        <td>진행 메시지에 elapsed, “중단하기” 버튼, 30초 무응답 heartbeat 추가</td>
+        <td>긴 쿼리/도구 대기 중 봇이 멈춘 것처럼 보이는 UX를 완화하고, 사용자가 직접 중단 가능</td>
+      </tr>
+      <tr>
+        <td>turn 결과, trace, feedback을 파일 기반으로 남김</td>
+        <td><code>logs/analyst-bot/</code> 아래 audit/trace/feedback JSONL 기록 추가</td>
+        <td>Slack thread만으로는 사후 품질 개선과 장애 재현이 어려움</td>
+      </tr>
+      <tr>
+        <td>Metabase MCP를 분석 세션 도구로 연결하고, 카드/대시보드는 봇이 직접 생성</td>
+        <td><code>METABASE_URL</code>/<code>METABASE_API_KEY</code>가 있을 때만 <code>--strict-mcp-config --mcp-config</code>로 Metabase MCP 주입. Slack 링크는 별도 public URL 사용</td>
+        <td>사용자에게 SQL 복붙을 넘기지 않고, 필요할 때 시각화 링크를 바로 제공하기 위함</td>
+      </tr>
+      <tr>
+        <td>Slack 한도 초과 시 compact/minimal fallback</td>
+        <td>현재는 2,500자 final guardrail과 chunk fallback으로 축소 구현</td>
+        <td>단일 Python 파일 구조에서 과한 block renderer를 넣기보다 먼저 P0 문제를 제거</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>적용된 변경</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>영역</th>
+        <th>변경</th>
+        <th>파일</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge done">완료</span> 답변 후처리</td>
+        <td>메타 서문·내부 체크리스트 라벨 제거, horizontal rule 제거, dry run/Claude 턴/BigQuery GiB 같은 운영 세부값 제거, GitHub Markdown → Slack mrkdwn 변환, secret redaction, 2,500자 compact guardrail</td>
+        <td><code>scripts/slack_analyst_bot.py</code></td>
+      </tr>
+      <tr>
+        <td><span class="badge done">완료</span> 실행 제어</td>
+        <td><code>SessionRegistry.claim()</code>으로 스레드 FIFO + 전역 동시성 제한. CLI 플래그 <code>--max-workers</code> 추가</td>
+        <td><code>scripts/slack_analyst_bot.py</code></td>
+      </tr>
+      <tr>
+        <td><span class="badge done">완료</span> 취소</td>
+        <td>진행 메시지에 <code>중단하기</code> 버튼 추가. 클릭 시 실행 중인 작업을 종료하고, Slack에는 “중단 요청됨 → 중단됨” 상태만 표시</td>
+        <td><code>scripts/slack_analyst_bot.py</code></td>
+      </tr>
+      <tr>
+        <td><span class="badge done">완료</span> 진행 UX</td>
+        <td>raw trace와 dry-run 단계명을 Slack에 노출하지 않고 사람이 읽는 상태 문구로 변환. 진행 중 elapsed와 최대 시간을 표시. 성공 시 별도 완료 stub 없이 진행 메시지를 최종 답변으로 교체</td>
+        <td><code>scripts/slack_analyst_bot.py</code></td>
+      </tr>
+      <tr>
+        <td><span class="badge done">완료</span> audit/feedback</td>
+        <td>turn, trace, feedback을 <code>logs/analyst-bot/</code> JSONL로 기록. dry run/scan/Claude 사용량은 여기로만 남기고 Slack 최종 답변에서는 숨김. Slack token/private key 패턴은 기록 전 redaction</td>
+        <td><code>scripts/slack_analyst_bot.py</code></td>
+      </tr>
+      <tr>
+        <td><span class="badge done">완료</span> Metabase MCP</td>
+        <td>선택 플래그 <code>--enable-metabase-mcp</code>, 런타임 <code>--mcp-config</code>, internal/public URL 분리, Metabase URL 추출, Slack <code>Metabase 열기</code> 버튼 추가. API key는 argv/Slack/audit에 남기지 않음</td>
+        <td><code>scripts/slack_analyst_bot.py</code>, <code>docker-compose.yml</code>, <code>docker/analyst-bot/entrypoint.sh</code></td>
+      </tr>
+      <tr>
+        <td><span class="badge done">완료</span> 테스트</td>
+        <td>외부 서비스 없는 단위/fake 통합 테스트 23개 통과. PO용 후처리와 Metabase MCP 명령 구성을 회귀에 포함</td>
+        <td><code>tests/test_slack_analyst_bot.py</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>검증 결과</h2>
+  <div class="card">
+    <ul>
+      <li><code>uv run python -m py_compile scripts/slack_analyst_bot.py tests/test_slack_analyst_bot.py</code> 통과</li>
+      <li><code>uv run pytest tests/test_slack_analyst_bot.py</code> → <strong>29 passed</strong></li>
+      <li><code>bash -n docker/analyst-bot/entrypoint.sh</code>, <code>docker compose config --services</code> 통과</li>
+      <li>검증 범위는 Slack/Claude/BigQuery를 실제 호출하지 않는 로컬 회귀다. 실 Slack canary는 별도 필요하다.</li>
+    </ul>
+  </div>
+
+  <h2>아직 남은 갭</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>상태</th>
+        <th>항목</th>
+        <th>판단</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge left">남음</span></td>
+        <td>프로젝트 수준 BigQuery 일일 쿼리 사용량 할당량</td>
+        <td>코드에서 막을 수 없는 운영 콘솔 설정이다. 현재 <code>.bigqueryrc</code> 기본값은 우회 가능하므로 하드 상한은 별도 설정 필요</td>
+      </tr>
+      <tr>
+        <td><span class="badge left">남음</span></td>
+        <td>컨테이너 격리</td>
+        <td>compose 서비스와 좁은 마운트는 추가됨. build, Docker dry-run, bq identity, dbt compile, bq dry-run, Claude OAuth self-test, headless Socket Mode 연결, Slack end-to-end canary 1회는 통과. 첫 canary에서 답변이 기술적으로 읽혀 캐주얼 용어/간단 답변 규칙을 추가했고 재확인이 다음 검증</td>
+      </tr>
+      <tr>
+        <td><span class="badge left">남음</span></td>
+        <td>Slack 실환경 canary</td>
+        <td><code>docs/analyst_bot_testcases.md</code>의 BOT-P0-01~03, BOT-I-04~05를 실제 채널에서 확인해야 한다</td>
+      </tr>
+      <tr>
+        <td><span class="badge left">남음</span></td>
+        <td>Metabase 실제 카드 생성 canary</td>
+        <td>현재 로컬 환경에는 <code>METABASE_URL</code>/<code>METABASE_API_KEY</code>가 없어 MCP smoke와 카드 생성은 아직 미검증이다</td>
+      </tr>
+      <tr>
+        <td><span class="badge left">남음</span></td>
+        <td>full block renderer</td>
+        <td>hamji 수준의 multi-page block renderer와 long code block 이미지 첨부는 이번 변경에서 제외했다. 현재는 compact text guardrail 중심</td>
+      </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

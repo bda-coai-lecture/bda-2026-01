@@ -1,6 +1,16 @@
 # BDA 2 Agent Guide
 
-이 저장소에서 분석 작업을 수행할 때는 [BigQuery + dbt 분석 워크플로우](docs/bigquery_dbt_analysis_workflow.md)를 따른다.
+이 저장소에서 분석 작업을 수행할 때는 `.claude/skills/analysis/` 스킬을 따른다.
+스킬이 **분석 절차의 정본**이고, [BigQuery + dbt 분석 워크플로우](docs/bigquery_dbt_analysis_workflow.md)가
+**비용·lineage 계약의 정본**이다.
+
+| 문서 | 역할 |
+|---|---|
+| `.claude/skills/analysis/` | 모드 분류, 인풋 9종, 건강성 검증, 보고 형식 |
+| `docs/bigquery_dbt_analysis_workflow.md` | 스캔 상한, 승인 절차, 모델 승격 기준 |
+| `docs/analysis_workflow_review.md` | 이 절차를 이렇게 만든 판정 근거 |
+| `docs/analysis_testset.md` | 절차 검증용 문제집 (실측 기준선 포함) |
+| `docs/analyst_bot_handoff.md` | Slack 분석 봇 인수인계 — 실행 방법, 미해결, 함정 |
 
 ## 기본 원칙
 

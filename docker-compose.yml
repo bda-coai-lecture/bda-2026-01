@@ -58,6 +58,8 @@ services:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
@@ -140,6 +142,72 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  analyst-bot:
+    build:
+      context: .
+      dockerfile: docker/analyst-bot/Dockerfile
+      args:
+        CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-latest}
+    image: bda-analyst-bot:latest
+    init: true
+    environment:
+      PYTHONUNBUFFERED: "1"
+      SLACK_ANALYST_BOT_TOKEN: ${SLACK_ANALYST_BOT_TOKEN:-}
+      SLACK_ANALYST_APP_TOKEN: ${SLACK_ANALYST_APP_TOKEN:-}
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      GCP_KEY_PATH: /secrets/analyst-bq-key.json
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/analyst-bq-key.json
+      ANALYST_GCLOUD_CONFIG_DIR: /home/analyst/.config/gcloud
+      ANALYST_STATE_DIR: /home/analyst/state
+      ANALYST_HEADLESS: ${ANALYST_HEADLESS:-1}
+      ANALYST_LOG_LEVEL: ${ANALYST_LOG_LEVEL:-INFO}
+      ANALYST_CHANNEL_ALLOWLIST: ${ANALYST_CHANNEL_ALLOWLIST:-}
+      ANALYST_MAX_BUDGET_USD: ${ANALYST_MAX_BUDGET_USD:-5}
+      ANALYST_MAX_SCAN_GIB: ${ANALYST_MAX_SCAN_GIB:-10}
+      ANALYST_TURN_TIMEOUT_S: ${ANALYST_TURN_TIMEOUT_S:-900}
+      ANALYST_MAX_WORKERS: ${ANALYST_MAX_WORKERS:-1}
+      ANALYST_ENABLE_METABASE_MCP: ${ANALYST_ENABLE_METABASE_MCP:-0}
+      ANALYST_METABASE_COLLECTION_NAME: ${ANALYST_METABASE_COLLECTION_NAME:-BDA 데이터 플랫폼}
+      METABASE_URL: ${ANALYST_METABASE_INTERNAL_URL:-http://metabase:3000}
+      ANALYST_METABASE_PUBLIC_URL: ${ANALYST_METABASE_PUBLIC_URL:-http://localhost:3001}
+      METABASE_API_KEY: ${METABASE_API_KEY:-}
+      ANALYST_AUDIT_DATABASE_URL: ${ANALYST_AUDIT_DATABASE_URL:-}
+      ANALYST_AUDIT_SCHEMA: ${ANALYST_AUDIT_SCHEMA:-analyst_audit}
+      DBT_BIGQUERY_PROJECT: ${DBT_BIGQUERY_PROJECT:-bda-coai}
+      DBT_BIGQUERY_DATASET: ${DBT_BIGQUERY_DATASET:-mart}
+      DBT_BIGQUERY_LOCATION: ${DBT_BIGQUERY_LOCATION:-US}
+    volumes:
+      - ./.claude:/app/.claude:ro
+      - ./.git:/app/.git:ro
+      - ./docker-compose.yml:/app/docker-compose.yml:ro
+      - ./AGENTS.md:/app/AGENTS.md:ro
+      - ./README.md:/app/README.md:ro
+      - ./config:/app/config:ro
+      - ./dags:/app/dags:ro
+      - ./dbt:/app/dbt:ro
+      - ./docs:/app/docs:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./reports:/app/reports:ro
+      - ./scripts:/app/scripts:ro
+      - ./uv.lock:/app/uv.lock:ro
+      - ./dbt/gharchive_metrics/analyses:/app/dbt/gharchive_metrics/analyses
+      - analyst-dbt-target:/app/dbt/gharchive_metrics/target
+      - type: bind
+        source: ./secrets/analyst-bq-key.json
+        target: /secrets/analyst-bq-key.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - analyst-claude:/home/analyst/.claude
+      - analyst-gcloud:/home/analyst/.config/gcloud
+      - analyst-state:/home/analyst/state
+      - analyst-uv-cache:/home/analyst/.cache/uv
+    restart: unless-stopped
+    stop_grace_period: 30s
+
   metabase:
     image: metabase/metabase:latest
     ports:
@@ -156,3 +224,8 @@ volumes:
   metabase-data:
   airflow-uv-cache:
   airflow-uv-env:
+  analyst-claude:
+  analyst-dbt-target:
+  analyst-gcloud:
+  analyst-state:
+  analyst-uv-cache:
