@@ -91,7 +91,8 @@ RUN npm install -g --no-fund --no-audit "@anthropic-ai/claude-code@${CLAUDE_CODE
 RUN uv pip install --system --no-cache \
     "slack-bolt>=1.21,<2" \
     "slack-sdk>=3.33,<4" \
-    "google-cloud-bigquery>=3.25,<4"
+    "google-cloud-bigquery>=3.25,<4" \
+    "psycopg[binary]>=3.2,<4"
 
 # --- Unprivileged user ------------------------------------------------------
 # Owns exactly the writable paths it needs: its home (uv cache, gcloud config,

@@ -20,6 +20,7 @@ secrets/
 # Local orchestration state
 logs/
 plugins/
+.openai/site-src/
 config/*
 # Exception: the Slack app manifest is source, not local state. It holds scopes and
 # event subscriptions only -- no tokens -- and docs/analyst_bot_handoff.md points at

@@ -262,6 +262,11 @@ if [[ "${ANALYST_ENABLE_METABASE_MCP:-0}" == "1" ]]; then
 else
     log "metabase_mcp=disabled"
 fi
+if [[ -n "${ANALYST_AUDIT_DATABASE_URL:-}" ]]; then
+    log "audit_database=enabled  audit_schema=${ANALYST_AUDIT_SCHEMA:-analyst_audit}"
+else
+    log "audit_database=disabled"
+fi
 if [[ -f "${CLAUDE_CREDS}" ]]; then
     log "anthropic_auth=in-container OAuth (${CLAUDE_CREDS})"
 elif [[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then

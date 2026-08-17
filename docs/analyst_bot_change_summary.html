@@ -75,7 +75,7 @@
         margin: 10px 0 6px;
         font-size: clamp(25px, 3.2vw, 34px);
         line-height: 1.2;
-        letter-spacing: -0.4px;
+        letter-spacing: 0;
       }
 
       .lede {
@@ -149,7 +149,7 @@
         margin: 0 0 16px;
         font-size: 19px;
         font-weight: 730;
-        letter-spacing: -0.2px;
+        letter-spacing: 0;
       }
 
       h3 { margin: 22px 0 8px; font-size: 15px; }
@@ -319,6 +319,101 @@
         font-size: 13px;
       }
 
+      .card ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 12.8px;
+      }
+
+      .card li + li { margin-top: 4px; }
+
+      .source-map {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 22px;
+      }
+
+      .source-card {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px 18px;
+        background: #fbfcfe;
+      }
+
+      .source-head {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 16px;
+        align-items: baseline;
+        padding-bottom: 11px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .source-head .cat {
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 820;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .source-head .claim {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 760;
+        line-height: 1.4;
+      }
+
+      .source-body {
+        display: grid;
+        grid-template-columns: 1fr 1.35fr;
+        gap: 18px;
+        padding-top: 13px;
+      }
+
+      .source-note {
+        color: var(--muted);
+        font-size: 13.5px;
+        line-height: 1.62;
+      }
+
+      .source-note b,
+      .source-points b {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--ink);
+        font-size: 12px;
+        font-weight: 820;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .source-note p {
+        margin: 0;
+      }
+
+      .source-points {
+        display: grid;
+        gap: 8px;
+      }
+
+      .source-points ul {
+        display: grid;
+        gap: 7px;
+        margin: 0;
+        padding-left: 0;
+        list-style: none;
+      }
+
+      .source-points li {
+        border-left: 3px solid #b8cce5;
+        padding: 2px 0 2px 10px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.48;
+      }
+
       .flow {
         display: grid;
         grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -397,6 +492,54 @@
         margin: 0;
         color: var(--muted);
         font-size: 13px;
+      }
+
+      .reading-map {
+        display: grid;
+        grid-template-columns: 1.05fr 1fr;
+        gap: 12px;
+        margin: 0 0 16px;
+      }
+
+      .reading-card {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        background: #fbfcfe;
+      }
+
+      .reading-card b {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 14px;
+      }
+
+      .reading-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .term-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .term {
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        padding: 9px 10px;
+        background: var(--paper);
+        font-size: 12.5px;
+      }
+
+      .term b {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--ink);
+        font-size: 12.5px;
       }
 
       .arch {
@@ -571,6 +714,27 @@
       .chain-node.muted { border-style: dashed; color: var(--muted); }
       .chain-node b { display: block; margin-bottom: 3px; font-size: 13.5px; color: var(--ink); }
 
+      .answer-notes {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin: 0 0 14px;
+      }
+
+      .answer-note {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 10px 11px;
+        background: #fbfcfe;
+        font-size: 12.5px;
+      }
+
+      .answer-note b {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 12.5px;
+      }
+
       .timeline {
         display: grid;
         gap: 10px;
@@ -681,6 +845,37 @@
 
       .side-list ul { margin-bottom: 0; }
 
+      .command-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin: 0 0 14px;
+      }
+
+      .command-card {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px 13px;
+        background: var(--paper);
+      }
+
+      .command-card h3 {
+        margin: 0 0 6px;
+        font-size: 14px;
+      }
+
+      .command-card p {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+
+      .command-card code {
+        display: block;
+        white-space: normal;
+        line-height: 1.45;
+      }
+
       .status {
         display: inline-block;
         border: 1px solid;
@@ -710,22 +905,28 @@
         .message-pair { grid-template-columns: 1fr; }
         .pipe-row { grid-template-columns: 1fr; }
         .pipe-key { padding-top: 0; }
+        .reading-map { grid-template-columns: 1fr; }
+        .source-head,
+        .source-body { grid-template-columns: 1fr; gap: 8px; }
+        .term-grid { grid-template-columns: 1fr; }
         .docker-map { grid-template-columns: 1fr; }
         .boundary-grid { grid-template-columns: 1fr; }
         .compare-row { grid-template-columns: 1fr; }
         .compare-chain { grid-template-columns: 1fr; }
+        .answer-notes { grid-template-columns: 1fr; }
         .timeline-grid { grid-template-columns: 1fr; }
         .flow { grid-template-columns: 1fr; }
         .step { min-height: auto; }
       }
 
       @media (max-width: 540px) {
-        .deck { width: calc(100vw - 48px); max-width: calc(100vw - 48px); margin-left: 10px; margin-right: auto; padding-bottom: 48px; }
+        .deck { width: calc(100% - 20px); max-width: calc(100% - 20px); margin: 0 auto; padding-bottom: 48px; }
         section { padding: 17px 16px; }
         .toc { flex-wrap: wrap; overflow-x: visible; }
         .tab { flex: 0 0 100%; justify-content: center; max-width: 100%; padding: 7px 9px; font-size: 12.5px; }
         .toc .idx { display: none; }
         .snapshot { grid-template-columns: 1fr; }
+        .command-grid { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -738,16 +939,16 @@
         </div>
         <h1>Slack 분석 봇 변경 요약</h1>
         <p class="lede">
-          이번 변경은 봇이 “분석을 할 수 있음”에서 “Slack에서 실제로 맡겨도 되는 동료처럼 움직임”으로 넘어가는 작업이다.
-          이 문서만 읽어도 무엇이 바뀌었고, 왜 바뀌었고, Docker 안에서 어떻게 돌아가는지 파악할 수 있게 정리했다.
-          핵심 기준은 <b>Slack은 의사결정 화면, 근거는 로그</b>다.
+          이번 변경은 자동화 분석 봇을 실제 Slack 운영 화면에 올릴 때 무엇을 보여주고 무엇을 기록으로 남겨야 하는지 다룬다.
+          핵심은 답변을 짧게 줄이는 일이 아니라, <b>사용자가 보는 화면과 분석자가 검증하는 기록을 분리하는 운영 계약</b>을 만드는 것이다.
+          탭을 따라가면 문제 정의, 답변 변화, 구현 위치, 실행 방법, 남은 검증을 순서대로 볼 수 있다.
         </p>
         <div class="toc" role="tablist" aria-label="문서 구획">
           <button class="tab" type="button" role="tab" id="t-summary" aria-controls="summary" aria-selected="true"><span class="idx">01</span>한 장 요약</button>
           <button class="tab" type="button" role="tab" id="t-workflow" aria-controls="workflow" aria-selected="false" tabindex="-1"><span class="idx">02</span>답변과 UX</button>
           <button class="tab" type="button" role="tab" id="t-implementation" aria-controls="implementation" aria-selected="false" tabindex="-1"><span class="idx">03</span>기술 변경</button>
           <button class="tab" type="button" role="tab" id="t-docker" aria-controls="docker" aria-selected="false" tabindex="-1"><span class="idx">04</span>Docker 실행</button>
-          <button class="tab" type="button" role="tab" id="t-status" aria-controls="status" aria-selected="false" tabindex="-1"><span class="idx">05</span>현재 상태</button>
+          <button class="tab" type="button" role="tab" id="t-status" aria-controls="status" aria-selected="false" tabindex="-1"><span class="idx">05</span>상태와 교훈</button>
         </div>
       </div>
 
@@ -768,24 +969,215 @@
           <div class="d">터미널을 붙잡지 않고 Slack 연결 유지</div>
         </div>
         <div class="metric">
-          <div class="k">피드백 루프</div>
-          <div class="v">실제 답변 보며 수정</div>
-          <div class="d">검증/재현 제거, 용어, 말투, 짧은 답변 규칙 반영</div>
+          <div class="k">학습 포인트</div>
+          <div class="v">표면과 기록 분리</div>
+          <div class="d">외부 사용 사례 반영 후 실제 답변을 보며 다듬음</div>
         </div>
         <div class="metric">
-          <div class="k">다음 확인</div>
-          <div class="v">실제 Slack 말투 확인</div>
-          <div class="d">기능은 통과, 쉬운 답변으로 보이는지 재확인</div>
+          <div class="k">비용 상한</div>
+          <div class="v">BigQuery hard quota 설정</div>
+          <div class="d">프로젝트 2 TiB/day, 사용자당 1 TiB/day</div>
         </div>
       </div>
 
       <section class="panel" id="summary" role="tabpanel" aria-labelledby="t-summary" tabindex="0">
         <h2>한 장 요약</h2>
-        <p class="sub">바뀐 구조를 한 장으로 보면 이렇다</p>
+        <p class="sub">분석 자동화는 답변 화면과 검증 기록을 분리하는 일이다</p>
         <p>
-          이번 변경의 중심은 “Claude가 분석한 모든 내용을 Slack에 그대로 흘리지 않는다”는 점이다.
-          봇 러너가 중간에서 세션 순서를 잡고, 실행 근거를 로그로 보내고, 마지막 답변만 Slack용으로 다시 다듬는다.
+          이번 변경의 중심은 Slack을 보는 사람이 제품 의사결정을 하는 사람이라는 점을 전제로,
+          바로 판단에 필요한 답만 보이게 만드는 것이다. 봇 러너가 중간에서 세션 순서를 잡고,
+          실행 근거는 기록으로 보내며, 마지막 답변만 Slack에서 읽기 좋은 형태로 다시 다듬는다.
         </p>
+
+        <div class="callout ok">
+          <span class="label">수업 끝나고 남길 문장</span>
+          <p>
+            분석 자동화의 품질은 모델이 SQL을 만들 수 있는지보다, 질문자용 답변과 재현 가능한 근거를
+            서로 다른 위치에 안정적으로 남길 수 있는지에서 갈린다.
+          </p>
+        </div>
+
+        <h3>학습 목표</h3>
+        <div class="cards" aria-label="학습 목표">
+          <div class="card">
+            <div class="cat">문제 정의</div>
+            <div class="claim">운영 화면과 분석 기록이 섞일 때 생기는 문제를 설명한다</div>
+            <p>맞는 답이어도 Slack에서 기술 문서처럼 보이면 질문자는 결론보다 과정을 먼저 읽게 된다.</p>
+          </div>
+          <div class="card">
+            <div class="cat">설계 판단</div>
+            <div class="claim">Slack 스레드, 분석 세션, 실행 기록의 경계를 구분한다</div>
+            <p>후속 질문의 맥락, 중단, 진행 표시, 재현 기록은 모두 같은 경계 설계에서 나온다.</p>
+          </div>
+          <div class="card">
+            <div class="cat">검증 읽기</div>
+            <div class="claim">테스트 통과와 운영 준비 완료를 구분한다</div>
+            <p>자동 회귀, 실제 Slack 실행, 비용 상한, Metabase 연결은 서로 다른 증거다.</p>
+          </div>
+        </div>
+
+        <h3>왜 바꿨나</h3>
+        <div class="source-map" aria-label="변경이 필요했던 문제">
+          <div class="source-card">
+            <div class="source-head">
+              <div class="cat">문제 1</div>
+              <div class="claim">Slack 답변이 분석 기록처럼 보였다</div>
+            </div>
+            <div class="source-body">
+              <div class="source-note">
+                <b>핵심 판단</b>
+                <p>질문자는 재현 절차보다 결론, 숫자, 기준일, 한계를 먼저 봐야 한다.</p>
+              </div>
+              <div class="source-points">
+                <b>바뀐 형태</b>
+                <ul>
+                  <li>검증, 재현 SQL, 비용 상세는 실행 기록으로 보낸다.</li>
+                  <li>Slack 최종 답변은 결론과 한계 중심으로 다시 정리한다.</li>
+                  <li>긴 분석 메모를 그대로 게시하지 않도록 후처리 관문을 둔다.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="source-card">
+            <div class="source-head">
+              <div class="cat">문제 2</div>
+              <div class="claim">후속 질문과 긴 실행이 꼬일 수 있었다</div>
+            </div>
+            <div class="source-body">
+              <div class="source-note">
+                <b>핵심 판단</b>
+                <p>Slack 스레드 하나가 분석 세션 하나여야 이전 정의와 필터가 이어진다.</p>
+              </div>
+              <div class="source-points">
+                <b>바뀐 형태</b>
+                <ul>
+                  <li>같은 스레드의 질문은 같은 Claude 분석 세션으로 이어진다.</li>
+                  <li>스레드별 FIFO queue로 답변 순서가 뒤섞이지 않게 했다.</li>
+                  <li>진행 메시지와 중단 버튼으로 오래 걸리는 실행을 운영 가능하게 했다.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="source-card">
+            <div class="source-head">
+              <div class="cat">문제 3</div>
+              <div class="claim">실행 환경이 사람마다 달라질 수 있었다</div>
+            </div>
+            <div class="source-body">
+              <div class="source-note">
+                <b>핵심 판단</b>
+                <p>수업, 데모, 검증 환경이 달라도 같은 명령으로 실행되게 만들 필요가 있었다.</p>
+              </div>
+              <div class="source-points">
+                <b>바뀐 형태</b>
+                <ul>
+                  <li>Python, gcloud, dbt, BigQuery CLI가 들어간 실행 환경을 이미지로 고정한다.</li>
+                  <li>컨테이너 안에서 로그인, 설정 점검, 자체 점검, Slack 연결을 같은 순서로 확인한다.</li>
+                  <li>필요한 파일만 마운트해 개인 환경 차이와 불필요한 파일 노출을 같이 줄인다.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="source-card">
+            <div class="source-head">
+              <div class="cat">문제 4</div>
+              <div class="claim">테스트 통과와 운영 준비가 같은 말로 보일 수 있었다</div>
+            </div>
+            <div class="source-body">
+              <div class="source-note">
+                <b>핵심 판단</b>
+                <p>자동 테스트, 실제 Slack 실행, 비용 상한, 선택 도구 연결은 서로 다른 검증이다.</p>
+              </div>
+              <div class="source-points">
+                <b>바뀐 형태</b>
+                <ul>
+                  <li>검증 상태를 완료와 남은 확인으로 나눠 표시했다.</li>
+                  <li>실제 Slack 표현 재확인과 BigQuery hard quota는 완료로 바꾸고, Metabase 카드는 남은 항목으로 둔다.</li>
+                  <li>5번 탭에서 각 검증이 무엇을 증명했는지 다시 나눈다.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout">
+          <span class="label">먼저 보는 용어 풀이</span>
+          <p>아래 용어는 문서 안에서 반복해서 나온다. 개발자가 아니어도 흐름을 따라갈 수 있게 쉬운 뜻을 같이 둔다.</p>
+          <div class="term-grid">
+            <div class="term"><b>제품 의사결정자</b>기능이나 지표를 보고 다음 행동을 정해야 하는 사람. 이 문서에서는 Slack 답변의 주 독자다.</div>
+            <div class="term"><b>분석 세션</b>Slack 스레드 하나에 붙는 이어지는 분석 대화. 같은 스레드 질문은 같은 흐름에서 이어진다.</div>
+            <div class="term"><b>실행 기록</b>Slack에는 숨기는 자세한 근거 파일. 검증, 재현 SQL, 도구 실행 원문이 여기에 남는다.</div>
+            <div class="term"><b>audit/trace</b>나중에 재현하거나 장애를 확인할 수 있게 남기는 실행 증거. Slack 답변보다 자세하다.</div>
+            <div class="term"><b>dbt</b>SQL을 정리하고 검사해서 실제 조회 가능한 형태로 만드는 도구.</div>
+            <div class="term"><b>BigQuery</b>GitHub Archive 데이터를 실제로 조회하는 데이터 저장소.</div>
+            <div class="term"><b>Metabase</b>쿼리 결과를 카드나 대시보드 화면으로 볼 수 있게 해주는 도구.</div>
+            <div class="term"><b>MCP</b>Claude가 Metabase 같은 외부 도구를 사용할 수 있게 붙이는 연결 방식.</div>
+            <div class="term"><b>실행 전 점검</b>큰 쿼리를 돌리기 전에 비용과 범위를 먼저 확인하는 단계. 명령 이름은 <code>--dry-run</code>이다.</div>
+            <div class="term"><b>raw/mart/grain 등</b>데이터가 어디에 어떤 단위로 저장됐는지 말하는 내부 구조 용어. Slack 첫 답변에는 보통 필요 없다.</div>
+            <div class="term"><b>기준 시간</b>데이터 날짜를 어느 시간대 기준으로 자르는지에 대한 약속. 쉽게 말하더라도 숨기면 안 된다.</div>
+            <div class="term"><b>Socket Mode</b>봇이 Slack 쪽으로 먼저 연결을 열어 메시지를 받는 방식. 공개 서버 주소 없이도 실행할 수 있다.</div>
+            <div class="term"><b>OAuth 로그인</b>컨테이너 안에서 Claude 계정 사용 권한을 한 번 받아 저장하는 절차.</div>
+            <div class="term"><b>서비스 계정</b>사람 계정 대신 봇이 BigQuery를 읽을 때 쓰는 낮은 권한의 계정.</div>
+            <div class="term"><b>FIFO queue</b>먼저 들어온 질문을 먼저 처리하는 대기열. 같은 Slack 스레드의 답변 순서가 꼬이지 않게 한다.</div>
+            <div class="term"><b>Docker 마운트</b>호스트의 특정 파일이나 폴더만 컨테이너 안에 보여주는 설정.</div>
+            <div class="term"><b>백그라운드 실행</b>터미널을 계속 붙잡지 않고도 Slack 연결이 유지되게 띄우는 방식.</div>
+          </div>
+        </div>
+
+        <div class="reading-map" aria-label="문서 읽는 법">
+          <div class="reading-card">
+            <b>문서 흐름</b>
+            <p>
+              1번 탭은 전체 지도, 2번 탭은 실제 Slack 답변이 어떻게 바뀌었는지,
+              3번 탭은 코드에서 무엇을 고쳤는지, 4번 탭은 Docker 안에서 어떻게 띄우는지,
+              5번 탭은 검증 상태와 이 사례에서 가져갈 교훈을 보여준다.
+            </p>
+          </div>
+          <div class="reading-card">
+            <b>변경을 한 문장으로</b>
+            <p>
+              분석 과정은 더 엄격하게 남기되, Slack에는 질문자가 바로 판단할 수 있는 답변만 보이게 했다.
+              그래서 정확성 확인과 사용자 경험을 같은 메시지에 우겨 넣지 않는다.
+            </p>
+          </div>
+        </div>
+
+        <h3>적용 순서</h3>
+        <div class="timeline" aria-label="전체 적용 순서">
+          <div class="timeline-item">
+            <div class="timeline-no">1</div>
+            <div class="timeline-card">
+              <h4>전체 워크플로우 이식</h4>
+              <div class="timeline-grid">
+                <div><b>출발점</b>외부 Slack 분석 봇 사례에서 이미 검증된 운영 패턴을 벤치마킹했다.</div>
+                <div><b>적용</b>질문 접수, 진행 표시, 중단, 최종 답변, 실행 기록 저장이라는 큰 흐름을 현재 봇에 맞췄다.</div>
+                <div><b>결과</b>Slack 스레드 하나가 분석 세션 하나가 되고, 답변과 근거 저장 위치가 분리됐다.</div>
+              </div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-no">2</div>
+            <div class="timeline-card">
+              <h4>실제 답변을 보면서 피드백 왕복</h4>
+              <div class="timeline-grid">
+                <div><b>본 결과</b>기능은 맞지만 <code>검증:</code>, <code>재현:</code>, <code>active actor</code>, <code>UTC</code> 때문에 답변이 기술적으로 읽혔다.</div>
+                <div><b>판단</b>Slack은 분석 기록이 아니라 의사결정 화면이어야 한다.</div>
+                <div><b>수정</b>실제 출력물을 보면서 용어, 말투, 짧은 답변 규칙, 최종 답변 후처리를 반복 조정했다.</div>
+              </div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-no">3</div>
+            <div class="timeline-card">
+              <h4>Docker 실행 환경 고정</h4>
+              <div class="timeline-grid">
+                <div><b>이유</b>수업, 데모, 검증을 실행하는 컴퓨터가 달라도 같은 방식으로 띄워야 했다.</div>
+                <div><b>적용</b>필요한 도구와 실행 순서를 컨테이너 이미지와 compose 명령으로 고정했다.</div>
+                <div><b>확인</b>컨테이너 안에서 Claude 로그인, 설정 점검, 자체 점검, Slack 백그라운드 연결을 확인했다.</div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div class="arch" aria-label="Slack 분석 봇 전체 아키텍처">
           <div class="arch-node slack">
@@ -818,8 +1210,8 @@
               <span>검증, 재현 SQL, 실행 전 비용 점검, Claude 사용 기록, BigQuery 사용량은 여기에 남긴다.</span>
             </div>
             <div class="mini-node">
-              <b>Docker 경계</b>
-              <span>컨테이너에는 필요한 레포 조각과 좁은 BQ 키만 넣는다.</span>
+              <b>Docker 실행 환경</b>
+              <span>필요한 도구와 실행 순서를 이미지와 compose 명령으로 고정한다.</span>
             </div>
           </div>
         </div>
@@ -827,13 +1219,13 @@
         <div class="change-grid">
           <div class="change-card">
             <div class="tagline">변경 전</div>
-            <div class="title">분석 로그가 Slack에 섞임</div>
+            <div class="title">분석 기록이 Slack에 섞임</div>
             <p>검증표, 재현 경로, 실행 전 점검값, 도구명까지 답변에 같이 들어와서 PO가 바로 읽기 어려웠다.</p>
           </div>
           <div class="change-card">
             <div class="tagline">변경 후</div>
             <div class="title">Slack은 결정용 요약</div>
-            <p>최종 메시지는 사람이 판단하는 데 필요한 숫자와 한계만 남기고 나머지는 로그로 보낸다.</p>
+            <p>최종 메시지는 사람이 판단하는 데 필요한 숫자와 한계만 남기고 나머지는 실행 기록으로 보낸다.</p>
           </div>
           <div class="change-card">
             <div class="tagline">의도</div>
@@ -847,37 +1239,30 @@
           <div class="compare-row">
             <div class="compare-label">변경 전</div>
             <div class="compare-chain">
-              <div class="chain-node"><b>Claude 원문</b>분석 과정과 답변이 한 덩어리로 생성됨</div>
-              <div class="chain-node bad"><b>그대로 게시</b>검증표, 재현 경로, 명령줄이 섞임</div>
-              <div class="chain-node slack"><b>Slack</b>질문자는 결론보다 과정부터 읽게 됨</div>
-              <div class="chain-node muted"><b>로그</b>일부 기록만 보조로 남음</div>
-              <div class="chain-node muted"><b>문제</b>정확해도 기술 문서처럼 보임</div>
+              <div class="chain-node"><b>Slack 질문</b>분석 요청이 들어옴</div>
+              <div class="chain-node"><b>Claude 원문</b>결론과 검증 과정이 함께 생성됨</div>
+              <div class="chain-node bad"><b>그대로 게시</b>재현 경로와 명령줄까지 섞임</div>
+              <div class="chain-node slack"><b>Slack</b>질문자는 결론보다 과정을 먼저 읽게 됨</div>
+              <div class="chain-node muted"><b>문제</b>맞는 답이어도 기술 문서처럼 보임</div>
             </div>
           </div>
           <div class="compare-row">
             <div class="compare-label">변경 후</div>
             <div class="compare-chain">
+              <div class="chain-node"><b>Slack 질문</b>스레드별 분석 세션에 연결</div>
               <div class="chain-node"><b>Claude 원문</b>분석과 검증은 계속 수행</div>
               <div class="chain-node ok"><b>후처리 관문</b>운영 상세와 민감값 패턴 제거</div>
               <div class="chain-node slack"><b>Slack</b>결론, 숫자, 기간, 한계만 표시</div>
-              <div class="chain-node ok"><b>실행 기록</b>검증, 재현 SQL, 비용 점검을 보관</div>
-              <div class="chain-node ok"><b>결과</b>읽는 사람과 운영자가 보는 화면을 분리</div>
+              <div class="chain-node ok"><b>실행 기록</b>검증과 재현 SQL은 따로 보관</div>
             </div>
           </div>
         </div>
 
-        <div class="callout">
-          <span class="label">문서 안 용어</span>
+        <div class="callout ok">
+          <span class="label">요약 탭에서 기억할 것</span>
           <p>
-            <b>분석 세션</b>은 Slack 스레드 하나에 붙는 이어지는 분석 대화다. <b>dbt</b>는 SQL을 정리하고 컴파일하는 도구,
-            <b>BigQuery</b>는 실제 데이터를 조회하는 저장소, <b>Metabase</b>는 결과를 카드나 대시보드로 보는 화면이다.
-            <b>Docker 마운트</b>는 호스트 파일 일부를 컨테이너 안에 보여주는 설정이고, <b>도구 허용 목록(permission list)</b>은 Claude가 쓸 수 있는 도구 목록이다.
-            <b>macOS 로그인 보관소(Keychain)</b>는 macOS가 로그인 정보를 보관하는 곳이다.
-          </p>
-          <p>
-            <b>실행 기록</b>은 봇이 남기는 자세한 근거 파일이다. Slack에는 숨긴 검증, 재현 SQL, 실행 전 점검값,
-            도구 실행 원문이 여기에 들어간다. <b>실행 전 점검</b>은 실제 쿼리를 돌리기 전에 비용과 범위를 확인하는 단계다.
-            명령 이름에는 <code>--dry-run</code>이라는 표현이 남아 있지만, 이 문서에서는 “설정 점검” 또는 “실행 전 점검”으로 풀어 쓴다.
+            이 작업은 답변을 대충 줄인 것이 아니다. Slack 사용자가 보는 화면과 개발자가 나중에 확인하는 실행 기록을 분리한 것이다.
+            그래서 답변은 쉬워졌지만, 검증과 재현 가능성은 실행 기록 쪽에 더 분명하게 남는다.
           </p>
         </div>
       </section>
@@ -885,12 +1270,23 @@
       <div class="panel" id="workflow" role="tabpanel" aria-labelledby="t-workflow" tabindex="0" hidden>
         <section>
           <h2>답변 흐름</h2>
-          <p class="sub">햄찌에서 가져온 건 코드보다 운영 감각이다</p>
+          <p class="sub">외부의 좋은 사용 사례에서 운영 패턴을 가져왔다</p>
           <p>
-            오래 돌던 <code>hamji-portable-20260801</code>을 보면서 그대로 베끼기보다,
-            지금 봇에 꼭 필요한 습관만 골랐다. 질문을 받으면 기다리는 사람에게 진행 상황을 보여주고,
-            답변은 바로 읽히게 만들고, 자세한 근거는 나중에 확인할 수 있게 따로 남기는 방식이다.
+            이번 작업은 외부 Slack 분석 봇 사례의 구현을 통째로 복사한 것이 아니라,
+            그 사례에서 검증된 운영 습관을 현재 봇에 맞게 번역한 것이다.
+            질문을 받으면 기다리는 사람에게 진행 상황을 보여주고, 답변은 바로 읽히게 만들고,
+            자세한 근거는 나중에 확인할 수 있게 따로 남기는 방식이다.
           </p>
+
+          <div class="callout">
+            <span class="label">여기서 가져온 패턴</span>
+            <p>
+              가져온 것은 코드가 아니라 아래 5단계 운영 흐름이다. Slack 질문을 하나의 분석 턴으로 잡고,
+              기다리는 사람에게 진행 상태를 보여주며, 분석 실행은 내부에서 처리하고,
+              게시 직전에는 Slack용 답변만 남기는 흐름이다. 이 5단계가 외부 사례에서 배운 부분이고,
+              구현 세부보다 운영 습관을 현재 봇에 맞게 옮겼다는 점이 핵심이다.
+            </p>
+          </div>
 
           <div class="flow" aria-label="Slack 분석 봇 흐름">
             <div class="step">
@@ -923,8 +1319,10 @@
           <div class="callout slack">
             <span class="label">협업 메모</span>
             <p>
-              작업 중 계속 잡았던 기준은 “분석자용 근거는 로그, Slack은 의사결정 화면”이었다.
-              햄찌를 너무 딱딱한 감사자가 아니라, Slack에서 옆자리 동료처럼 말하는 분석 파트너로 두자는 쪽으로 톤을 맞췄다.
+              외부 사례에서 가져온 것은 위 5단계 운영 흐름이다. 반대로 <code>active actor</code>를
+              <code>활동 계정</code>처럼 바꾸고, 짧은 질문에는 짧게 답하게 만든 일은 오늘 실제 Slack 답변을
+              보면서 같이 조정한 결과다. 작업 중 계속 잡았던 기준은 “분석자용 근거는 실행 기록,
+              Slack은 의사결정 화면”이었다.
             </p>
           </div>
 
@@ -932,6 +1330,17 @@
           <div class="timeline" aria-label="피드백 반영 타임라인">
             <div class="timeline-item">
               <div class="timeline-no">1</div>
+              <div class="timeline-card">
+                <h4>전체 운영 흐름을 먼저 붙였다</h4>
+                <div class="timeline-grid">
+                  <div><b>본 사례</b>외부의 좋은 Slack 분석 봇은 진행 상태, 중단, 답변, 실행 기록이 한 흐름으로 묶여 있었다.</div>
+                  <div><b>판단</b>지금 봇도 “질문을 받았다”에서 “근거를 남겼다”까지 한 번에 이어져야 한다.</div>
+                  <div><b>수정</b>스레드별 세션, 진행 메시지, 중단 버튼, 피드백, 실행 기록 저장을 먼저 붙였다.</div>
+                </div>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-no">2</div>
               <div class="timeline-card">
                 <h4>검증/재현 라인이 Slack에 남았다</h4>
                 <div class="timeline-grid">
@@ -942,24 +1351,13 @@
               </div>
             </div>
             <div class="timeline-item">
-              <div class="timeline-no">2</div>
-              <div class="timeline-card">
-                <h4>Docker 안에서는 호스트 Claude 로그인이 넘어오지 않았다</h4>
-                <div class="timeline-grid">
-                  <div><b>본 결과</b>컨테이너에서 Claude 인증이 없어 실행이 막혔다.</div>
-                  <div><b>판단</b>호스트 <code>~/.claude</code>를 마운트하면 격리 목적이 깨진다.</div>
-                  <div><b>수정</b>컨테이너 안에서 Claude 로그인을 한 번 수행하고 Docker 저장 공간에 보관했다.</div>
-                </div>
-              </div>
-            </div>
-            <div class="timeline-item">
               <div class="timeline-no">3</div>
               <div class="timeline-card">
                 <h4>첫 실제 Slack 테스트 답변이 너무 기술적으로 읽혔다</h4>
                 <div class="timeline-grid">
                   <div><b>본 답변</b><code>active actor</code>, <code>actor.id</code>, <code>UTC</code>가 앞에 나왔다.</div>
                   <div><b>판단</b>정확한 지표명보다 먼저 사람이 이해하는 말이 나와야 한다.</div>
-                  <div><b>수정</b><code>활동 계정</code>, <code>계정 ID</code>, <code>데이터 기준</code>으로 바꾸는 용어표를 넣었다.</div>
+                  <div><b>수정</b><code>활동 계정</code>, <code>계정 ID</code>, <code>UTC 기준일</code>처럼 쉬우면서 기준 시간이 남는 용어표를 넣었다.</div>
                 </div>
               </div>
             </div>
@@ -980,8 +1378,8 @@
                 <h4>말투가 아직 감사 노트처럼 느껴졌다</h4>
                 <div class="timeline-grid">
                   <div><b>본 느낌</b>기능은 되지만 Slack 동료가 말하는 느낌은 약했다.</div>
-                  <div><b>판단</b>햄찌의 장점은 친근한 톤이었다. 다만 캐릭터 놀이가 아니라 일하는 동료 톤이어야 한다.</div>
-                  <div><b>수정</b><code>APPEND_SYSTEM_PROMPT</code>에 “Slack에서 도와주는 동료처럼 답하기” 기준을 넣었다.</div>
+                  <div><b>판단</b>외부 사례의 장점인 친근함은 살리되, 캐릭터 놀이가 아니라 일하는 동료 톤이어야 한다.</div>
+                  <div><b>수정</b><code>APPEND_SYSTEM_PROMPT</code>에 “Slack에서 도와주는 동료처럼 답하기” 기준을 넣고 캐주얼 용어표를 보강했다.</div>
                 </div>
               </div>
             </div>
@@ -994,7 +1392,7 @@
               Docker로 띄운 뒤 Slack에서 <b>“최근 완료된 1일 active actor 수 간단히 봐줘”</b>라고 물었다.
               기능은 성공했다. 봇은 Slack 이벤트를 받고, BigQuery를 조회하고, 답변까지 게시했다.
               하지만 답변이 <code>active actor</code>, <code>actor.id</code>, <code>UTC</code>, 토요일 비교표까지 포함해
-              “간단히”라는 요청에 비해 너무 기술적으로 읽혔다. 그래서 아래처럼 목표 답변 형태를 다시 잡았다.
+              “간단히”라는 요청에 비해 너무 기술적으로 읽혔다. 아래 오른쪽은 그 관찰을 바탕으로 다시 잡은 교육용 목표 형태다.
             </p>
           </div>
           <div class="message-pair" aria-label="Slack 답변 before after">
@@ -1014,7 +1412,7 @@ Claude 4턴.</div>
             </div>
             <div class="slack-msg good">
               <div class="hdr"><span>변경 후 · 목표 Slack 답변</span><span>노출 OK</span></div>
-              <div class="bubble">2026-08-01 데이터 기준 활동 계정은 305,409개입니다.
+              <div class="bubble">2026-08-01 UTC 기준 활동 계정은 305,409개입니다.
 
 이 값은 최신 완료일 기준으로 본 고유 계정 수예요. 짧게 물어본 경우라 추가 표나 긴 진단은 붙이지 않습니다.
 
@@ -1023,17 +1421,26 @@ Claude 4턴.</div>
           </div>
 
           <p>
-            숫자는 예시다. 중요한 변화는 형식이다. Slack에는 결론이 먼저 오고,
+            오른쪽 숫자는 첫 테스트에서 나온 값을 형식 설명에 재사용한 예시다.
+            중요한 변화는 형식이다. Slack에는 결론이 먼저 오고, 기준 시간은 쉬운 말로 남기며,
             검증과 재현 방법은 사라지는 대신 실행 기록에 남는다.
           </p>
+          <div class="answer-notes" aria-label="답변 변화 요약">
+            <div class="answer-note"><b>결론 위치</b>첫 줄에서 날짜와 숫자를 바로 말한다.</div>
+            <div class="answer-note"><b>용어</b><code>active actor</code>를 <code>활동 계정</code>으로 바꾼다.</div>
+            <div class="answer-note"><b>길이</b>짧게 물으면 표와 추가 진단을 붙이지 않는다.</div>
+            <div class="answer-note"><b>근거</b>검증과 재현 SQL은 Slack이 아니라 실행 기록에 남긴다.</div>
+          </div>
         </section>
 
         <section>
           <h2>Slack UX</h2>
-          <p class="sub">스키마 용어를 먼저 내세우지 않고, 사람이 읽는 말로 바꿨다</p>
+          <p class="sub">이 부분은 실제 답변을 보면서 피드백 왕복으로 나온 변경이다</p>
           <p>
-            Slack 답변은 데이터 모델을 설명하는 문서가 아니다. 그래서 지표명은 유지하되,
-            첫 표현은 질문자가 바로 이해할 수 있는 말로 바꾼다. 원래 스키마 기준이 꼭 필요하면
+            외부 사례에서 가져온 것은 운영 흐름이고, 아래 용어 조정은 오늘 실제 Slack 답변을 보면서 만든 것이다.
+            <code>active actor</code>, <code>actor.id</code>, <code>distinct count</code> 같은 말이 앞에 나오면
+            제품 의사결정자 입장에서는 답보다 데이터 모델 설명을 먼저 읽게 된다. 그래서 지표명은 유지하되,
+            첫 표현은 질문자가 바로 이해할 수 있는 말로 바꾸고, 원래 스키마 기준이 꼭 필요하면
             한계 문장이나 괄호 안에서 보충한다.
           </p>
 
@@ -1064,8 +1471,8 @@ Claude 4턴.</div>
                 </tr>
                 <tr>
                   <td><code>UTC</code></td>
-                  <td>데이터 기준</td>
-                  <td>시간대 설명은 남기되 첫 화면을 덜 딱딱하게 만든다.</td>
+                  <td>UTC 기준일</td>
+                  <td>시간대 설명은 숨기지 않고, 첫 화면에서 바로 읽히게 만든다.</td>
                 </tr>
                 <tr>
                   <td><code>mart/raw/shard/partition/grain</code></td>
@@ -1081,9 +1488,9 @@ Claude 4턴.</div>
       <div class="panel" id="implementation" role="tabpanel" aria-labelledby="t-implementation" tabindex="0" hidden>
         <section>
           <h2>기술 변경</h2>
-          <p class="sub">Docker를 빼면 변경은 다섯 가지 축으로 정리된다</p>
+          <p class="sub">Docker를 빼면 변경은 여섯 가지 축으로 정리된다</p>
           <p>
-            2번 꼭지는 자칫 구현 목록처럼 보이기 쉬워서, “무슨 문제를 줄였는가” 기준으로 묶었다.
+            이 탭은 자칫 구현 목록처럼 보이기 쉬워서, “무슨 문제를 줄였는가” 기준으로 묶었다.
             핵심 파일은 거의 <code>scripts/slack_analyst_bot.py</code>에 모여 있다.
           </p>
           <p>
@@ -1091,6 +1498,23 @@ Claude 4턴.</div>
             제품용 정리 단계가 생겼다</b>는 것이다. 모델은 여전히 검증하고, 쿼리를 실행하기 전에 비용을 확인하고,
             필요한 SQL을 저장한다. 다만 그 과정 전체를 Slack에 그대로 보여주지 않는다.
           </p>
+
+          <div class="callout">
+            <span class="label">읽는 기준</span>
+            <p>
+              아래 기술 변경은 크게 두 갈래다. 하나는 Slack 화면을 읽기 좋게 만드는 일이고,
+              다른 하나는 긴 분석 작업이 꼬이지 않게 세션, 중단, 실행 기록, 선택 도구 연결을 관리하는 일이다.
+            </p>
+          </div>
+
+          <div class="callout ok">
+            <span class="label">전체 설계 HTML에서 여기로 온 내용</span>
+            <p>
+              핵심은 “Slack 스레드 1개 = Claude 분석 세션 1개”라는 구조와,
+              답변이 Slack에 그대로 게시된다는 위험을 코드에서 통제해야 한다는 판단이다.
+              아래 여섯 축은 그 설계를 구현 관점으로 다시 묶은 것이다.
+            </p>
+          </div>
 
           <div class="cards">
             <div class="card">
@@ -1110,7 +1534,7 @@ Claude 4턴.</div>
             </div>
             <div class="card">
               <div class="cat">실행 기록</div>
-              <div class="claim">근거는 로그로 이동</div>
+              <div class="claim">근거는 실행 기록으로 이동</div>
               <p>질문, 실행 상태, Claude 사용 기록, BigQuery 사용량, 도구 실행 원문, 피드백을 <code>logs/analyst-bot/</code>에 남긴다.</p>
             </div>
             <div class="card">
@@ -1121,8 +1545,43 @@ Claude 4턴.</div>
             <div class="card">
               <div class="cat">비용 경계</div>
               <div class="claim">비용 경계 명확화</div>
-              <p><code>.bigqueryrc</code>로 기본 스캔 상한을 넣고, 하드 quota는 콘솔 설정이 필요하다고 문서화했다.</p>
+              <p><code>.bigqueryrc</code>로 쿼리 1회 기본 상한을 두고, BigQuery custom query quota로 일일 사용량 상한을 걸었다.</p>
             </div>
+          </div>
+
+          <h3>설계 문서에서 흡수한 판단</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>설계 문서의 판단</th>
+                  <th>이 변경 요약에서 보이는 위치</th>
+                  <th>읽는 포인트</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Slack 스레드 하나를 분석 세션 하나로 본다.</td>
+                  <td>분석 세션, 스레드별 순서 보장</td>
+                  <td>같은 질문 흐름의 후속 질문이 이전 맥락을 잃지 않게 한다.</td>
+                </tr>
+                <tr>
+                  <td>Slack 답변은 제품 화면처럼 다뤄야 한다.</td>
+                  <td>최종 답변 후처리, 답변 계약</td>
+                  <td>분석자가 보는 실행 메모와 PO가 보는 결론을 섞지 않는다.</td>
+                </tr>
+                <tr>
+                  <td>도구 실행 원문은 Slack보다 실행 기록에 남긴다.</td>
+                  <td>실행 기록, 진행 메시지, 운영 상세 제거</td>
+                  <td>나중에 재현할 근거는 남기되, 질문자가 읽는 화면은 어지럽히지 않는다.</td>
+                </tr>
+                <tr>
+                  <td>Metabase는 있으면 붙는 선택 도구다.</td>
+                  <td>Metabase 카드/대시보드 링크</td>
+                  <td>Slack에는 내부 도구 이름이 아니라 열 수 있는 링크와 버튼만 보여준다.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <h3>최종 답변 처리 파이프라인</h3>
@@ -1156,10 +1615,10 @@ Claude 4턴.</div>
               </div>
             </div>
             <div class="pipe-row">
-              <div class="pipe-key">5 · 쉬운 용어로 치환</div>
+              <div class="pipe-key">5 · 피드백으로 정한 용어 치환</div>
               <div class="pipe-val">
-                <b>스키마 말을 Slack 말로 바꿈</b>
-                <span><code>active actor</code>는 <code>활동 계정</code>, <code>actor.id</code>는 <code>계정 ID</code>, <code>event</code>는 <code>활동 기록</code>처럼 바꾼다.</span>
+                <b>실제 답변을 보고 스키마 말을 Slack 말로 바꿈</b>
+                <span><code>active actor</code>는 <code>활동 계정</code>, <code>actor.id</code>는 <code>계정 ID</code>, <code>event</code>는 <code>활동 기록</code>처럼 바꾼다. 이 조정은 외부 사례가 아니라 오늘 답변을 보며 나온 변경이다.</span>
               </div>
             </div>
             <div class="pipe-row">
@@ -1195,7 +1654,7 @@ Claude 4턴.</div>
                 <tr>
                   <td><code>casualize_slack_terms()</code></td>
                   <td>스키마 용어를 Slack 친화 표현으로 바꾼다.</td>
-                  <td><code>active actor</code> → 활동 계정, <code>event</code> → 활동 기록</td>
+                  <td>실제 Slack 답변을 보며 정한 용어표. <code>active actor</code> → 활동 계정, <code>event</code> → 활동 기록</td>
                 </tr>
                 <tr>
                   <td><code>format_final_answer_for_slack()</code></td>
@@ -1225,7 +1684,7 @@ Claude 4턴.</div>
               <thead>
                 <tr>
                   <th>Slack에 남김</th>
-                  <th>로그로 보냄</th>
+                  <th>실행 기록으로 보냄</th>
                 </tr>
               </thead>
               <tbody>
@@ -1262,19 +1721,29 @@ Claude 4턴.</div>
       <div class="panel" id="docker" role="tabpanel" aria-labelledby="t-docker" tabindex="0" hidden>
         <section>
           <h2>Docker</h2>
-          <p class="sub">Docker는 배포 편의보다 권한 경계 때문에 넣었다</p>
+          <p class="sub">Docker는 어디서나 같은 방식으로 실행하기 위해 넣었다</p>
           <p>
-            로컬 세션 도구는 레포 밖 파일을 읽을 수 있었다. 이름 기반 deny만으로는 충분하지 않아서,
-            실제 운영 경계는 Claude 도구 허용 목록이 아니라 컨테이너에 어떤 폴더를 보여줄지 정하는 마운트 설정으로 잡았다.
+            여기서 Docker는 회사 프로덕션 배포처를 뜻하지 않는다. 실제 회사라면 개인 노트북이 아니라
+            서버, 컨테이너 플랫폼, 예약 잡 같은 운영 런타임에 올리고 Secret Manager, IAM, 모니터링을 붙인다.
+            이 문서의 Docker는 수업, 데모, 검증 환경이 바뀌어도 같은 명령과 같은 의존성으로 봇을 띄우기 위한 실행 패키징이다.
           </p>
           <p>
-            여기서 Docker의 역할은 “어디서나 쉽게 실행”보다 “볼 수 있는 파일을 줄이기”에 가깝다.
-            컨테이너 안에는 분석에 필요한 레포 조각과 읽기 전용 BigQuery 키만 넣고,
-            운영자 개인 키나 호스트의 Claude 로그인 파일은 넣지 않는다. 그래서 컨테이너 안에서
-            파일 읽기 권한이 넓더라도 실제로 볼 수 있는 민감 파일이 없다.
+            그래서 핵심은 Python, gcloud, dbt, BigQuery CLI, Claude 로그인 저장 위치, 로그 저장 위치를
+            매번 같은 형태로 맞추는 것이다. 동시에 필요한 경로만 마운트하면 개인 컴퓨터의 임의 파일을
+              컨테이너 안으로 끌고 들어오지 않아도 되므로, 파일 노출 범위도 함께 깔끔해진다.
           </p>
 
-          <div class="docker-map" aria-label="Docker 권한 경계">
+          <div class="callout ok">
+            <span class="label">Docker 운영 원문에서 가져온 판단</span>
+            <p>
+              핵심은 “환경을 이미지로 고정하고, 마운트는 필요한 만큼만 둔다”이다.
+              실행 환경을 고정해야 다른 컴퓨터에서도 같은 방식으로 검증할 수 있고,
+              마운트를 좁혀야 개인 설정이나 키 파일이 우연히 컨테이너 안에 들어오지 않는다.
+              아래 구조도와 실행 순서는 이 두 목적을 함께 보여준다.
+            </p>
+          </div>
+
+          <div class="docker-map" aria-label="Docker 실행 환경과 마운트 범위">
             <div class="side-list">
               <h3>호스트</h3>
               <ul>
@@ -1333,14 +1802,164 @@ Claude 4턴.</div>
             </p>
           </div>
 
-          <pre><code>docker compose run --rm -it --entrypoint claude analyst-bot auth login</code></pre>
+          <h3>실행 순서</h3>
+          <div class="command-grid" aria-label="Docker 실행 순서">
+            <div class="command-card">
+              <h3>1. 이미지 만들기</h3>
+              <p>컨테이너 안에서 필요한 Python, gcloud, dbt, BigQuery CLI가 같이 들어간 실행 환경을 만든다.</p>
+              <code>docker compose build analyst-bot</code>
+            </div>
+            <div class="command-card">
+              <h3>2. 컨테이너 안에서 로그인</h3>
+              <p>호스트 로그인 파일을 넘기지 않고, 봇 컨테이너가 직접 Claude 로그인을 갖게 한다.</p>
+              <code>docker compose run --rm -it --entrypoint claude analyst-bot auth login</code>
+            </div>
+            <div class="command-card">
+              <h3>3. 실행 전 점검</h3>
+              <p>실제 Slack을 처리하기 전에 필요한 파일, 로그 저장 위치, 쿼리 기본 상한이 잡혔는지 확인한다.</p>
+              <code>docker compose run --rm analyst-bot --dry-run</code>
+            </div>
+            <div class="command-card">
+              <h3>4. 백그라운드로 켜기</h3>
+              <p>터미널을 닫아도 Slack 이벤트를 계속 받을 수 있게 띄우고, 로그로 상태를 본다.</p>
+              <code>docker compose up -d analyst-bot<br />docker compose logs -f analyst-bot</code>
+            </div>
+          </div>
+
+          <h3>실습 체크 기준</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>확인할 것</th>
+                  <th>성공으로 보는 신호</th>
+                  <th>막히면 먼저 볼 곳</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>이미지 빌드</td>
+                  <td>Python, gcloud, dbt, BigQuery CLI가 들어간 이미지가 끝까지 만들어진다.</td>
+                  <td>Dockerfile과 entrypoint에서 설치 단계가 실패했는지 본다.</td>
+                </tr>
+                <tr>
+                  <td>컨테이너 로그인</td>
+                  <td>컨테이너 재시작 뒤에도 Claude 로그인이 유지된다.</td>
+                  <td>호스트 로그인 파일을 넘기려 하지 말고 Docker 저장 공간이 유지되는지 본다.</td>
+                </tr>
+                <tr>
+                  <td>실행 전 점검</td>
+                  <td>레포 위치, 실행 기록 저장 위치, BigQuery 계정, 기본 스캔 상한이 출력된다.</td>
+                  <td>마운트 경로, BigQuery 키, <code>.bigqueryrc</code> 적용 여부를 본다.</td>
+                </tr>
+                <tr>
+                  <td>세션 이어가기</td>
+                  <td>첫 질문과 후속 질문이 같은 Slack 스레드 세션으로 이어진다.</td>
+                  <td>스레드 키와 session id 생성 규칙, <code>--resume</code> 경로를 본다.</td>
+                </tr>
+                <tr>
+                  <td>백그라운드 실행</td>
+                  <td>로그에 Slack 연결 완료 문구가 보이고, 터미널을 닫아도 봇이 유지된다.</td>
+                  <td>Slack 앱 설정, 토큰 환경변수, 허용 채널, 컨테이너 로그를 차례로 본다.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="callout warn">
+            <span class="label">실습에서 헷갈리기 쉬운 점</span>
+            <p>
+              <code>--dry-run</code>은 실제 Slack 질문을 처리했다는 뜻이 아니다. 설정과 실행 경로가 잡혔는지 보는 단계다.
+              실제 운영 표면은 Slack에서 짧은 질문을 던지고, 답변 표현과 실행 기록 저장을 함께 확인해야 한다.
+            </p>
+          </div>
         </section>
 
       </div>
 
       <section class="panel" id="status" role="tabpanel" aria-labelledby="t-status" tabindex="0" hidden>
-          <h2>현재 상태</h2>
-          <p class="sub">백그라운드 실행은 확인됐고, 다음은 실제 Slack에서 쉬운 말투를 다시 확인하는 것이다</p>
+          <h2>상태와 교훈</h2>
+          <p class="sub">검증 증거를 나눠 읽고, 자동화 사례의 원칙으로 마무리한다</p>
+          <div class="callout">
+            <span class="label">운영 원문을 상태표로 바꾼 것</span>
+            <p>
+              인수인계 원문은 미해결 항목을, 데모 런북은 짧게 켜고 Slack에서 확인하는 순서를,
+              Docker 런북은 컨테이너 실행 경로를 담고 있었다. 아래 표는 그 내용을
+              “지금 끝난 것과 아직 확인할 것”만 뽑아 한 화면으로 정리한 것이다.
+            </p>
+          </div>
+
+          <h3>검증 증거를 나눠 읽기</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>증거</th>
+                  <th>증명한 것</th>
+                  <th>아직 증명하지 않은 것</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="status s-ok">완료</span> 자동 회귀 테스트</td>
+                  <td>답변 후처리, 용어 치환, 중단 버튼, 피드백 버튼, 오류 은닉 로직이 깨지지 않았음</td>
+                  <td>실제 Slack에서 사람이 읽기에 충분히 자연스러운지</td>
+                </tr>
+                <tr>
+                  <td><span class="status s-ok">완료</span> Docker 실행 점검</td>
+                  <td>컨테이너 실행 환경, BigQuery 읽기 계정, 세션 이어가기가 기본 경로에서 동작함</td>
+                  <td>장시간 운영 중 토큰 만료, 네트워크 끊김, 반복 질문 부하</td>
+                </tr>
+                <tr>
+                  <td><span class="status s-ok">완료</span> 실제 Slack 표현 재확인</td>
+                  <td>보강한 용어표와 짧은 답변 규칙이 실제 Slack 답변에서 확인됨</td>
+                  <td>긴 질문, 후속 질문, Metabase 포함 답변은 별도 케이스로 계속 본다.</td>
+                </tr>
+                <tr>
+                  <td><span class="status s-ok">완료</span> 비용 hard quota</td>
+                  <td>BigQuery <code>Query usage</code> quota override 설정 완료</td>
+                  <td>프로젝트 전체 2 TiB/day, 사용자·서비스 계정별 1 TiB/day</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>관련 산출물이 어디에 반영됐나</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>산출물 성격</th>
+                  <th>핵심 판단</th>
+                  <th>이 HTML에서 읽을 위치</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>전체 설계</td>
+                  <td>Slack 스레드, 분석 세션, 실행 환경, 비용 경계를 먼저 정해야 한다.</td>
+                  <td>1번 탭의 전체 구조, 3번 탭의 기술 변경 축</td>
+                </tr>
+                <tr>
+                  <td>강의용 개요</td>
+                  <td>Slack, Claude, dbt, BigQuery는 서로 다른 역할을 맡는다.</td>
+                  <td>용어 풀이와 아키텍처 그림</td>
+                </tr>
+                <tr>
+                  <td>외부 사례 적용</td>
+                  <td>가져온 것은 코드가 아니라 질문, 진행, 실행, 정리, 답변의 운영 패턴이다.</td>
+                  <td>2번 탭의 5단계 답변 흐름</td>
+                </tr>
+                <tr>
+                  <td>운영 원문</td>
+                  <td>실행 순서와 남은 검증을 완료로 섞지 않는다.</td>
+                  <td>4번 탭의 실행 체크, 5번 탭의 상태표</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>현재 운영 상태</h3>
           <div class="table-wrap">
             <table>
               <thead>
@@ -1372,9 +1991,9 @@ Claude 4턴.</div>
                   <td>로그에 <code>Bolt app is running!</code> 표시</td>
                 </tr>
                 <tr>
-                  <td><span class="status s-warn">남음</span> 실제 Slack 말투 확인</td>
-                  <td>첫 실제 Slack 테스트는 기능 통과, 말투가 기술적으로 읽힘</td>
-                  <td>용어와 짧은 답변 규칙을 보강했으므로 같은 질문을 다시 던져 쉬운 답변으로 보이는지 확인</td>
+                  <td><span class="status s-ok">완료</span> 실제 Slack 말투 확인</td>
+                  <td>보강 후 실제 Slack 표현 확인 완료</td>
+                  <td>짧은 질문에서는 결론, 기준일, 숫자, 한계 중심으로 노출</td>
                 </tr>
                 <tr>
                   <td><span class="status s-warn">남음</span> Metabase 카드 생성 확인</td>
@@ -1382,12 +2001,44 @@ Claude 4턴.</div>
                   <td>카드 생성과 Slack 버튼 노출 확인</td>
                 </tr>
                 <tr>
-                  <td><span class="status s-warn">남음</span> BigQuery 강제 사용량 제한</td>
-                  <td>콘솔 설정 필요</td>
-                  <td><code>.bigqueryrc</code>는 기본값이지 완전한 하드 상한은 아님</td>
+                  <td><span class="status s-ok">완료</span> BigQuery 강제 사용량 제한</td>
+                  <td>Service Usage API quota override 설정 완료</td>
+                  <td><code>.bigqueryrc</code>는 쿼리 1회 상한, quota override는 일일 사용량 상한 역할</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <h3>이 사례에서 배울 것</h3>
+          <div class="cards" aria-label="학습 정리">
+            <div class="card">
+              <div class="cat">원칙 1</div>
+              <div class="claim">사용자 화면은 의사결정용으로 설계한다</div>
+              <p>결론, 숫자, 기준일, 한계를 먼저 보이고 재현 경로는 실행 기록으로 보낸다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">원칙 2</div>
+              <div class="claim">검증 가능성을 없애지 않고 위치를 바꾼다</div>
+              <p>Slack에서 지운 정보가 사라진 것이 아니라 audit/trace에 남아야 운영 가능한 자동화다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">원칙 3</div>
+              <div class="claim">실행 환경은 말이 아니라 이미지와 명령으로 고정한다</div>
+              <p>의존성과 실행 순서를 컨테이너로 묶고, 마운트와 낮은 권한 계정으로 불필요한 노출을 줄인다.</p>
+            </div>
+            <div class="card">
+              <div class="cat">원칙 4</div>
+              <div class="claim">테스트 통과와 운영 준비 완료를 구분한다</div>
+              <p>자동 테스트, 실제 Slack 실행, 비용 상한, 선택 도구 연결은 각각 따로 확인해야 한다.</p>
+            </div>
+          </div>
+
+          <div class="callout ok">
+            <span class="label">포트폴리오 문장으로 번역</span>
+            <p>
+              Slack 기반 분석 자동화 봇에서 최종 답변 후처리, 스레드별 세션 관리, 실행 기록 분리,
+              Docker 실행 환경, 제한된 마운트, 비용 상한 점검을 설계해 분석 결과의 사용자 경험과 재현 가능성을 분리했다.
+            </p>
           </div>
 
           <h3>기본 운영 명령</h3>
@@ -1397,23 +2048,8 @@ docker compose run --rm analyst-bot --self-test
 docker compose up -d analyst-bot</code></pre>
       </section>
 
-      <section>
-        <h2>참고 문서</h2>
-        <p class="sub">브라우저에서 읽을 문서와 레포 원문을 분리한다</p>
-        <p>
-          이 변경 요약은 발표·공유용 HTML을 정본으로 본다. 운영 런북 원문은 레포 안의 Markdown에 남아 있지만,
-          핵심 흐름과 명령은 위 섹션에 흡수해 두었다.
-        </p>
-        <ul>
-          <li>전체 설계 HTML: <a href="./analyst_bot_design.html">docs/analyst_bot_design.html</a></li>
-          <li>강의용 개요 HTML: <a href="./analyst_bot_overview.html">docs/analyst_bot_overview.html</a></li>
-          <li>hamji 적용 상세: <a href="../reports/20260801_slack_analyst_bot_hamji_adaptation.html">reports/20260801_slack_analyst_bot_hamji_adaptation.html</a></li>
-          <li>운영 원문 파일명: <code>docs/analyst_bot_handoff.md</code>, <code>docs/analyst_bot_demo_runbook.md</code>, <code>docs/analyst_bot_docker.md</code></li>
-        </ul>
-      </section>
-
       <footer>
-        작성 기준: 2026-08-02. Docker에서 실제 Slack 질문 처리까지는 확인했고, 쉬운 말투로 다시 답하는지 확인하는 단계가 남아 있다.
+        작성 기준: 2026-08-02. 이 사례의 핵심은 분석 자동화를 사용자 화면, 실행 기록, 재현 가능한 실행 환경, 검증 증거로 나누어 운영 가능한 형태로 만드는 것이다.
       </footer>
     </main>
 

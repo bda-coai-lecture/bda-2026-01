@@ -35,9 +35,12 @@ cp <read-only-sa-key>.json secrets/analyst-bq-key.json
 chmod 644 secrets/analyst-bq-key.json   # 컨테이너는 uid 10001로 :ro 마운트를 읽는다
 ```
 
-- 키에 필요한 역할은 `roles/bigquery.dataViewer` + `roles/bigquery.jobUser`이고
+- 키에 필요한 역할은 `roles/bigquery.dataViewer` + `roles/bigquery.jobUser` +
+  `projects/bda-coai/roles/analystBotJobMetadataViewer`이고
   **`dataEditor`는 주지 않는다.** `bq query`는 DDL/DML을 실행할 수 있고 명령 문자열
   매칭으로 SQL을 제한할 수 없으므로 읽기 전용은 IAM에서만 강제된다.
+  `analystBotJobMetadataViewer`는 `bigquery.jobs.list` 하나만 가진 custom role이며,
+  봇이 `INFORMATION_SCHEMA.JOBS_BY_USER`로 자기 BigQuery 사용량을 audit에 남기기 위해 필요하다.
   (해당 키의 IAM 발급 절차는 별도 런북에서 다룬다. 여기서는 경로만 소비한다.)
 - **`./gcp-key.json`을 마운트하지 않는다.** 그것은 `~/Documents/gcp-key.json`으로 가는
   심볼릭 링크이며 운영자의 광범위 키다.
@@ -71,6 +74,10 @@ ANALYST_METABASE_INTERNAL_URL=http://metabase:3000  # MCP 접속용 컨테이너
 ANALYST_METABASE_PUBLIC_URL=http://localhost:3001   # Slack 링크용 브라우저 URL
 METABASE_API_KEY=mb_...
 ANALYST_METABASE_COLLECTION_NAME=BDA 데이터 플랫폼
+
+# 선택: 별도 Postgres/RDS audit 테이블 저장
+ANALYST_AUDIT_DATABASE_URL=postgresql://...
+ANALYST_AUDIT_SCHEMA=analyst_audit
 ```
 
 Slack 앱 자체를 아직 안 만들었다면 전체 절차는 봇이 직접 출력한다:
@@ -90,6 +97,10 @@ Docker Compose로 띄운 봇에서 Metabase에 붙을 때는 `localhost:3001`을
 컨테이너 내부의 `localhost`는 봇 컨테이너 자신이므로 MCP 접속 URL은
 `http://metabase:3000`이어야 한다. Slack에 노출할 링크만 브라우저용
 `http://localhost:3001`로 둔다.
+
+Postgres/RDS audit을 켤 때는 먼저 `scripts/analyst_audit_schema.sql`을 audit DB에서 실행한다.
+세부 설계와 backfill 절차는 `docs/analyst_bot_postgres_audit.md`, 강의용 데이터 흐름 설명은
+`docs/analyst_bot_feedback_loop_lecture.html`을 본다.
 
 ## Anthropic 인증 — 반드시 읽을 것
 

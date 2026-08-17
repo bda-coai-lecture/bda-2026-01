@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>분석 자동화 봇 — 데이터 흐름과 피드백 루프</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f6f8;
+        --paper: #ffffff;
+        --ink: #172033;
+        --muted: #64748b;
+        --line: #d7dee8;
+        --soft: #eef3f7;
+        --slack: #6d28d9;
+        --session: #2563eb;
+        --data: #0f766e;
+        --eval: #7c3aed;
+        --guard: #b45309;
+        --bad: #b91c1c;
+        --ok: #15803d;
+      }
+
+      * { box-sizing: border-box; min-width: 0; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+        line-height: 1.56;
+        overflow-x: hidden;
+      }
+
+      .deck {
+        width: min(1180px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 22px 0 72px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding: 12px 0 0;
+        background: linear-gradient(var(--bg) 86%, rgb(244 246 248 / 0));
+      }
+
+      .brandrow {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .dot { width: 11px; height: 11px; border-radius: 999px; background: var(--data); }
+      .stamp { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+      h1 {
+        margin: 10px 0 6px;
+        font-size: 36px;
+        line-height: 1.18;
+        letter-spacing: 0;
+      }
+
+      .lede {
+        max-width: 82ch;
+        margin: 0 0 18px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .tablist {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 4px 0 10px;
+        scrollbar-width: none;
+      }
+
+      .tablist::-webkit-scrollbar { display: none; }
+
+      .tab {
+        appearance: none;
+        cursor: pointer;
+        white-space: nowrap;
+        background: var(--paper);
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 15px;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 720;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .tab:hover { color: var(--ink); }
+      .tab:focus-visible { outline: 2px solid var(--session); outline-offset: 2px; }
+      .tab .idx {
+        font-size: 11px;
+        color: #94a3b8;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+      .tab[aria-selected="true"] { background: var(--session); border-color: var(--session); color: #fff; }
+      .tab[aria-selected="true"] .idx { color: rgb(255 255 255 / 0.72); }
+
+      .panel[hidden] { display: none; }
+
+      section {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 20px 22px;
+        margin: 0 0 18px;
+      }
+
+      section > h2 {
+        margin: 0 0 4px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      section > h2 + .sub {
+        margin: 0 0 16px;
+        font-size: 19px;
+        font-weight: 730;
+        letter-spacing: 0;
+      }
+
+      h3 { margin: 22px 0 8px; font-size: 15px; }
+      h3:first-of-type { margin-top: 4px; }
+      p { margin: 0 0 12px; }
+      ul, ol { margin: 0 0 12px; padding-left: 20px; }
+      li { margin: 4px 0; }
+      p, li, td, .role, .d, .bubble, .flow-node, .loop-step { overflow-wrap: anywhere; }
+
+      code {
+        background: var(--soft);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 1px 5px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.88em;
+      }
+
+      pre {
+        margin: 0 0 14px;
+        padding: 13px 15px;
+        overflow-x: auto;
+        background: var(--soft);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+      }
+
+      pre code {
+        padding: 0;
+        border: 0;
+        background: none;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      a { color: var(--session); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+      .snapshot {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        margin: 0 0 18px;
+      }
+
+      .metric {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 15px;
+      }
+
+      .metric .k {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .metric .v {
+        margin-top: 6px;
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.24;
+      }
+
+      .metric .d {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin: 0 0 14px;
+      }
+
+      table { border-collapse: collapse; width: 100%; font-size: 14px; }
+      th, td { padding: 9px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+      thead th {
+        background: var(--soft);
+        font-size: 12px;
+        letter-spacing: 0;
+        color: var(--muted);
+        font-weight: 800;
+        white-space: nowrap;
+      }
+      tbody tr:last-child td { border-bottom: 0; }
+      td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      td code { background: none; border: 0; padding: 0; }
+
+      .tag {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid;
+        white-space: nowrap;
+      }
+
+      .t-slack { color: var(--slack); border-color: #c7b6ea; background: #f7f1ff; }
+      .t-data { color: var(--data); border-color: #9fd5ca; background: #f2fbf8; }
+      .t-eval { color: var(--eval); border-color: #cab6f2; background: #f7f2ff; }
+      .t-guard { color: var(--guard); border-color: #e2c48d; background: #fbf3e6; }
+      .t-ok { color: var(--ok); border-color: #a7d3b4; background: #eef7f1; }
+      .t-bad { color: var(--bad); border-color: #e3aeae; background: #fbeded; }
+
+      .flow {
+        display: grid;
+        grid-template-columns: minmax(150px, 1fr) 36px minmax(170px, 1fr) 36px minmax(170px, 1fr) 36px minmax(170px, 1fr);
+        gap: 10px 8px;
+        align-items: stretch;
+        margin: 0 0 16px;
+      }
+
+      .flow-node {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--session);
+        border-radius: 10px;
+        padding: 13px 14px;
+      }
+
+      .flow-node.slack { border-top-color: var(--slack); background: #faf7ff; }
+      .flow-node.data { border-top-color: var(--data); background: #f4fbfa; }
+      .flow-node.guard { border-top-color: var(--guard); background: #fdfaf5; }
+      .flow-node.eval { border-top-color: var(--eval); background: #f7f2ff; }
+      .flow-node .sys { font-size: 15px; font-weight: 800; margin-bottom: 4px; }
+      .flow-node .role { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+
+      .arrow {
+        display: grid;
+        place-items: center;
+        color: #94a3b8;
+        font-size: 20px;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .arrow small {
+        display: block;
+        font-size: 10px;
+        line-height: 1.25;
+        font-weight: 700;
+        color: var(--muted);
+      }
+
+      .lane {
+        display: grid;
+        grid-template-columns: 210px minmax(0, 1fr);
+        gap: 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin: 0 0 10px;
+        background: var(--paper);
+      }
+
+      .lane .name {
+        padding: 13px 14px;
+        border-right: 1px solid var(--line);
+        background: var(--soft);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .lane .body { padding: 12px 14px; }
+      .lane .body p:last-child { margin-bottom: 0; }
+
+      .loop {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(145px, 1fr));
+        gap: 9px;
+        margin: 0 0 16px;
+      }
+
+      .loop-step {
+        position: relative;
+        min-height: 155px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 14px 12px;
+        background: var(--paper);
+      }
+
+      .loop-step::before {
+        content: attr(data-step);
+        display: inline-grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        background: var(--session);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 800;
+        margin-bottom: 10px;
+      }
+
+      .loop-step.eval::before { background: var(--eval); }
+      .loop-step.data::before { background: var(--data); }
+      .loop-step.guard::before { background: var(--guard); }
+      .loop-step .ttl { font-weight: 800; margin-bottom: 6px; }
+      .loop-step p { color: var(--muted); font-size: 13px; margin: 0; }
+
+      .cards {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        margin: 0 0 14px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 13px 15px;
+        background: var(--paper);
+      }
+
+      .card .cat {
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .card .claim {
+        margin: 5px 0 6px;
+        font-size: 14.5px;
+        font-weight: 760;
+        line-height: 1.42;
+      }
+
+      .card p { margin: 0; color: var(--muted); font-size: 13px; }
+
+      .note {
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--guard);
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin: 0 0 14px;
+        background: #fdfaf5;
+      }
+
+      .note.ok { border-top-color: var(--ok); background: #f6fbf7; }
+      .note.info { border-top-color: var(--session); background: #f6f9fe; }
+      .note.bad { border-top-color: var(--bad); background: #fdf6f6; }
+      .note .lbl {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--guard);
+        font-size: 12px;
+        font-weight: 850;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+      .note.ok .lbl { color: var(--ok); }
+      .note.info .lbl { color: var(--session); }
+      .note.bad .lbl { color: var(--bad); }
+      .note p:last-child { margin-bottom: 0; }
+
+      .split {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 12px;
+        margin: 0 0 14px;
+      }
+
+      .col {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        background: var(--paper);
+      }
+
+      .col.soft { background: var(--soft); }
+      .col h4 {
+        margin: 0 0 6px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+      .col .cap { margin: 0 0 10px; font-size: 15px; font-weight: 780; }
+
+      .query {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .query pre { margin-bottom: 0; }
+
+      footer {
+        color: var(--muted);
+        font-size: 12px;
+        padding-top: 6px;
+      }
+
+      @media (max-width: 960px) {
+        .flow { grid-template-columns: 1fr; }
+        .arrow { min-height: 24px; transform: rotate(90deg); }
+        .arrow small { display: none; }
+        .loop { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+
+      @media (max-width: 680px) {
+        .deck { width: min(100% - 22px, 1180px); padding-top: 14px; }
+        section { padding: 18px 16px; border-radius: 12px; }
+        h1 { font-size: 29px; }
+        .brandrow { display: block; }
+        .stamp { margin-top: 2px; }
+        .lane { grid-template-columns: 1fr; }
+        .lane .name { border-right: 0; border-bottom: 1px solid var(--line); }
+        .loop, .query { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <div class="topbar">
+        <div class="brandrow">
+          <div class="brand"><span class="dot"></span><span>BDA 2 · Analyst Bot Lecture</span></div>
+          <div class="stamp">2026-08-09 · Slack automation audit</div>
+        </div>
+        <h1>분석 자동화 봇은 답변보다 로그가 더 중요하다</h1>
+        <p class="lede">
+          Slack에서 질문을 받는 봇은 “한 번 답을 잘했다”로 끝나지 않는다. 질문, 도구 사용,
+          비용, 실패, 피드백이 테이블로 남아야 나중에 채점하고, 반복 실패를 찾고, 프롬프트와
+          데이터 모델을 개선할 수 있다. 이 문서는 별도 RDS/Postgres audit 테이블을 중심으로 봇의
+          데이터 흐름과 피드백 루프를 설명한다.
+        </p>
+        <div class="tablist" role="tablist" aria-label="강의 섹션">
+          <button class="tab" role="tab" aria-selected="true" aria-controls="p0" id="t0"><span class="idx">00</span> 왜 저장하나</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="p1" id="t1"><span class="idx">01</span> 전체 흐름</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="p2" id="t2"><span class="idx">02</span> 테이블 설계</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="p3" id="t3"><span class="idx">03</span> 피드백 루프</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="p4" id="t4"><span class="idx">04</span> 운영 가드레일</button>
+        </div>
+      </div>
+
+      <section class="panel" role="tabpanel" id="p0" aria-labelledby="t0">
+        <h2>Thesis</h2>
+        <p class="sub">분석 봇의 핵심 산출물은 Slack 답변 하나가 아니라, 다시 학습 가능한 실행 기록이다.</p>
+
+        <div class="snapshot">
+          <div class="metric">
+            <div class="k">Primary Surface</div>
+            <div class="v">Slack thread</div>
+            <div class="d">사용자는 질문과 최종 답만 본다.</div>
+          </div>
+          <div class="metric">
+            <div class="k">Durable State</div>
+            <div class="v">RDS/Postgres + JSONL</div>
+            <div class="d">채점, 장애 조사, 비용 추적은 테이블에서 한다.</div>
+          </div>
+          <div class="metric">
+            <div class="k">Feedback Unit</div>
+            <div class="v">audit_id</div>
+            <div class="d">질문, 답변, trace, 비용, 버튼 피드백을 묶는 키다.</div>
+          </div>
+          <div class="metric">
+            <div class="k">Improvement Target</div>
+            <div class="v">workflow, prompt, mart</div>
+            <div class="d">틀린 답만 고치는 것이 아니라 반복 실패 경로를 고친다.</div>
+          </div>
+        </div>
+
+        <div class="note info">
+          <span class="lbl">강의 메시지</span>
+          <p>
+            LLM 분석 자동화에서 “결과를 저장한다”는 말은 답변 텍스트를 보관한다는 뜻이 아니다.
+            어떤 질문이 들어왔고, 어떤 세션 문맥으로 실행됐고, 어떤 데이터 소스를 조회했고,
+            비용 제한과 권한 제한을 어떻게 통과했는지까지 남겨야 재현 가능한 시스템이 된다.
+          </p>
+        </div>
+
+        <div class="cards">
+          <div class="card">
+            <div class="cat">Before</div>
+            <div class="claim">JSONL만 있으면 운영 증거는 있지만 비교 분석이 불편하다.</div>
+            <p>파일을 직접 뒤져야 하므로 “최근 부정확 피드백이 늘었나?”, “BigQuery 비용이 큰 질문 유형은?” 같은 질문이 느리다.</p>
+          </div>
+          <div class="card">
+            <div class="cat">After</div>
+            <div class="claim">별도 Postgres에 넣으면 봇 자체도 분석 대상이 된다.</div>
+            <p>질문-답변-사용량-피드백을 SQL로 묶어서 보고, Metabase 카드나 평가 리포트로 확장할 수 있다.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Principle</div>
+            <div class="claim">사용자용 답변과 운영용 증거는 분리한다.</div>
+            <p>Slack에는 짧고 읽기 쉬운 답만 남기고, dry-run bytes, tool trace, permission denial은 audit 테이블로 보낸다.</p>
+          </div>
+        </div>
+
+        <h3>좋은 로그의 조건</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>조건</th><th>봇에서의 의미</th><th>나중에 가능한 일</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="tag t-data">구조화</span></td>
+                <td>`status`, `bq_gib`, `permission_denials`, `feedback_type`처럼 컬럼으로 저장한다.</td>
+                <td>실패율, 비용, 피드백을 SQL로 바로 집계한다.</td>
+              </tr>
+              <tr>
+                <td><span class="tag t-eval">연결성</span></td>
+                <td>`audit_id`로 turns, usage, trace, feedback, eval score를 묶는다.</td>
+                <td>특정 답변이 왜 틀렸는지 실행 경로까지 내려간다.</td>
+              </tr>
+              <tr>
+                <td><span class="tag t-guard">비밀 분리</span></td>
+                <td>Audit DB URL은 봇 프로세스만 읽고 Claude child env에서는 제거한다.</td>
+                <td>분석 세션이 audit DB credential을 볼 수 없다.</td>
+              </tr>
+              <tr>
+                <td><span class="tag t-ok">실패 격리</span></td>
+                <td>Postgres 쓰기가 실패해도 JSONL은 남고 Slack 답변은 계속 간다.</td>
+                <td>관측 시스템 장애가 사용자 경험을 망치지 않는다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" role="tabpanel" id="p1" aria-labelledby="t1" hidden>
+        <h2>Data Flow</h2>
+        <p class="sub">하나의 Slack 질문은 세 가지 산출물을 만든다: 사용자 답변, 실행 증거, 개선 데이터.</p>
+
+        <div class="flow" aria-label="분석 봇 데이터 흐름">
+          <div class="flow-node slack">
+            <div class="sys">Slack 질문</div>
+            <div class="role">멘션 또는 DM. thread key는 `(team, channel, thread_ts)`다.</div>
+          </div>
+          <div class="arrow">→<small>session id</small></div>
+          <div class="flow-node">
+            <div class="sys">Claude session</div>
+            <div class="role">thread key에서 결정론적 `session_id`를 만들고 `--resume`으로 문맥을 이어간다.</div>
+          </div>
+          <div class="arrow">→<small>tool trace</small></div>
+          <div class="flow-node data">
+            <div class="sys">BigQuery / dbt</div>
+            <div class="role">작은 범위 검증, dry-run, mart 우선, raw는 `_TABLE_SUFFIX`로 제한한다.</div>
+          </div>
+          <div class="arrow">→<small>answer + audit</small></div>
+          <div class="flow-node eval">
+            <div class="sys">RDS/Postgres audit</div>
+            <div class="role">질문, 답변, 비용, trace, 피드백을 테이블로 저장한다.</div>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="name">Slack-visible lane</div>
+          <div class="body">
+            <p>
+              사용자는 진행 메시지와 최종 답변만 본다. 최종 답변에는 실행 시간과
+              “상세 실행 내역은 로그에 저장됨” 정도만 붙는다. Claude 턴 수, BigQuery GiB,
+              dry-run 바이트, tool 이름은 숨긴다.
+            </p>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="name">Audit lane</div>
+          <div class="body">
+            <p>
+              같은 턴에서 `turns`, `turn_usage`, `trace_events`, `feedback`이 채워진다.
+              Slack 답변은 제품 표면이고, audit 테이블은 운영 표면이다. 둘을 분리해야 답변은 읽기 쉽고
+              운영자는 충분한 증거를 갖는다.
+            </p>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="name">Fallback lane</div>
+          <div class="body">
+            <p>
+              JSONL은 계속 저장한다. Postgres 연결이 끊기거나 테이블 권한이 틀려도 로컬 로그는 남기고,
+              나중에 `scripts/backfill_analyst_audit_to_postgres.py`로 재적재한다.
+            </p>
+          </div>
+        </div>
+
+        <h3>턴 하나에서 발생하는 이벤트</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>순서</th><th>이벤트</th><th>저장되는 위치</th><th>사용자에게 보이는가</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="n">1</td><td>Slack 메시지 수신, `audit_id` 생성</td><td>`threads`, `turns` 준비</td><td>아직 안 보임</td></tr>
+              <tr><td class="n">2</td><td>Claude session 실행</td><td>`trace_events` 후보 line 수집</td><td>진행 메시지만 보임</td></tr>
+              <tr><td class="n">3</td><td>BigQuery 사용량 집계</td><td>`turn_usage.bq_*`</td><td>세부값은 숨김</td></tr>
+              <tr><td class="n">4</td><td>최종 답변 정리</td><td>`turns.answer`</td><td>Slack 최종 답변</td></tr>
+              <tr><td class="n">5</td><td>버튼 피드백 클릭</td><td>`feedback`</td><td>피드백 기록 상태만 보임</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note ok">
+          <span class="lbl">설계 포인트</span>
+          <p>
+            trace는 turn row 뒤에 저장한다. `trace_events.audit_id`가 `turns.audit_id`를 참조하기 때문이다.
+            순서를 바꾸지 않으면 Postgres에서는 FK 오류가 난다.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel" role="tabpanel" id="p2" aria-labelledby="t2" hidden>
+        <h2>Schema</h2>
+        <p class="sub">테이블은 “대화”, “실행”, “사용량”, “피드백”, “채점”을 분리한다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>테이블</th><th>grain</th><th>핵심 컬럼</th><th>왜 분리하나</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>threads</code></td>
+                <td>Slack thread 1개</td>
+                <td>`team_id`, `channel_id`, `thread_ts`, `session_id`</td>
+                <td>같은 스레드의 후속 질문을 같은 Claude session으로 묶는다.</td>
+              </tr>
+              <tr>
+                <td><code>turns</code></td>
+                <td>분석 요청 1회</td>
+                <td>`audit_id`, `question`, `answer`, `status`, `error`</td>
+                <td>사용자가 체감한 요청 단위다. 채점과 피드백의 중심 키다.</td>
+              </tr>
+              <tr>
+                <td><code>turn_usage</code></td>
+                <td>분석 요청 1회</td>
+                <td>`claude_turns`, `bq_billed_bytes`, `bq_gib`, `permission_denials`</td>
+                <td>비용과 권한 문제는 답변 품질과 다른 축이라 별도 관리한다.</td>
+              </tr>
+              <tr>
+                <td><code>trace_events</code></td>
+                <td>compact trace line</td>
+                <td>`event_type`, `text`, `payload`, `seq`</td>
+                <td>답변이 틀렸을 때 “어느 단계에서 틀렸나”를 재구성한다.</td>
+              </tr>
+              <tr>
+                <td><code>feedback</code></td>
+                <td>피드백 클릭 1회</td>
+                <td>`feedback_type`, `user_id`, `created_at`</td>
+                <td>사람이 느낀 품질 신호를 턴에 연결한다.</td>
+              </tr>
+              <tr>
+                <td><code>eval_cases</code> 계열</td>
+                <td>채점 문제와 실행</td>
+                <td>`rubric_version`, `expected`, `score`, `details`</td>
+                <td>수동 피드백을 정량 평가 루프로 확장한다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="split">
+          <div class="col soft">
+            <h4>Operational table</h4>
+            <p class="cap">운영자가 지금 보는 질문</p>
+            <ul>
+              <li>최근 실패한 요청은 무엇인가?</li>
+              <li>Slack에는 성공처럼 보였지만 delivery가 실패한 턴이 있는가?</li>
+              <li>BigQuery 사용량 집계가 깨졌는가?</li>
+              <li>권한 deny가 잦은 도구는 무엇인가?</li>
+            </ul>
+          </div>
+          <div class="col">
+            <h4>Evaluation table</h4>
+            <p class="cap">개선 담당자가 나중에 보는 질문</p>
+            <ul>
+              <li>어떤 질문 유형에서 답변이 길어지는가?</li>
+              <li>틀린 답변은 lineage 확인을 건너뛰었는가?</li>
+              <li>피드백이 나쁜 답변은 비용도 높은가?</li>
+              <li>rubric version을 바꾼 뒤 품질이 올랐는가?</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>채점용 view</h3>
+        <p>
+          `v_turns_for_scoring`은 한 줄에 질문, 답변, 비용, 피드백을 모아준다. evaluator나
+          Metabase 카드는 이 view부터 보면 된다.
+        </p>
+        <pre><code>select
+  audit_id,
+  status,
+  started_at,
+  question,
+  answer,
+  bq_gib,
+  bq_error,
+  feedback
+from analyst_audit.v_turns_for_scoring
+order by started_at desc
+limit 20;</code></pre>
+
+        <div class="note">
+          <span class="lbl">주의</span>
+          <p>
+            질문과 답변 원문은 제품/운영 맥락을 포함한다. RDS DB 권한은 내부 운영자와 봇 전용 user에만 열고,
+            anon/public key나 클라이언트 SDK로 이 테이블을 직접 노출하지 않는다.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel" role="tabpanel" id="p3" aria-labelledby="t3" hidden>
+        <h2>Feedback Loop</h2>
+        <p class="sub">피드백 루프는 “버튼 클릭”이 아니라, 실패 유형을 찾아 절차를 바꾸는 닫힌 회로다.</p>
+
+        <div class="loop">
+          <div class="loop-step data" data-step="01">
+            <div class="ttl">질문 수집</div>
+            <p>Slack 질문과 thread context를 `turns`에 저장한다. 실제 사용자의 언어가 testset 후보가 된다.</p>
+          </div>
+          <div class="loop-step" data-step="02">
+            <div class="ttl">실행 증거 수집</div>
+            <p>도구 trace, 비용, deny, 오류를 `trace_events`와 `turn_usage`로 분리해 남긴다.</p>
+          </div>
+          <div class="loop-step eval" data-step="03">
+            <div class="ttl">사람 피드백</div>
+            <p>답변 버튼이 `helpful`, `inaccurate`, `needs_more_investigation`으로 저장된다.</p>
+          </div>
+          <div class="loop-step guard" data-step="04">
+            <div class="ttl">실패 분류</div>
+            <p>틀린 숫자, 너무 긴 답변, 비용 초과, lineage 누락, caveat 누락처럼 원인을 태깅한다.</p>
+          </div>
+          <div class="loop-step eval" data-step="05">
+            <div class="ttl">절차 개선</div>
+            <p>프롬프트, analysis skill, mart, guardrail, testset 중 맞는 레이어를 바꾼 뒤 재채점한다.</p>
+          </div>
+        </div>
+
+        <h3>피드백을 어떻게 해석할까</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>피드백</th><th>일차 해석</th><th>바로 보면 좋은 컬럼</th><th>가능한 개선</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="tag t-ok">helpful</span></td>
+                <td>사용자 목적에는 맞았다.</td>
+                <td>`duration_ms`, `bq_gib`, `answer` 길이</td>
+                <td>좋은 답변 패턴을 prompt example이나 testset 기준으로 승격한다.</td>
+              </tr>
+              <tr>
+                <td><span class="tag t-bad">inaccurate</span></td>
+                <td>숫자, 기간, 정의, source 선택 중 하나가 틀렸을 가능성이 높다.</td>
+                <td>`trace_events`, `permission_denials`, 사용 SQL path</td>
+                <td>lineage 확인, raw/mart reconcile, metric definition을 testset에 추가한다.</td>
+              </tr>
+              <tr>
+                <td><span class="tag t-guard">needs_more_investigation</span></td>
+                <td>결론은 유용하지만 근거가 얕거나 caveat가 부족했다.</td>
+                <td>`answer`, `trace_line_count`, `bq_jobs`</td>
+                <td>답변에 필요한 최소 caveat와 추가 분석 trigger를 조정한다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="query">
+          <div>
+            <h3>품질 이슈 찾기</h3>
+            <pre><code>select
+  f.feedback_type,
+  count(*) as turns,
+  avg(t.duration_ms) / 1000 as avg_seconds,
+  avg(u.bq_gib) as avg_bq_gib
+from analyst_audit.feedback f
+join analyst_audit.turns t using (audit_id)
+left join analyst_audit.turn_usage u using (audit_id)
+group by 1
+order by turns desc;</code></pre>
+          </div>
+          <div>
+            <h3>비용 큰 질문 보기</h3>
+            <pre><code>select
+  t.started_at,
+  t.status,
+  left(t.question, 120) as question,
+  u.bq_gib,
+  u.bq_jobs,
+  u.bq_error
+from analyst_audit.turns t
+join analyst_audit.turn_usage u using (audit_id)
+order by u.bq_gib desc nulls last
+limit 20;</code></pre>
+          </div>
+        </div>
+
+        <div class="note info">
+          <span class="lbl">강의 포인트</span>
+          <p>
+            피드백 루프는 모델을 바로 fine-tune하는 이야기가 아니다. 대부분의 개선은 prompt,
+            비용 guardrail, dbt mart, health check, 답변 후처리에서 먼저 일어난다.
+            테이블은 어떤 레이어를 고쳐야 하는지 알려주는 증거다.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel" role="tabpanel" id="p4" aria-labelledby="t4" hidden>
+        <h2>Guardrails</h2>
+        <p class="sub">분석 자동화 로그에는 민감 정보와 비용 정보가 섞인다. 그래서 저장 경계가 설계의 일부다.</p>
+
+        <div class="cards">
+          <div class="card">
+            <div class="cat">Credential boundary</div>
+            <div class="claim">Audit DB URL은 child env에서 제거한다.</div>
+            <p>Claude 세션은 `ANALYST_AUDIT_DATABASE_URL`을 볼 수 없다. DB write는 봇 프로세스가 담당한다.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Data boundary</div>
+            <div class="claim">JSONL은 fallback, Postgres는 질의용이다.</div>
+            <p>DB 장애가 있어도 Slack 답변은 막지 않고, 나중에 backfill로 테이블을 복구한다.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Cost boundary</div>
+            <div class="claim">Claude 환산 cost와 BigQuery 실제 스캔을 분리한다.</div>
+            <p>Claude CLI cost는 구독 사용량의 API 환산값이고, BigQuery GiB/USD가 실제 비용 축이다.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Slack boundary</div>
+            <div class="claim">Slack에는 운영 세부값을 숨긴다.</div>
+            <p>사용자 답변은 결론 중심으로 유지하고, dry-run bytes와 tool trace는 audit에만 남긴다.</p>
+          </div>
+        </div>
+
+        <h3>실패 모드별 저장 위치</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>실패 모드</th><th>Slack 표면</th><th>테이블 표면</th><th>운영 액션</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Claude timeout</td>
+                <td>명시적 실패 메시지</td>
+                <td>`turns.status = error`, `turns.error`</td>
+                <td>질문 유형, trace 마지막 단계, timeout 값을 본다.</td>
+              </tr>
+              <tr>
+                <td>도구 권한 거부</td>
+                <td>내부 권한 문자열은 숨김</td>
+                <td>`turn_usage.permission_denials`</td>
+                <td>allowlist가 너무 좁은지, 세션이 위험한 명령을 시도했는지 나눈다.</td>
+              </tr>
+              <tr>
+                <td>BigQuery 사용량 집계 실패</td>
+                <td>최종 답변에는 숨김</td>
+                <td>`turn_usage.bq_error`</td>
+                <td>계측용 service account와 `INFORMATION_SCHEMA.JOBS` 권한을 확인한다.</td>
+              </tr>
+              <tr>
+                <td>Postgres write 실패</td>
+                <td>답변은 계속 전달</td>
+                <td>JSONL에는 남고 프로세스 로그에 경고</td>
+                <td>스키마, URL, 네트워크, DB 권한 확인 후 backfill한다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note bad">
+          <span class="lbl">하지 말 것</span>
+          <p>
+            RDS를 연결한다고 해서 owner key나 `.env` 전체를 컨테이너에 더 마운트하지 않는다.
+            이 봇의 격리 경계는 좁은 Docker mount 목록이다. 마운트를 늘리면 Read 도구 위험이 다시 커진다.
+          </p>
+        </div>
+
+        <h3>운영 체크리스트</h3>
+        <ol>
+          <li>별도 audit DB에서 `scripts/analyst_audit_schema.sql` 실행.</li>
+          <li>`.env`에 `ANALYST_AUDIT_DATABASE_URL`과 `ANALYST_AUDIT_SCHEMA` 추가.</li>
+          <li>`docker compose build analyst-bot`로 `psycopg` 포함 이미지 재빌드.</li>
+          <li>`docker compose run --rm analyst-bot --dry-run`에서 `audit_database = configured` 확인.</li>
+          <li>짧은 Slack canary 후 `analyst_audit.v_turns_for_scoring`에서 row 확인.</li>
+        </ol>
+
+        <div class="note ok">
+          <span class="lbl">마무리</span>
+          <p>
+            이 구조를 갖추면 다음 단계는 자동 채점이다. `docs/analysis_testset.md`의 문제를
+            `eval_cases`에 넣고, Slack 또는 CLI로 실행한 결과를 `eval_runs`, `eval_scores`에 연결하면
+            봇 개선이 “느낌”이 아니라 회귀 테스트가 된다.
+          </p>
+        </div>
+      </section>
+
+      <footer>
+        관련 구현: <code>scripts/slack_analyst_bot.py</code>,
+        <code>scripts/analyst_audit_schema.sql</code>,
+        <code>docs/analyst_bot_postgres_audit.md</code>
+      </footer>
+    </main>
+
+    <script>
+      const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+      const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+
+      function activate(tab) {
+        tabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
+        panels.forEach((panel) => {
+          panel.hidden = panel.id !== tab.getAttribute('aria-controls');
+        });
+        tab.focus();
+      }
+
+      tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => activate(tab));
+        tab.addEventListener('keydown', (event) => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          let next = index;
+          if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+          if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+          if (event.key === 'Home') next = 0;
+          if (event.key === 'End') next = tabs.length - 1;
+          activate(tabs[next]);
+        });
+      });
+    </script>
+  </body>
+</html>

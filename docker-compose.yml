@@ -58,6 +58,8 @@ services:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
@@ -172,6 +174,8 @@ services:
       METABASE_URL: ${ANALYST_METABASE_INTERNAL_URL:-http://metabase:3000}
       ANALYST_METABASE_PUBLIC_URL: ${ANALYST_METABASE_PUBLIC_URL:-http://localhost:3001}
       METABASE_API_KEY: ${METABASE_API_KEY:-}
+      ANALYST_AUDIT_DATABASE_URL: ${ANALYST_AUDIT_DATABASE_URL:-}
+      ANALYST_AUDIT_SCHEMA: ${ANALYST_AUDIT_SCHEMA:-analyst_audit}
       DBT_BIGQUERY_PROJECT: ${DBT_BIGQUERY_PROJECT:-bda-coai}
       DBT_BIGQUERY_DATASET: ${DBT_BIGQUERY_DATASET:-mart}
       DBT_BIGQUERY_LOCATION: ${DBT_BIGQUERY_LOCATION:-US}

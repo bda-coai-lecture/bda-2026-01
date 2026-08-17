@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OLAP/OLTP - 챗봇에서 ML serving까지</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f6f8;
+        --paper: #ffffff;
+        --ink: #172033;
+        --muted: #64748b;
+        --line: #d7dee8;
+        --soft: #eef3f7;
+        --slack: #6d28d9;
+        --session: #2563eb;
+        --data: #0f766e;
+        --eval: #7c3aed;
+        --guard: #b45309;
+        --bad: #b91c1c;
+        --ok: #15803d;
+      }
+
+      * { box-sizing: border-box; min-width: 0; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+        line-height: 1.56;
+        overflow-x: hidden;
+      }
+
+      .deck {
+        width: min(1180px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 22px 0 72px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding: 12px 0 0;
+        background: linear-gradient(var(--bg) 86%, rgb(244 246 248 / 0));
+      }
+
+      .brandrow {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .dot { width: 11px; height: 11px; border-radius: 999px; background: var(--data); }
+      .stamp { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+      h1 {
+        margin: 10px 0 6px;
+        font-size: 36px;
+        line-height: 1.18;
+        letter-spacing: 0;
+      }
+
+      .lede {
+        max-width: 84ch;
+        margin: 0 0 18px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .tablist {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 4px 0 10px;
+        scrollbar-width: none;
+      }
+
+      .tablist::-webkit-scrollbar { display: none; }
+
+      .tab {
+        appearance: none;
+        cursor: pointer;
+        white-space: nowrap;
+        background: var(--paper);
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 15px;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 720;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .tab:hover { color: var(--ink); }
+      .tab:focus-visible { outline: 2px solid var(--session); outline-offset: 2px; }
+      .tab .idx {
+        font-size: 11px;
+        color: #94a3b8;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+      .tab[aria-selected="true"] { background: var(--session); border-color: var(--session); color: #fff; }
+      .tab[aria-selected="true"] .idx { color: rgb(255 255 255 / 0.72); }
+
+      .panel[hidden] { display: none; }
+
+      section {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 20px 22px;
+        margin: 0 0 18px;
+      }
+
+      section > h2 {
+        margin: 0 0 4px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      section > h2 + .sub {
+        margin: 0 0 16px;
+        font-size: 19px;
+        font-weight: 730;
+        letter-spacing: 0;
+      }
+
+      h3 { margin: 22px 0 8px; font-size: 15px; }
+      h3:first-of-type { margin-top: 4px; }
+      p { margin: 0 0 12px; }
+      ul, ol { margin: 0 0 12px; padding-left: 20px; }
+      li { margin: 4px 0; }
+      p, li, td, .role, .d, .flow-node, .loop-step { overflow-wrap: anywhere; }
+
+      code {
+        background: var(--soft);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 1px 5px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.88em;
+      }
+
+      pre {
+        margin: 0 0 14px;
+        padding: 13px 15px;
+        overflow-x: auto;
+        background: var(--soft);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+      }
+
+      pre code {
+        padding: 0;
+        border: 0;
+        background: none;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .snapshot {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        margin: 0 0 18px;
+      }
+
+      .metric {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 15px;
+      }
+
+      .metric .k {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .metric .v {
+        margin-top: 6px;
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.24;
+      }
+
+      .metric .d {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin: 0 0 14px;
+      }
+
+      table { border-collapse: collapse; width: 100%; font-size: 14px; }
+      th, td { padding: 9px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+      thead th {
+        background: var(--soft);
+        font-size: 12px;
+        letter-spacing: 0;
+        color: var(--muted);
+        font-weight: 800;
+        white-space: nowrap;
+      }
+      tbody tr:last-child td { border-bottom: 0; }
+      td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+      .tag {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid;
+        white-space: nowrap;
+      }
+
+      .t-slack { color: var(--slack); border-color: #c7b6ea; background: #f7f1ff; }
+      .t-data { color: var(--data); border-color: #9fd5ca; background: #f2fbf8; }
+      .t-eval { color: var(--eval); border-color: #cab6f2; background: #f7f2ff; }
+      .t-guard { color: var(--guard); border-color: #e2c48d; background: #fbf3e6; }
+      .t-ok { color: var(--ok); border-color: #a7d3b4; background: #eef7f1; }
+      .t-bad { color: var(--bad); border-color: #e3aeae; background: #fbeded; }
+
+      .flow {
+        display: grid;
+        grid-template-columns: minmax(150px, 1fr) 36px minmax(170px, 1fr) 36px minmax(170px, 1fr) 36px minmax(170px, 1fr);
+        gap: 10px 8px;
+        align-items: stretch;
+        margin: 0 0 16px;
+      }
+
+      .flow-node {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--session);
+        border-radius: 10px;
+        padding: 13px 14px;
+      }
+
+      .flow-node.slack { border-top-color: var(--slack); background: #faf7ff; }
+      .flow-node.data { border-top-color: var(--data); background: #f4fbfa; }
+      .flow-node.guard { border-top-color: var(--guard); background: #fdfaf5; }
+      .flow-node.eval { border-top-color: var(--eval); background: #f7f2ff; }
+      .flow-node.bad { border-top-color: var(--bad); background: #fdf6f6; }
+      .flow-node .sys { font-size: 15px; font-weight: 800; margin-bottom: 4px; }
+      .flow-node .role { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+
+      .arrow {
+        display: grid;
+        place-items: center;
+        color: #94a3b8;
+        font-size: 20px;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .arrow small {
+        display: block;
+        font-size: 10px;
+        line-height: 1.25;
+        font-weight: 700;
+        color: var(--muted);
+      }
+
+      .lane {
+        display: grid;
+        grid-template-columns: 210px minmax(0, 1fr);
+        gap: 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin: 0 0 10px;
+        background: var(--paper);
+      }
+
+      .lane .name {
+        padding: 13px 14px;
+        border-right: 1px solid var(--line);
+        background: var(--soft);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .lane .body { padding: 12px 14px; }
+      .lane .body p:last-child { margin-bottom: 0; }
+
+      .loop {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(145px, 1fr));
+        gap: 9px;
+        margin: 0 0 16px;
+      }
+
+      .loop-step {
+        position: relative;
+        min-height: 155px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 14px 12px;
+        background: var(--paper);
+      }
+
+      .loop-step::before {
+        content: attr(data-step);
+        display: inline-grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        background: var(--session);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 800;
+        margin-bottom: 10px;
+      }
+
+      .loop-step.eval::before { background: var(--eval); }
+      .loop-step.data::before { background: var(--data); }
+      .loop-step.guard::before { background: var(--guard); }
+      .loop-step.ok::before { background: var(--ok); }
+      .loop-step.bad::before { background: var(--bad); }
+      .loop-step .ttl { font-weight: 800; margin-bottom: 6px; }
+      .loop-step p { color: var(--muted); font-size: 13px; margin: 0; }
+
+      .cards {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        margin: 0 0 14px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 13px 15px;
+        background: var(--paper);
+      }
+
+      .card .cat {
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .card .claim {
+        margin: 5px 0 6px;
+        font-size: 14.5px;
+        font-weight: 760;
+        line-height: 1.42;
+      }
+
+      .card p { margin: 0; color: var(--muted); font-size: 13px; }
+
+      .note {
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--guard);
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin: 0 0 14px;
+        background: #fdfaf5;
+      }
+
+      .note.ok { border-top-color: var(--ok); background: #f6fbf7; }
+      .note.info { border-top-color: var(--session); background: #f6f9fe; }
+      .note.bad { border-top-color: var(--bad); background: #fdf6f6; }
+      .note .lbl {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--guard);
+        font-size: 12px;
+        font-weight: 850;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+      .note.ok .lbl { color: var(--ok); }
+      .note.info .lbl { color: var(--session); }
+      .note.bad .lbl { color: var(--bad); }
+      .note p:last-child { margin-bottom: 0; }
+
+      .split {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 12px;
+        margin: 0 0 14px;
+      }
+
+      .col {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        background: var(--paper);
+      }
+
+      .col.soft { background: var(--soft); }
+      .col h4 {
+        margin: 0 0 6px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+      .col .cap { margin: 0 0 10px; font-size: 15px; font-weight: 780; }
+
+      .query {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .query pre { margin-bottom: 0; }
+
+      footer {
+        color: var(--muted);
+        font-size: 12px;
+        padding-top: 6px;
+      }
+
+      @media (max-width: 960px) {
+        .flow { grid-template-columns: 1fr; }
+        .arrow { min-height: 24px; transform: rotate(90deg); }
+        .arrow small { display: none; }
+        .loop { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+
+      @media (max-width: 680px) {
+        .deck { width: min(100% - 22px, 1180px); padding-top: 14px; }
+        section { padding: 18px 16px; border-radius: 12px; }
+        h1 { font-size: 29px; }
+        .brandrow { display: block; }
+        .stamp { margin-top: 2px; }
+        .lane { grid-template-columns: 1fr; }
+        .lane .name { border-right: 0; border-bottom: 1px solid var(--line); }
+        .loop, .query { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <div class="topbar">
+        <div class="brandrow">
+          <div class="brand"><span class="dot"></span><span>BDA 2 · Data Platform Lecture</span></div>
+          <div class="stamp">2026-08-09 · OLAP / OLTP</div>
+        </div>
+        <h1>OLAP/OLTP는 챗봇의 읽기와 쓰기에서 바로 보인다</h1>
+        <p class="lede">
+          분석 자동화 챗봇은 BigQuery와 dbt mart를 읽어 답을 만들고, 방금 생긴 질문과 답변,
+          비용, 피드백은 Postgres/RDS audit에 남긴다. 그 기록은 다시 warehouse로 올라가
+          품질, 비용, 실패 패턴을 보는 데이터가 된다. 같은 구조가 ML 서비스에서는 feature,
+          model, online serving, feedback loop로 이어진다.
+        </p>
+        <div class="tablist" role="tablist" aria-label="강의 섹션">
+          <button class="tab" role="tab" aria-selected="true" aria-controls="p0" id="t0"><span class="idx">00</span> 큰 그림</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="p1" id="t1"><span class="idx">01</span> OLTP / OLAP</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="p2" id="t2"><span class="idx">02</span> 챗봇 설계</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="p3" id="t3"><span class="idx">03</span> Warehouse</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="p4" id="t4"><span class="idx">04</span> Scheduler</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="p5" id="t5"><span class="idx">05</span> ML Serving</button>
+          <button class="tab" role="tab" aria-selected="false" aria-controls="p6" id="t6"><span class="idx">06</span> 정리</button>
+        </div>
+      </div>
+
+      <section class="panel" role="tabpanel" id="p0" aria-labelledby="t0">
+        <h2>Thesis</h2>
+        <p class="sub">서비스 이벤트는 row로 남고, 분석 질문은 warehouse에서 풀린다.</p>
+
+        <div class="snapshot">
+          <div class="metric">
+            <div class="k">Read Path</div>
+            <div class="v">BigQuery + dbt mart</div>
+            <div class="d">과거 이벤트, 지표, segment, trend를 읽음.</div>
+          </div>
+          <div class="metric">
+            <div class="k">Write Path</div>
+            <div class="v">Postgres / RDS audit</div>
+            <div class="d">질문, 답변, 상태, 비용, feedback을 row로 저장.</div>
+          </div>
+          <div class="metric">
+            <div class="k">Loop</div>
+            <div class="v">OLTP -> OLAP</div>
+            <div class="d">audit 기록이 CDC, batch, dbt를 거쳐 mart가 됨.</div>
+          </div>
+          <div class="metric">
+            <div class="k">Serving</div>
+            <div class="v">RDB / cache / online store</div>
+            <div class="d">API 요청 path에서는 key lookup과 낮은 지연이 필요.</div>
+          </div>
+        </div>
+
+        <div class="flow" aria-label="강의 전체 흐름">
+          <div class="flow-node slack">
+            <div class="sys">Slack 질문</div>
+            <div class="role">사용자가 묻는 분석 질문. thread와 session으로 이어짐.</div>
+          </div>
+          <div class="arrow">→<small>read</small></div>
+          <div class="flow-node data">
+            <div class="sys">OLAP warehouse</div>
+            <div class="role">GitHub Archive, fact, mart, metric을 읽어 답변 생성.</div>
+          </div>
+          <div class="arrow">→<small>write</small></div>
+          <div class="flow-node">
+            <div class="sys">OLTP audit</div>
+            <div class="role">turn, usage, trace, feedback을 안정적으로 저장.</div>
+          </div>
+          <div class="arrow">→<small>learn</small></div>
+          <div class="flow-node eval">
+            <div class="sys">개선 데이터</div>
+            <div class="role">품질, 비용, 실패 패턴, testset으로 다시 사용.</div>
+          </div>
+        </div>
+
+        <div class="note info">
+          <span class="lbl">강의 흐름</span>
+          <p>
+            먼저 챗봇의 read/write path를 잡고, OLTP/OLAP의 workload 차이를 본다.
+            다음으로 RDS CDC, event log, SaaS/API 데이터가 warehouse로 모이는 과정을 보고,
+            scheduler와 ML serving까지 이어서 정리한다.
+          </p>
+        </div>
+
+        <h3>BDA2에서 이미 쓴 기술을 다시 배치</h3>
+        <div class="cards">
+          <div class="card">
+            <div class="cat">Source / Warehouse</div>
+            <div class="claim">GitHub Archive, BigQuery, local parquet</div>
+            <p>큰 로그와 분석용 저장소. raw, fact, mart의 출발점.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Transform</div>
+            <div class="claim">Python scripts, dbt Core, dbt-bigquery</div>
+            <p>grain, 타입, metric contract를 반복 가능한 모델로 고정.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Operate</div>
+            <div class="claim">Airflow 3, Cosmos, Docker Compose</div>
+            <p>배치 실행 순서, 재시도, backfill, 실행 환경을 관리.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Consume / Serve</div>
+            <div class="claim">Metabase, Slack bot, MLflow, FAISS, FastAPI</div>
+            <p>사람이 보는 화면과 서비스가 읽는 API path로 연결.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" role="tabpanel" id="p1" aria-labelledby="t1" hidden>
+        <h2>Concept</h2>
+        <p class="sub">OLTP는 현재 상태와 작은 거래, OLAP은 누적 기록과 집계.</p>
+
+        <div class="split">
+          <div class="col soft">
+            <h4>OLTP</h4>
+            <p class="cap">서비스에서 지금 발생한 row 처리</p>
+            <ul>
+              <li>insert, update, delete가 자주 일어남.</li>
+              <li>동시 요청이 들어와도 상태가 안정적으로 유지되어야 함.</li>
+              <li>특정 key로 빠르게 찾는 index lookup이 자주 등장.</li>
+              <li>예: 질문 저장, 주문 생성, 피드백 클릭, 턴 상태 업데이트.</li>
+            </ul>
+          </div>
+          <div class="col">
+            <h4>OLAP</h4>
+            <p class="cap">많은 기록을 모아 분석 질문 처리</p>
+            <ul>
+              <li>기간, segment, 이벤트 타입별 집계가 많음.</li>
+              <li>많은 row를 scan하고 aggregate하는 처리량이 중요.</li>
+              <li>columnar, distributed, MPP 성격의 엔진이 자주 등장.</li>
+              <li>예: DAU 추세, repo segment 분석, cohort retention, 비용 리포트.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>같은 SQL, 다른 목표</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>구분</th><th>OLTP</th><th>OLAP</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>대표 질문</td><td>이 요청이 저장됐나?</td><td>지난 4주 지표가 왜 움직였나?</td></tr>
+              <tr><td>데이터 범위</td><td>몇 row, 특정 key</td><td>수백만에서 수십억 row</td></tr>
+              <tr><td>중요 기준</td><td>일관성, 동시성, 낮은 지연</td><td>scan 처리량, 집계, 비용</td></tr>
+              <tr><td>BDA2 예시</td><td><code>analyst_audit.turns</code></td><td><code>metrics_daily</code>, retention mart</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note info">
+          <span class="lbl">수업 메모</span>
+          <p>
+            제품명, query shape, SLA, grain을 같이 본다. Postgres에서도 작은 분석은 가능하고,
+            BigQuery에도 write API가 있다. 설계할 때는 주된 사용 패턴을 먼저 확인한다.
+          </p>
+        </div>
+
+        <h3>grain부터 확인</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>테이블</th><th>한 행의 의미</th><th>성격</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>fact_user_repo_activity</code></td>
+                <td><code>activity_date x user_id x repo_id x action</code></td>
+                <td><span class="tag t-data">분석 fact</span></td>
+              </tr>
+              <tr>
+                <td><code>analyst_audit.turns</code></td>
+                <td>Slack 분석 요청 1회</td>
+                <td><span class="tag t-ok">운영 기록</span></td>
+              </tr>
+              <tr>
+                <td><code>feedback</code></td>
+                <td>사용자 피드백 버튼 클릭 1회</td>
+                <td><span class="tag t-eval">서비스 이벤트</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" role="tabpanel" id="p2" aria-labelledby="t2" hidden>
+        <h2>Chatbot</h2>
+        <p class="sub">답변 생성 path와 audit write path를 나눠서 보기.</p>
+
+        <div class="flow" aria-label="분석 챗봇 read write 흐름">
+          <div class="flow-node slack">
+            <div class="sys">Slack thread</div>
+            <div class="role">질문, 후속 질문, feedback 버튼이 발생.</div>
+          </div>
+          <div class="arrow">→<small>session</small></div>
+          <div class="flow-node">
+            <div class="sys">Analyst bot</div>
+            <div class="role">thread key로 session을 이어가고, 분석 절차를 실행.</div>
+          </div>
+          <div class="arrow">→<small>read</small></div>
+          <div class="flow-node data">
+            <div class="sys">BigQuery / dbt mart</div>
+            <div class="role">GitHub Archive, fact, metrics mart를 읽어 답변 작성.</div>
+          </div>
+          <div class="arrow">→<small>write</small></div>
+          <div class="flow-node eval">
+            <div class="sys">Postgres audit</div>
+            <div class="role">질문, 답변, 비용, trace, feedback을 저장.</div>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="name">Read lane</div>
+          <div class="body">
+            <p>
+              챗봇 질문은 GitHub Archive raw, <code>fact_user_repo_activity</code>,
+              dbt <code>metrics_*</code> mart를 읽는다. DAU, event mix, retention,
+              repo trend처럼 많은 row를 묶어 답하는 질문이 많다.
+            </p>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="name">Write lane</div>
+          <div class="body">
+            <p>
+              봇이 방금 처리한 요청은 서비스 이벤트다. <code>turns</code>, <code>turn_usage</code>,
+              <code>trace_events</code>, <code>feedback</code>에 row 단위로 남긴다.
+            </p>
+          </div>
+        </div>
+
+        <div class="lane">
+          <div class="name">Feedback lane</div>
+          <div class="body">
+            <p>
+              audit row는 나중에 BigQuery로 올라가 <code>bot_quality_daily</code>,
+              <code>bot_cost_daily</code>, <code>bot_feedback_summary</code> 같은 mart가 된다.
+            </p>
+          </div>
+        </div>
+
+        <h3>audit 테이블 역할</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>테이블</th><th>grain</th><th>용도</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>threads</code></td><td>Slack thread</td><td>channel, thread_ts, session 연결</td></tr>
+              <tr><td><code>turns</code></td><td>분석 요청 1회</td><td>question, answer, status, error</td></tr>
+              <tr><td><code>turn_usage</code></td><td>분석 요청 1회</td><td>Claude 사용량, BigQuery job, 비용</td></tr>
+              <tr><td><code>trace_events</code></td><td>trace line</td><td>도구 사용 흐름과 final summary</td></tr>
+              <tr><td><code>feedback</code></td><td>버튼 클릭 1회</td><td>helpful, inaccurate, needs_more_investigation</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note ok">
+          <span class="lbl">설계 포인트</span>
+          <p>
+            <code>audit_id</code>가 여러 테이블을 묶는 키다. Slack에는 답을 간결하게 남기고,
+            재현에 필요한 실행 증거는 audit 테이블에 남긴다.
+          </p>
+        </div>
+
+        <h3>설계를 섞을 때 자주 보이는 증상</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>구조</th><th>증상</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>운영 DB를 BI가 계속 scan</td><td>서비스 요청과 분석 쿼리가 같은 자원을 사용.</td></tr>
+              <tr><td>warehouse를 primary app DB처럼 사용</td><td>짧은 트랜잭션, 상태 업데이트, key lookup 기대치와 어긋남.</td></tr>
+              <tr><td>Slack 답변에 모든 trace 노출</td><td>사용자는 읽기 어렵고, 운영자는 구조화된 재현 정보를 잃음.</td></tr>
+              <tr><td>API가 매 요청마다 BigQuery scan</td><td>분석에는 빠른 1초도 서비스 응답에는 길 수 있음.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" role="tabpanel" id="p3" aria-labelledby="t3" hidden>
+        <h2>Warehouse</h2>
+        <p class="sub">OLTP 기록, event log, SaaS/API 데이터가 warehouse에서 만난다.</p>
+
+        <div class="cards">
+          <div class="card">
+            <div class="cat">RDS CDC</div>
+            <div class="claim">DB에 commit된 row 변화 복제</div>
+            <p><code>users</code>, <code>orders</code>, <code>turns</code>처럼 운영 DB의 상태 변화를 transaction log에서 읽음.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Event Log</div>
+            <div class="claim">앱이 직접 발행한 도메인 사건</div>
+            <p>impression, click, search, prediction request처럼 append-only stream으로 남기는 행동 기록.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Batch Extract</div>
+            <div class="claim">DB, SaaS API, file을 일정 주기로 적재</div>
+            <p>freshness가 덜 빡빡한 광고비, CRM, 결제, CS, 외부 API 데이터에 자주 사용.</p>
+          </div>
+        </div>
+
+        <h3>warehouse에는 제품 로그만 모이지 않음</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>원천</th><th>예시</th><th>답할 수 있는 질문</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="tag t-data">Product</span></td><td>가입, 로그인, 클릭, 주문, 추천 요청</td><td>DAU, retention, conversion, funnel</td></tr>
+              <tr><td><span class="tag t-guard">Marketing</span></td><td>광고비, UTM, 캠페인, push/email 결과</td><td>CAC, ROAS, 유입 채널 품질</td></tr>
+              <tr><td><span class="tag t-eval">Business ops</span></td><td>CRM lead, 영업 pipeline, 결제, 환불, CS 티켓</td><td>매출, churn, 고객 경험 이슈</td></tr>
+              <tr><td><span class="tag t-slack">External</span></td><td>GitHub Archive, 환율, 공휴일, 시장 데이터</td><td>외부 이벤트와 지표 변동 연결</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="loop">
+          <div class="loop-step data" data-step="01">
+            <div class="ttl">Raw / Bronze</div>
+            <p>원천 payload, CDC row, load metadata를 보존.</p>
+          </div>
+          <div class="loop-step" data-step="02">
+            <div class="ttl">Staging</div>
+            <p>타입, timezone, key, 중복, 삭제 표시 정리.</p>
+          </div>
+          <div class="loop-step ok" data-step="03">
+            <div class="ttl">Fact</div>
+            <p>한 행의 의미와 grain을 고정.</p>
+          </div>
+          <div class="loop-step guard" data-step="04">
+            <div class="ttl">Mart</div>
+            <p>팀이 반복해서 보는 지표와 dashboard용 테이블.</p>
+          </div>
+          <div class="loop-step eval" data-step="05">
+            <div class="ttl">Feature / Label</div>
+            <p>ML 학습, 평가, 추천 후보 생성에 재사용.</p>
+          </div>
+        </div>
+
+        <div class="query">
+          <div>
+            <h3>챗봇 품질 mart 예시</h3>
+            <pre><code>select
+  date(started_at) as activity_date,
+  status,
+  count(*) as turns,
+  avg(duration_ms) / 1000 as avg_seconds
+from analyst_audit.turns
+group by 1, 2;</code></pre>
+          </div>
+          <div>
+            <h3>마케팅 join 예시</h3>
+            <pre><code>select
+  campaign,
+  sum(ad_spend) as spend,
+  count(distinct user_id) as retained_users
+from mart_acquisition_daily
+group by 1;</code></pre>
+          </div>
+        </div>
+
+        <div class="note info">
+          <span class="lbl">구분 포인트</span>
+          <p>
+            CDC는 DB 상태 변화 복제, event log는 제품 행동 기록. 둘 다 warehouse로 오지만
+            event time, idempotency key, delete/update 처리 방식이 다르다.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel" role="tabpanel" id="p4" aria-labelledby="t4" hidden>
+        <h2>Scheduler</h2>
+        <p class="sub">batch는 시간표와 의존성, 재시도, backfill까지 운영한다.</p>
+
+        <div class="flow" aria-label="scheduler dag 흐름">
+          <div class="flow-node data">
+            <div class="sys">Raw ingest</div>
+            <div class="role">원천 데이터 도착, partition 준비 상태 확인.</div>
+          </div>
+          <div class="arrow">→<small>clean</small></div>
+          <div class="flow-node">
+            <div class="sys">Staging</div>
+            <div class="role">타입, key, timezone, dedupe 처리.</div>
+          </div>
+          <div class="arrow">→<small>build</small></div>
+          <div class="flow-node guard">
+            <div class="sys">dbt build / test</div>
+            <div class="role">fact, mart, test, docs를 같은 계약으로 실행.</div>
+          </div>
+          <div class="arrow">→<small>notify</small></div>
+          <div class="flow-node eval">
+            <div class="sys">Dashboard / Slack</div>
+            <div class="role">Metabase, Slack alert, bot이 새 mart를 소비.</div>
+          </div>
+        </div>
+
+        <div class="cards">
+          <div class="card">
+            <div class="cat">Schedule</div>
+            <div class="claim">언제 실행할지</div>
+            <p>매일 07:00 KST, 매시간, 특정 데이터 도착 후 실행.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Dependency</div>
+            <div class="claim">어떤 순서로 실행할지</div>
+            <p>raw 적재 후 staging, staging 후 dbt test, test 후 mart publish.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Retry / Backfill</div>
+            <div class="claim">실패와 과거 재계산</div>
+            <p>일시 오류 재시도, 누락 partition 재계산, 로직 수정 후 과거 구간 재실행.</p>
+          </div>
+          <div class="card">
+            <div class="cat">Guardrail</div>
+            <div class="claim">freshness, 비용, 알림</div>
+            <p>데이터 준비 시각, 동시성, pool, 비용 상한, 실패 알림 관리.</p>
+          </div>
+        </div>
+
+        <h3>BDA2 DAG 맥락</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>DAG</th><th>역할</th><th>수업에서 연결할 개념</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>gharchive_repo_metadata_refresh</code></td><td>repo metadata 갱신</td><td>source freshness와 재사용 가능한 dimension</td></tr>
+              <tr><td><code>gharchive_platform_metrics</code></td><td>platform metric 계산</td><td>raw/fact에서 반복 지표 생성</td></tr>
+              <tr><td><code>gharchive_dbt_metrics</code></td><td>dbt mart 실행</td><td>metric contract와 test 운영</td></tr>
+              <tr><td><code>gharchive_recsys_features</code></td><td>추천 feature 생성</td><td>warehouse 산출물이 ML로 넘어가는 지점</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="lane">
+          <div class="name">Docker / headless</div>
+          <div class="body">
+            <p>
+              노트북에서 한 번 도는 코드와 계속 켜져 있는 서비스는 운영 조건이 다르다.
+              Docker Compose는 Slack bot, Airflow, Metabase, API를 같은 실행 계약으로 묶고,
+              volume은 state와 log를 보존한다. env는 credential과 endpoint를 주입한다.
+            </p>
+          </div>
+        </div>
+
+        <div class="note">
+          <span class="lbl">수업 메모</span>
+          <p>
+            실제 계산은 BigQuery, dbt, Python job, API client, worker가 수행한다.
+            scheduler는 실행 시점, 순서, 상태, 재시도, 알림을 관리한다.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel" role="tabpanel" id="p5" aria-labelledby="t5" hidden>
+        <h2>ML Serving</h2>
+        <p class="sub">offline에서 만든 feature가 online 응답 시간과 만나는 구간.</p>
+
+        <div class="snapshot">
+          <div class="metric">
+            <div class="k">Offline</div>
+            <div class="v">warehouse / batch</div>
+            <div class="d">긴 기간 로그, label, feature, 모델 학습.</div>
+          </div>
+          <div class="metric">
+            <div class="k">Nearline</div>
+            <div class="v">minutes freshness</div>
+            <div class="d">최근 행동을 feature와 후보에 반영.</div>
+          </div>
+          <div class="metric">
+            <div class="k">Online</div>
+            <div class="v">ms lookup</div>
+            <div class="d">RDB, Redis, FAISS, online feature store.</div>
+          </div>
+          <div class="metric">
+            <div class="k">Feedback</div>
+            <div class="v">event log</div>
+            <div class="d">노출, 클릭, 전환, 오류가 다음 학습 데이터가 됨.</div>
+          </div>
+        </div>
+
+        <div class="loop">
+          <div class="loop-step data" data-step="01">
+            <div class="ttl">OLAP 분석</div>
+            <p>BigQuery/StarRocks에서 과거 활동, repo profile, user profile 집계.</p>
+          </div>
+          <div class="loop-step guard" data-step="02">
+            <div class="ttl">Feature / 후보</div>
+            <p>batch job이 feature table과 사용자별 top-K 후보 생성.</p>
+          </div>
+          <div class="loop-step eval" data-step="03">
+            <div class="ttl">MLflow</div>
+            <p>split, feature cache, model config, metric, artifact 기록.</p>
+          </div>
+          <div class="loop-step ok" data-step="04">
+            <div class="ttl">Publish</div>
+            <p>RDB, Redis, FAISS index, API bundle, online store로 배포.</p>
+          </div>
+          <div class="loop-step data" data-step="05">
+            <div class="ttl">Service feedback</div>
+            <p>API 응답 후 노출, 클릭, 전환 로그를 다시 적재.</p>
+          </div>
+        </div>
+
+        <div class="split">
+          <div class="col soft">
+            <h4>Offline feature store</h4>
+            <p class="cap">학습과 backtest용</p>
+            <ul>
+              <li>긴 기간의 feature history 보관.</li>
+              <li>label, split, point-in-time join 관리.</li>
+              <li>재현 가능한 학습 데이터 생성.</li>
+            </ul>
+          </div>
+          <div class="col">
+            <h4>Online feature store</h4>
+            <p class="cap">사용자 요청 path용</p>
+            <ul>
+              <li>user_id, item_id 같은 key로 낮은 지연 조회.</li>
+              <li>API latency와 cache hit를 같이 관리.</li>
+              <li>offline feature 정의와 freshness 계약을 맞춤.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>추천 서비스 예시</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>단계</th><th>저장소/도구</th><th>역할</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>후보 생성</td><td>BigQuery, StarRocks, parquet mart</td><td>최근 활동과 repo/user profile 집계</td></tr>
+              <tr><td>실험 추적</td><td>MLflow</td><td>metric, config, artifact, feature snapshot 기록</td></tr>
+              <tr><td>검색/조회</td><td>FAISS, RDB, Redis</td><td>top-K 후보와 feature를 key로 빠르게 조회</td></tr>
+              <tr><td>API</td><td>FastAPI, Streamlit, Vercel</td><td>사용자 요청을 받아 추천 결과 표시</td></tr>
+              <tr><td>피드백</td><td>event log, OLTP audit</td><td>노출, 클릭, 전환, 오류를 다음 학습 데이터로 적재</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note info">
+          <span class="lbl">latency 감각</span>
+          <p>
+            StarRocks와 BigQuery의 1초 안팎 분석 응답은 분석가에게 충분히 빠른 편이다.
+            사용자 요청마다 추천 후보를 보여주는 API path에서는 수십 ms 단위의 lookup 계약을 따로 잡는다.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel" role="tabpanel" id="p6" aria-labelledby="t6" hidden>
+        <h2>Practice</h2>
+        <p class="sub">요구사항을 보고 저장소와 실행 위치를 고르는 연습.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>요구사항</th><th>분류</th><th>이유</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Slack 질문 저장</td><td><span class="tag t-ok">OLTP</span></td><td>방금 발생한 row 단위 이벤트</td></tr>
+              <tr><td>같은 스레드의 이전 session_id 찾기</td><td><span class="tag t-ok">OLTP</span></td><td>짧은 key lookup</td></tr>
+              <tr><td>30일 BigQuery 비용 추이</td><td><span class="tag t-data">OLAP</span></td><td>기간별 사용량 집계</td></tr>
+              <tr><td>feedback 유형별 부정확 답변 비율</td><td><span class="tag t-data">OLAP</span></td><td>누적 feedback 집계와 segment 분석</td></tr>
+              <tr><td>RDS users 변경분을 BigQuery에 복제</td><td><span class="tag t-guard">CDC</span></td><td>운영 DB row 변화가 warehouse로 이동</td></tr>
+              <tr><td>Google Ads 비용을 매일 warehouse에 적재</td><td><span class="tag t-guard">SaaS/API</span></td><td>제품 로그와 CAC, ROAS join</td></tr>
+              <tr><td>매일 07:00 KST에 dbt mart 갱신</td><td><span class="tag t-eval">Scheduler</span></td><td>시간표와 dependency 고정</td></tr>
+              <tr><td>추천 API에서 user_id로 top-K 후보 조회</td><td><span class="tag t-slack">Online serving</span></td><td>요청 path에서 낮은 지연 lookup</td></tr>
+              <tr><td>모델 학습용 90일 feature 생성</td><td><span class="tag t-data">OLAP</span></td><td>긴 기간 로그를 집계해 training dataset 생성</td></tr>
+              <tr><td>feature drift 리포트</td><td><span class="tag t-data">OLAP</span></td><td>누적 feature 분포를 기간별 비교</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note ok">
+          <span class="lbl">30초 답변</span>
+          <p>
+            서비스에서 생기는 질문, 답변, 피드백은 row 단위 운영 기록으로 남김.
+            여러 기록을 모아 추세와 품질을 볼 때는 warehouse와 mart를 읽음.
+            ML 서비스에서는 학습과 feature 집계는 offline에서 만들고, API 요청 path에는
+            RDB, cache, online feature store를 둠.
+          </p>
+        </div>
+
+        <div class="cards">
+          <div class="card">
+            <div class="cat">질문 1</div>
+            <div class="claim">이 데이터는 방금 발생한 서비스 이벤트인가?</div>
+            <p>그렇다면 OLTP, audit, event log 쪽에서 시작.</p>
+          </div>
+          <div class="card">
+            <div class="cat">질문 2</div>
+            <div class="claim">많은 기간과 segment를 묶어 봐야 하나?</div>
+            <p>그렇다면 OLAP, warehouse, mart 쪽으로 이동.</p>
+          </div>
+          <div class="card">
+            <div class="cat">질문 3</div>
+            <div class="claim">매일 같은 순서로 반복되어야 하나?</div>
+            <p>그렇다면 Airflow 같은 scheduler와 운영 가드레일 필요.</p>
+          </div>
+          <div class="card">
+            <div class="cat">질문 4</div>
+            <div class="claim">사용자가 기다리는 API path인가?</div>
+            <p>그렇다면 serving store, cache, index lookup 계약을 잡음.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        관련 자료: <code>docs/analyst_bot_feedback_loop_lecture.html</code>,
+        <code>docs/week9_analytics_engineering.html</code>,
+        <code>docs/data_platform_three_shapes.html</code>,
+        <code>docs/olap_oltp_chatbot_lecture_design.md</code>
+      </footer>
+    </main>
+
+    <script>
+      const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+      const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+
+      function activate(tab) {
+        tabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
+        panels.forEach((panel) => {
+          panel.hidden = panel.id !== tab.getAttribute('aria-controls');
+        });
+        tab.focus();
+      }
+
+      tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => activate(tab));
+        tab.addEventListener('keydown', (event) => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          let next = index;
+          if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+          if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+          if (event.key === 'Home') next = 0;
+          if (event.key === 'End') next = tabs.length - 1;
+          activate(tabs[next]);
+        });
+      });
+    </script>
+  </body>
+</html>

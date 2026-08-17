@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
+from urllib.parse import urlsplit
 
 # This is a long-running daemon (Socket Mode connection stays open for days), so we
 # use `logging` instead of bare print(): timestamps, levels and thread names matter
@@ -45,11 +46,7 @@ DEFAULT_GCP_KEY = "secrets/analyst-bq-key.json"
 #     --key-file=secrets/analyst-bq-key.json
 ANALYST_GCLOUD_CONFIG = "secrets/gcloud-analyst"
 ANALYST_GCLOUD_CONFIG_ENV = "ANALYST_GCLOUD_CONFIG_DIR"
-# Operator key. Used ONLY by the bot process for privileged accounting
-# (INFORMATION_SCHEMA.JOBS), never injected into the session. See bq_usage_since.
-DEFAULT_OPERATOR_KEY = "gcp-key.json"
 BQ_PROJECT = "bda-coai"
-ANALYST_SA_PREFIX = "bda-analyst-ro@"
 
 # --- Slack credentials ------------------------------------------------------
 # Slack credentials are intentionally read from analyst-specific environment
@@ -64,6 +61,9 @@ BOT_TOKEN_ENV = "SLACK_ANALYST_BOT_TOKEN"
 APP_TOKEN_ENV = "SLACK_ANALYST_APP_TOKEN"
 METABASE_OPEN_ACTION_ID = "open_metabase_result"
 METABASE_RUNTIME_CONFIG_FILENAME = "metabase-credentials-mcp.json"
+AUDIT_DATABASE_URL_ENV = "ANALYST_AUDIT_DATABASE_URL"
+AUDIT_SCHEMA_ENV = "ANALYST_AUDIT_SCHEMA"
+DEFAULT_AUDIT_SCHEMA = "analyst_audit"
 
 
 def bot_token() -> str | None:
@@ -703,9 +703,10 @@ SECRET_REDACTIONS = [
     re.compile(r"\bsk-ant-[A-Za-z0-9_-]{10,}"),
     re.compile(r"\bmb_[A-Za-z0-9_-]{8,}"),
     re.compile(
-        r"\b(?:METABASE_API_KEY|ANTHROPIC_API_KEY|ANTHROPIC_AUTH_TOKEN|CLAUDE_CODE_OAUTH_TOKEN)\s*[:=]\s*['\"]?[^\s'\"`]+",
+        r"\b(?:METABASE_API_KEY|ANTHROPIC_API_KEY|ANTHROPIC_AUTH_TOKEN|CLAUDE_CODE_OAUTH_TOKEN|ANALYST_AUDIT_DATABASE_URL)\s*[:=]\s*['\"]?[^\s'\"`]+",
         re.I,
     ),
+    re.compile(r"\bpostgres(?:ql)?://[^:\s/@]+:[^@\s]+@", re.I),
     re.compile(r"(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"AIza[0-9A-Za-z_-]{20,}"),
 ]
@@ -728,6 +729,39 @@ def redact_sensitive_value(value):
     if isinstance(value, dict):
         return {key: redact_sensitive_value(item) for key, item in value.items()}
     return value
+
+
+SCHEMA_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+AUDIT_DB_TABLES = ("threads", "turns", "turn_usage", "trace_events", "feedback")
+
+
+def validate_audit_schema(schema: str) -> str:
+    name = (schema or DEFAULT_AUDIT_SCHEMA).strip()
+    if not SCHEMA_NAME_RE.match(name):
+        raise ValueError(
+            f"invalid audit schema name {schema!r}; use letters, digits, and underscores only"
+        )
+    return name
+
+
+def describe_database_url(url: str) -> str:
+    if not url:
+        return "disabled"
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return "<invalid url>"
+    host = parsed.hostname or "<unknown-host>"
+    port = f":{parsed.port}" if parsed.port else ""
+    db = parsed.path.lstrip("/") or "<unknown-db>"
+    user = parsed.username or "<unknown-user>"
+    return f"{parsed.scheme or 'postgres'}://{user}@{host}{port}/{db}"
+
+
+def trace_event_type(line: str) -> str:
+    token = (line or "").strip().split(maxsplit=1)[0] if line else "trace"
+    token = token.rstrip("[]:").lower()
+    return token or "trace"
 
 
 def slack_progress_line(raw_line: str) -> str | None:
@@ -892,6 +926,10 @@ def child_env(cfg: "Config") -> dict[str, str]:
     env.pop("SLACK_BOT_TOKEN", None)
     env.pop(BOT_TOKEN_ENV, None)
     env.pop(APP_TOKEN_ENV, None)
+    # Audit DB credentials belong to the bot process only. The spawned analysis
+    # session should be able to read data through BigQuery, not inspect or mutate
+    # the Postgres/RDS audit store.
+    env.pop(AUDIT_DATABASE_URL_ENV, None)
     # Metabase credentials are passed to the MCP server through its dedicated MCP
     # config, not as generic Claude child env. If MCP is disabled, strip a parent
     # shell key so a non-Metabase turn cannot leak it via stderr/final text.
@@ -922,6 +960,8 @@ class Config:
     metabase_public_url: str = ""
     metabase_api_key: str = ""
     metabase_collection_name: str = "BDA 데이터 플랫폼"
+    audit_database_url: str = ""
+    audit_schema: str = DEFAULT_AUDIT_SCHEMA
     # Overridable only so --self-test can exercise the spawn/stream path without
     # dragging the whole analysis skill into a trivial prompt.
     append_system_prompt: str = APPEND_SYSTEM_PROMPT
@@ -1300,6 +1340,7 @@ def _handle_event(event: dict, result: TurnResult, emit, on_text) -> None:
 # --- Session bookkeeping ----------------------------------------------------
 @dataclass
 class ScanUsage:
+    bytes_billed: int = 0
     gib: float = 0.0
     usd: float = 0.0
     jobs: int = 0
@@ -1315,19 +1356,18 @@ BQ_USD_PER_TIB = 6.25
 def bq_usage_since(cfg: "Config", since: datetime) -> ScanUsage:
     """Bytes actually billed to the analyst service account since `since`.
 
-    Runs in the BOT process with the operator key, never in the session: reading
-    INFORMATION_SCHEMA needs bigquery.jobs.listAll, and granting that to the
-    read-only account would widen exactly the surface we spent the day narrowing.
-    Accounting is a privileged operation and belongs on the privileged side.
+    Runs in the bot process with the same read-only analyst key that the session
+    uses. `JOBS_BY_USER` only exposes the authenticated principal's own jobs, so
+    the service account only needs `bigquery.jobs.list` rather than `jobs.listAll`.
 
     Never raises -- a turn must still report its answer if billing lookup fails.
     """
     try:
-        key = Path(cfg.repo_dir) / DEFAULT_OPERATOR_KEY
+        key = gcp_key_path(cfg.repo_dir)
         if not key.is_file():
             return ScanUsage(
                 error=(
-                    "BigQuery usage lookup disabled: operator key is not mounted "
+                    "BigQuery usage lookup disabled: analyst key is not mounted "
                     f"at {key}"
                 )
             )
@@ -1344,27 +1384,25 @@ def bq_usage_since(cfg: "Config", since: datetime) -> ScanUsage:
             select
               count(*) as jobs,
               ifnull(sum(total_bytes_billed), 0) as bytes_billed
-            from `region-us`.INFORMATION_SCHEMA.JOBS
+            from `region-us`.INFORMATION_SCHEMA.JOBS_BY_USER
             where creation_time >= @since
               and job_type = 'QUERY'
-              and user_email like @account
             """,
             job_config=bigquery.QueryJobConfig(
                 query_parameters=[
                     bigquery.ScalarQueryParameter("since", "TIMESTAMP", since),
-                    bigquery.ScalarQueryParameter(
-                        "account", "STRING", f"{ANALYST_SA_PREFIX}%"
-                    ),
                 ]
             ),
         )
         row = next(iter(job.result()), None)
         if row is None:
             return ScanUsage()
-        gib = (row.bytes_billed or 0) / 1024**3
+        bytes_billed = row.bytes_billed or 0
+        gib = bytes_billed / 1024**3
         return ScanUsage(
+            bytes_billed=bytes_billed,
             gib=gib,
-            usd=(row.bytes_billed or 0) / 1024**4 * BQ_USD_PER_TIB,
+            usd=bytes_billed / 1024**4 * BQ_USD_PER_TIB,
             jobs=row.jobs or 0,
         )
     except Exception as exc:  # noqa: BLE001 - accounting must never kill a turn
@@ -1510,6 +1548,219 @@ def safe_state_key(*parts: str) -> str:
     return "_".join(parts).replace("/", "_").replace(":", "_").replace(".", "_")
 
 
+class PostgresAuditSink:
+    """Optional Postgres/RDS audit sink.
+
+    The sink opens short-lived connections instead of keeping one forever: Slack turns
+    are sparse, and reconnecting cleanly is simpler than nursing a stale pooler socket.
+    """
+
+    def __init__(self, database_url: str, schema: str) -> None:
+        self.database_url = database_url
+        self.schema = validate_audit_schema(schema)
+        self._lock = threading.Lock()
+
+    def _connect(self):
+        import psycopg
+
+        return psycopg.connect(self.database_url, connect_timeout=5)
+
+    def _table(self, name: str):
+        from psycopg import sql
+
+        return sql.Identifier(self.schema, name)
+
+    def _upsert_thread(self, cur, record: dict) -> int:
+        from psycopg import sql
+
+        cur.execute(
+            sql.SQL(
+                """
+                insert into {} (
+                  team_id, channel_id, thread_ts, session_id, first_seen_at, last_seen_at
+                )
+                values (%s, %s, %s, %s, %s, %s)
+                on conflict (team_id, channel_id, thread_ts)
+                do update set
+                  session_id = excluded.session_id,
+                  last_seen_at = excluded.last_seen_at
+                returning thread_id
+                """
+            ).format(self._table("threads")),
+            (
+                record.get("team"),
+                record.get("channel"),
+                record.get("thread_ts"),
+                record.get("session_id"),
+                record.get("created_at"),
+                record.get("completed_at") or record.get("created_at"),
+            ),
+        )
+        row = cur.fetchone()
+        return int(row[0])
+
+    def record_turn(self, record: dict) -> None:
+        from psycopg import sql
+        from psycopg.types.json import Jsonb
+
+        payload = redact_sensitive_value(dict(record))
+        with self._lock, self._connect() as conn, conn.cursor() as cur:
+            thread_id = self._upsert_thread(cur, payload)
+            cur.execute(
+                sql.SQL(
+                    """
+                    insert into {} (
+                      audit_id, thread_id, status, requester, question, answer,
+                      slack_message_ts, started_at, completed_at, duration_ms,
+                      resume, session_id, error, raw_record
+                    )
+                    values (
+                      %s, %s, %s, %s, %s, %s,
+                      %s, %s, %s, %s,
+                      %s, %s, %s, %s
+                    )
+                    on conflict (audit_id)
+                    do update set
+                      thread_id = excluded.thread_id,
+                      status = excluded.status,
+                      requester = excluded.requester,
+                      question = excluded.question,
+                      answer = excluded.answer,
+                      slack_message_ts = excluded.slack_message_ts,
+                      completed_at = excluded.completed_at,
+                      duration_ms = excluded.duration_ms,
+                      resume = excluded.resume,
+                      session_id = excluded.session_id,
+                      error = excluded.error,
+                      raw_record = excluded.raw_record
+                    """
+                ).format(self._table("turns")),
+                (
+                    payload.get("audit_id"),
+                    thread_id,
+                    payload.get("status"),
+                    payload.get("requester"),
+                    payload.get("question"),
+                    payload.get("answer"),
+                    payload.get("answer_message_ts"),
+                    payload.get("created_at"),
+                    payload.get("completed_at"),
+                    payload.get("duration_ms"),
+                    bool(payload.get("resume")),
+                    payload.get("session_id"),
+                    payload.get("error"),
+                    Jsonb(payload),
+                ),
+            )
+            cur.execute(
+                sql.SQL(
+                    """
+                    insert into {} (
+                      audit_id, claude_turns, claude_duration_ms,
+                      claude_cost_usd_equivalent, bq_jobs, bq_billed_bytes,
+                      bq_gib, bq_usd, bq_error, permission_denials, bad_json_lines
+                    )
+                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    on conflict (audit_id)
+                    do update set
+                      claude_turns = excluded.claude_turns,
+                      claude_duration_ms = excluded.claude_duration_ms,
+                      claude_cost_usd_equivalent = excluded.claude_cost_usd_equivalent,
+                      bq_jobs = excluded.bq_jobs,
+                      bq_billed_bytes = excluded.bq_billed_bytes,
+                      bq_gib = excluded.bq_gib,
+                      bq_usd = excluded.bq_usd,
+                      bq_error = excluded.bq_error,
+                      permission_denials = excluded.permission_denials,
+                      bad_json_lines = excluded.bad_json_lines
+                    """
+                ).format(self._table("turn_usage")),
+                (
+                    payload.get("audit_id"),
+                    payload.get("claude_turns"),
+                    payload.get("claude_duration_ms"),
+                    payload.get("claude_cost_usd_equivalent"),
+                    payload.get("bq_jobs"),
+                    payload.get("bq_billed_bytes"),
+                    payload.get("bq_gib"),
+                    payload.get("bq_usd"),
+                    payload.get("bq_error"),
+                    Jsonb(payload.get("permission_denials") or []),
+                    payload.get("bad_json_lines") or 0,
+                ),
+            )
+
+    def record_trace(self, trace: list[str], summary: dict) -> None:
+        from psycopg import sql
+        from psycopg.types.json import Jsonb
+
+        payload = redact_sensitive_value(dict(summary))
+        audit_id = payload.get("audit_id")
+        if not audit_id:
+            return
+        rows = [
+            (
+                audit_id,
+                seq,
+                datetime.now(timezone.utc).isoformat(),
+                trace_event_type(line),
+                redact_sensitive_text(line),
+                Jsonb({"raw_line": redact_sensitive_text(line)}),
+            )
+            for seq, line in enumerate(trace, start=1)
+        ]
+        rows.append(
+            (
+                audit_id,
+                len(rows) + 1,
+                datetime.now(timezone.utc).isoformat(),
+                "summary",
+                None,
+                Jsonb(payload),
+            )
+        )
+        with self._lock, self._connect() as conn, conn.cursor() as cur:
+            cur.executemany(
+                sql.SQL(
+                    """
+                    insert into {} (audit_id, seq, event_ts, event_type, text, payload)
+                    values (%s, %s, %s, %s, %s, %s)
+                    on conflict (audit_id, seq)
+                    do update set
+                      event_ts = excluded.event_ts,
+                      event_type = excluded.event_type,
+                      text = excluded.text,
+                      payload = excluded.payload
+                    """
+                ).format(self._table("trace_events")),
+                rows,
+            )
+
+    def record_feedback(self, record: dict) -> None:
+        from psycopg import sql
+
+        payload = redact_sensitive_value(dict(record))
+        with self._lock, self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                sql.SQL(
+                    """
+                    insert into {} (
+                      audit_id, feedback_type, user_id, channel_id, thread_ts, created_at
+                    )
+                    values (%s, %s, %s, %s, %s, %s)
+                    """
+                ).format(self._table("feedback")),
+                (
+                    payload.get("audit_id"),
+                    payload.get("feedback_type"),
+                    payload.get("user"),
+                    payload.get("channel"),
+                    payload.get("thread_ts"),
+                    payload.get("ts"),
+                ),
+            )
+
+
 class BotAuditLogger:
     """Append-only local audit and feedback logs.
 
@@ -1517,8 +1768,16 @@ class BotAuditLogger:
     Records are operational evidence, not source artifacts.
     """
 
-    def __init__(self, state_dir: str) -> None:
+    def __init__(
+        self,
+        state_dir: str,
+        database_url: str = "",
+        database_schema: str = DEFAULT_AUDIT_SCHEMA,
+    ) -> None:
         self.state_dir = Path(state_dir).expanduser()
+        self.db_sink: PostgresAuditSink | None = None
+        if database_url:
+            self.db_sink = PostgresAuditSink(database_url, database_schema)
 
     def _date_key(self, dt: datetime) -> str:
         kst = dt.astimezone(timezone(timedelta(hours=9)))
@@ -1543,6 +1802,11 @@ class BotAuditLogger:
             dt = datetime.now(timezone.utc)
         payload = redact_sensitive_value(dict(record))
         self._append_jsonl(f"audit/{self._date_key(dt)}.jsonl", payload)
+        if self.db_sink is not None:
+            try:
+                self.db_sink.record_turn(payload)
+            except Exception:  # noqa: BLE001 - DB must not hide Slack delivery
+                LOG.exception("failed to write turn audit to Postgres")
 
     def record_trace(self, channel: str, thread_ts: str, trace: list[str], summary: dict) -> None:
         key = safe_state_key(channel, thread_ts)
@@ -1555,14 +1819,17 @@ class BotAuditLogger:
                     "line": redact_sensitive_text(line),
                 },
             )
-        self._append_jsonl(
-            f"traces/{key}.jsonl",
-            redact_sensitive_value({
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "type": "summary",
-                **summary,
-            }),
-        )
+        summary_record = redact_sensitive_value({
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "type": "summary",
+            **summary,
+        })
+        self._append_jsonl(f"traces/{key}.jsonl", summary_record)
+        if self.db_sink is not None:
+            try:
+                self.db_sink.record_trace(trace, summary_record)
+            except Exception:  # noqa: BLE001
+                LOG.exception("failed to write trace audit to Postgres")
 
     def record_feedback(
         self,
@@ -1573,17 +1840,21 @@ class BotAuditLogger:
         channel: str,
         thread_ts: str,
     ) -> None:
-        self._append_jsonl(
-            f"feedback/{self._date_key(datetime.now(timezone.utc))}.jsonl",
-            {
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "audit_id": audit_id,
-                "feedback_type": feedback_type,
-                "user": user,
-                "channel": channel,
-                "thread_ts": thread_ts,
-            },
-        )
+        record = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "audit_id": audit_id,
+            "feedback_type": feedback_type,
+            "user": user,
+            "channel": channel,
+            "thread_ts": thread_ts,
+        }
+        payload = redact_sensitive_value(record)
+        self._append_jsonl(f"feedback/{self._date_key(datetime.now(timezone.utc))}.jsonl", payload)
+        if self.db_sink is not None:
+            try:
+                self.db_sink.record_feedback(payload)
+            except Exception:  # noqa: BLE001
+                LOG.exception("failed to write feedback audit to Postgres")
 
 
 def section_block(text: str) -> dict:
@@ -2098,6 +2369,25 @@ def handle_turn(
         if result.bad_json_lines:
             audit_footer += f" · malformed_lines={result.bad_json_lines}"
 
+        trace_summary = {
+            "audit_id": audit_id,
+            "ok": result.ok,
+            "cancelled": result.cancelled,
+            "footer": audit_footer,
+            "trace_line_count": len(result.trace),
+        }
+
+        def record_trace_audit() -> None:
+            try:
+                audit_logger.record_trace(
+                    channel,
+                    thread_ts,
+                    result.trace,
+                    trace_summary,
+                )
+            except Exception:  # noqa: BLE001 - audit must not hide the answer
+                LOG.exception("failed to record trace audit")
+
         audit_common = {
             "audit_id": audit_id,
             "created_at": turn_started_at.isoformat(),
@@ -2113,6 +2403,7 @@ def handle_turn(
             "claude_turns": result.num_turns,
             "claude_duration_ms": result.duration_ms,
             "claude_cost_usd_equivalent": result.total_cost_usd,
+            "bq_billed_bytes": scan.bytes_billed,
             "bq_gib": scan.gib,
             "bq_usd": scan.usd,
             "bq_jobs": scan.jobs,
@@ -2120,20 +2411,6 @@ def handle_turn(
             "permission_denials": result.permission_denials,
             "bad_json_lines": result.bad_json_lines,
         }
-        try:
-            audit_logger.record_trace(
-                channel,
-                thread_ts,
-                result.trace[-TRACE_MAX_LINES:],
-                {
-                    "audit_id": audit_id,
-                    "ok": result.ok,
-                    "cancelled": result.cancelled,
-                    "footer": audit_footer,
-                },
-            )
-        except Exception:  # noqa: BLE001 - audit must not hide the answer
-            LOG.exception("failed to record trace audit")
 
         if result.cancelled:
             elapsed_ms = int((datetime.now(timezone.utc) - turn_started_at).total_seconds() * 1000)
@@ -2151,6 +2428,7 @@ def handle_turn(
                 )
             except Exception:  # noqa: BLE001
                 LOG.exception("failed to record cancelled turn audit")
+            record_trace_audit()
             return
 
         if not result.ok:
@@ -2165,6 +2443,7 @@ def handle_turn(
                 )
             except Exception:  # noqa: BLE001
                 LOG.exception("failed to record failed turn audit")
+            record_trace_audit()
             return
 
         raw_body = result.final_text.strip() or "\n\n".join(chunks_of_text).strip() or "_(빈 응답)_"
@@ -2202,6 +2481,7 @@ def handle_turn(
                 )
             except Exception:  # noqa: BLE001
                 LOG.exception("failed to record delivery error audit")
+            record_trace_audit()
             return
         try:
             audit_logger.record_turn(
@@ -2212,9 +2492,49 @@ def handle_turn(
             )
         except Exception:  # noqa: BLE001
             LOG.exception("failed to record successful turn audit")
+        record_trace_audit()
 
 
 # --- Preflight --------------------------------------------------------------
+def audit_database_status(cfg: Config) -> tuple[str, list[str]]:
+    if not cfg.audit_database_url:
+        return "disabled", []
+    blockers: list[str] = []
+    try:
+        schema = validate_audit_schema(cfg.audit_schema)
+    except ValueError as exc:
+        return "blocked (invalid schema)", [str(exc)]
+    try:
+        import psycopg  # noqa: F401
+    except ImportError:
+        return (
+            "blocked (psycopg missing)",
+            ["ANALYST_AUDIT_DATABASE_URL 이 설정됐지만 psycopg 를 import 할 수 없습니다."],
+        )
+
+    try:
+        sink = PostgresAuditSink(cfg.audit_database_url, schema)
+        with sink._connect() as conn, conn.cursor() as cur:
+            cur.execute("select 1")
+            missing: list[str] = []
+            for table in AUDIT_DB_TABLES:
+                cur.execute("select to_regclass(%s)", (f"{schema}.{table}",))
+                if cur.fetchone()[0] is None:
+                    missing.append(table)
+            if missing:
+                blockers.append(
+                    "audit DB schema/table 이 없습니다. "
+                    f"scripts/analyst_audit_schema.sql 을 audit DB에서 실행하세요. missing={missing}"
+                )
+                return f"blocked ({schema} missing tables: {', '.join(missing)})", blockers
+    except Exception as exc:  # noqa: BLE001
+        return (
+            "blocked (connection failed)",
+            [f"audit DB 연결 확인 실패: {truncate_line(str(exc), 180)}"],
+        )
+    return f"configured ({describe_database_url(cfg.audit_database_url)}, schema={schema})", []
+
+
 def preflight(cfg: Config) -> tuple[list[str], dict]:
     """Return (blockers, resolved-config-summary). Never raises."""
     blockers: list[str] = []
@@ -2244,6 +2564,9 @@ def preflight(cfg: Config) -> tuple[list[str], dict]:
         blockers.append(f"analysis 스킬이 없습니다: {skill}")
     if not (key.is_file() and os.access(key, os.R_OK)):
         blockers.append(f"GCP 키를 읽을 수 없습니다: {key}")
+
+    audit_db_status, audit_db_blockers = audit_database_status(cfg)
+    blockers.extend(audit_db_blockers)
 
     metabase_status = "disabled"
     metabase_config_file = ""
@@ -2309,6 +2632,11 @@ def preflight(cfg: Config) -> tuple[list[str], dict]:
         except (OSError, subprocess.SubprocessError) as exc:  # pragma: no cover
             blockers.append(f"gcloud 계정 확인 실패: {exc}")
 
+    try:
+        audit_schema_summary = validate_audit_schema(cfg.audit_schema)
+    except ValueError:
+        audit_schema_summary = f"invalid ({cfg.audit_schema})"
+
     summary = {
         "repo_dir": str(repo),
         "state_dir": str(Path(cfg.state_dir).expanduser()),
@@ -2335,6 +2663,8 @@ def preflight(cfg: Config) -> tuple[list[str], dict]:
         "metabase_api_key": "set" if cfg.metabase_api_key else "MISSING",
         "metabase_collection": cfg.metabase_collection_name,
         "metabase_mcp_config": metabase_config_file or "<not written>",
+        "audit_database": audit_db_status,
+        "audit_schema": audit_schema_summary,
         "project_transcript_dir": str(
             Path.home() / ".claude" / "projects" / encode_project_dir(cfg.repo_dir)
         ),
@@ -2494,7 +2824,11 @@ def start_listener(cfg: Config) -> None:
 
     registry = SessionRegistry(cfg.max_workers)
     active_turns = ActiveTurnRegistry()
-    audit_logger = BotAuditLogger(cfg.state_dir)
+    audit_logger = BotAuditLogger(
+        cfg.state_dir,
+        database_url=cfg.audit_database_url,
+        database_schema=cfg.audit_schema,
+    )
     previous_signal_handlers: dict[int, object] = {}
 
     def request_shutdown(signum, _frame) -> None:  # noqa: ANN001
@@ -2792,6 +3126,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="봇이 생성 카드/대시보드를 우선 저장할 Metabase 컬렉션 이름",
     )
+    parser.add_argument(
+        "--audit-schema",
+        default=None,
+        help=f"Postgres/RDS audit schema 이름. 기본: {DEFAULT_AUDIT_SCHEMA}",
+    )
     parser.add_argument("--dry-run", action="store_true", help="사전 점검 후 설정만 출력하고 종료")
     parser.add_argument("--self-test", action="store_true", help="Slack 없이 세션 생성/재개 검증")
     return parser.parse_args(argv)
@@ -2831,6 +3170,8 @@ def main() -> None:
             args.metabase_collection_name
             or os.environ.get("ANALYST_METABASE_COLLECTION_NAME", "BDA 데이터 플랫폼")
         ),
+        audit_database_url=os.environ.get(AUDIT_DATABASE_URL_ENV, ""),
+        audit_schema=args.audit_schema or os.environ.get(AUDIT_SCHEMA_ENV, DEFAULT_AUDIT_SCHEMA),
     )
 
     if args.dry_run:

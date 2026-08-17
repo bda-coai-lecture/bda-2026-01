@@ -38,7 +38,9 @@ uv run --with slack-bolt --with google-cloud-bigquery python scripts/slack_analy
 `--headless`(TTY 없는 실행 모드 표시) · `--log-level`(기본 INFO, Docker/headless에서도 로그 유지) ·
 `--enable-metabase-mcp`(선택, `METABASE_URL`/`METABASE_API_KEY` 필요) ·
 `--metabase-public-url`(선택, Docker 내부 URL 대신 Slack에 노출할 브라우저 URL) ·
-`--metabase-collection-name`(기본 `BDA 데이터 플랫폼`)
+`--metabase-collection-name`(기본 `BDA 데이터 플랫폼`) ·
+`ANALYST_AUDIT_DATABASE_URL`(선택, 별도 Postgres/RDS audit 저장. 설정법은
+`docs/analyst_bot_postgres_audit.md`)
 
 ## 2. 검증된 현재 상태
 
@@ -96,7 +98,7 @@ Metabase 실제 카드 생성 canary, 응답 시간·재질문율 같은 효과 
 | `SLACK_ANALYST_BOT_TOKEN` (.env) | 분석 봇 `xoxb-` | 알림 앱과 **같은 앱**(bot_id `B0B76RVQA66`) |
 | `SLACK_ANALYST_APP_TOKEN` (.env) | Socket Mode `xapp-` | `connections:write`. app_id `A0B6RBYRZ4P` |
 | `SLACK_BOT_TOKEN` (.env) | Airflow 알림 | 같은 앱이라 위 스코프를 **함께 얻었다** — 아래 경고 |
-| `secrets/analyst-bq-key.json` | 봇 BigQuery | `bda-analyst-ro@bda-coai...`, mode 600, gitignore |
+| `secrets/analyst-bq-key.json` | 봇 BigQuery | `bda-analyst-ro@bda-coai...`, mode 600, gitignore. `roles/bigquery.jobUser` + read 대상 dataset 권한 + `projects/bda-coai/roles/analystBotJobMetadataViewer` |
 | `secrets/gcloud-analyst/` | `bq` 경로 전용 gcloud 설정 | 읽기 전용 SA만 활성화. `child_env()`가 `CLOUDSDK_CONFIG`로 **강제 주입**. 재생성 명령은 6절 |
 | `gcp-key.json` (심볼릭 링크) | 운영자·Airflow | `dane-gcp@...`, **`roles/owner` 보유**. 봇은 쓰지 않는다 |
 | Anthropic | 호스트 로그인 | `dane@clobe.com`, Max 구독 |
@@ -137,6 +139,8 @@ Slack 멘션 → 스레드 키 (channel, thread_ts)
 | `scripts/slack_analyst_bot.py` | Slack Socket Mode 러너 |
 | `.claude/skills/analysis/` | 분석 절차 정본 (SKILL.md + references 5종) |
 | `docs/analyst_bot_demo_runbook.md` | 짧은 실행·시연·문제 확인 절차 |
+| `docs/analyst_bot_postgres_audit.md` | 별도 Postgres/RDS audit 테이블 저장 설계와 설정 |
+| `docs/analyst_bot_feedback_loop_lecture.html` | 강의용 자료 — 데이터 흐름과 피드백 루프 |
 | `docs/analysis_workflow_review.md` | 외부 워크플로우 적용 판정 근거 |
 | `docs/analysis_testset.md` | 채점 문제집 8개 + 실측 기준선 |
 | `docs/analyst_bot_testcases.md` | 봇 러너 TC — Slack·세션·권한·비용·출력 계약 |
@@ -278,6 +282,10 @@ fast path가 필요하다.
   `metrics_user_retention_weekly`는 `metrics_user_lifecycle_weekly`의 `select *` 별칭이다.
 - **`roles/bigquery.user`는 읽기 전용이 아니다.** `datasets.create`를 포함해
   봇이 만든 데이터셋의 OWNER가 된다. `jobUser`가 맞는 role이다.
+- **BigQuery 사용량 audit에는 `bigquery.jobs.list`가 필요하다.** 내장
+  `roles/bigquery.resourceViewer`는 `jobs.listAll`까지 포함하므로 넓다. 프로젝트 custom role
+  `analystBotJobMetadataViewer`에 `bigquery.jobs.list` 하나만 넣고,
+  봇은 `INFORMATION_SCHEMA.JOBS_BY_USER`로 자기 job만 집계한다.
 - **`gcloud`는 `GOOGLE_APPLICATION_CREDENTIALS`를 무시한다.** 별도로 인증된 계정을 쓴다.
 - **`BIGQUERY_MAXIMUM_BYTES_BILLED`는 `bq`에 안 먹는다.** 그 환경변수는 **Python 클라이언트만** 읽고
   `bq` CLI는 완전히 무시한다. 2026-07-26 실측: 10 GiB 상한을 env로 걸고 dry run 18.4 GB짜리
